@@ -1,7 +1,7 @@
 using HT.ResourceMapper.Client.Utils;
-using HT.ResourceMapper.UI.Client.Pages;
 using HT.ResourceMapper.UI.Components;
 using Microsoft.FluentUI.AspNetCore.Components;
+using Serilog;
 
 namespace HT.ResourceMapper.UI
 {
@@ -10,6 +10,10 @@ namespace HT.ResourceMapper.UI
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+
+            // Configure Serilog for ILogger<T> injection
+            builder.Host.UseSerilog((context, configuration) =>
+                configuration.ReadFrom.Configuration(context.Configuration));
 
             // Add services to the container.
             builder.Services.AddRazorComponents()
