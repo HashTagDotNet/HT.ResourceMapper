@@ -1,4 +1,6 @@
 <Solution>
+  <Folder Name="/Libraries/" />
+  <Folder Name="/Libraries/ApiContracts/" />
   <Folder Name="/Modules/">
     <Project Path="Modules/HT.ResourceMapper.Client/HT.ResourceMapper.Client.csproj" Id="96a3abba-114d-4656-ab8f-f28279eebd28" />
     <Project Path="Modules/HT.ResourceMapper.Server/HT.ResourceMapper.Server.csproj" Id="106e5877-93f6-4e7f-af20-402552a5472e" />
@@ -6,6 +8,6 @@
   </Folder>
   <Folder Name="/UI/">
     <Project Path="UI/HT.ResourceMapper.UI/HT.ResourceMapper.UI.Client/HT.ResourceMapper.UI.Client.csproj" Id="e46b82f2-aa59-451b-be11-1c1f443df03f" />
-    <Project Path="UI/HT.ResourceMapper.UI/HT.ResourceMapper.UI/HT.ResourceMapper.UI.csproj" Id="4c98f7e4-298f-42a4-b740-5809d3f332ee" />
+    <Project Path="UI/HT.ResourceMapper.UI/HT.ResourceMapper.UI/HT.ResourceMapper.UI.Server.csproj" Id="4c98f7e4-298f-42a4-b740-5809d3f332ee" />
   </Folder>
 </Solution>

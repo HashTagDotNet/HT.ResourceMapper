@@ -1,6 +1,3 @@
-using HT.ResourceMapper.Client.Utils;
-using HT.ResourceMapper.UI.Components;
-using Microsoft.FluentUI.AspNetCore.Components;
 using Serilog;
 
 namespace HT.ResourceMapper.UI
@@ -12,13 +9,8 @@ namespace HT.ResourceMapper.UI
             var builder = WebApplication.CreateBuilder(args);
 
             // Configure Serilog for ILogger<T> injection
-            builder.Host.UseSerilog((context, configuration) =>
-                configuration.ReadFrom.Configuration(context.Configuration));
-
-            // Add services to the container.
-            builder.Services.AddRazorComponents()
-                .AddInteractiveWebAssemblyComponents();
-            builder.Services.AddFluentUIComponents();
+            //builder.Host.UseSerilog((context, configuration) =>
+            //    configuration.ReadFrom.Configuration(context.Configuration));
 
             var app = builder.Build();
 
@@ -29,20 +21,21 @@ namespace HT.ResourceMapper.UI
             }
             else
             {
-                app.UseExceptionHandler("/Error");
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }
 
             app.UseHttpsRedirection();
+            
+            // This serves the WebAssembly framework files (_framework/*)
+            app.UseBlazorFrameworkFiles();
+            // This serves static files from wwwroot folders
+            app.UseStaticFiles();
+            
+            app.UseRouting();
 
-            app.UseAntiforgery();
-
-            app.MapStaticAssets();
-            app.MapRazorComponents<App>()
-                .AddInteractiveWebAssemblyRenderMode()
-                .AddAdditionalAssemblies(typeof(Client._Imports).Assembly,
-                typeof(DependencyInjectorMapper).Assembly);
+            // Fallback for client-side routing - this is crucial for WebAssembly
+            app.MapFallbackToFile("index.html");
 
             app.Run();
         }
