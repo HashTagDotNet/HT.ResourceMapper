@@ -1,11 +1,37 @@
 <Solution>
-  <Folder Name="/Modules/">
-    <Project Path="Modules/HT.ResourceMapper.Client/HT.ResourceMapper.Client.csproj" Id="96a3abba-114d-4656-ab8f-f28279eebd28" />
-    <Project Path="Modules/HT.ResourceMapper.Server/HT.ResourceMapper.Server.csproj" Id="106e5877-93f6-4e7f-af20-402552a5472e" />
-    <Project Path="Modules/HT.ResourceMapper.Shared/HT.ResourceMapper.Shared.csproj" Id="106c657d-ba3b-4072-8f5b-02b3349c758d" />
+  <Folder Name="/Database/">
+    <Project Path="Database/HTServices/HTServices.sqlproj" Type="42ea0dbd-9cf1-443e-919e-be9c484e4577" />
+  </Folder>
+  <Folder Name="/Libraries/" />
+  <Folder Name="/Libraries/ApiContracts/">
+    <Project Path="Libraries/ApiContracts/HT.ApiContracts/HT.ApiContracts.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/Collections/">
+    <Project Path="Libraries/Collections/HT.Collections/HT.Collections.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/Configuration/">
+    <Project Path="Libraries/Configuration/HT.Microsoft.IConfiguration.Extensions/HT.Microsoft.IConfiguration.Extensions.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/Logging/">
+    <Project Path="Libraries/Logging/HT.Microsoft.ILogger.Extensions/HT.Microsoft.ILogger.Extensions.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/SqlClient/">
+    <Project Path="Libraries/SqlClient/HT.Microsoft.SqlClient.Abstractions/HT.Microsoft.SqlClient.Extensions.Abstractions.csproj" />
+    <Project Path="Libraries/SqlClient/HT.Microsoft.SqlClient.Extensions/HT.Microsoft.SqlClient.Extensions.csproj" />
+  </Folder>
+  <Folder Name="/Modules/" />
+  <Folder Name="/Modules/Common/">
+    <Project Path="Modules/Common/ResourceMapper.Common.Client/ResourceMapper.Common.Client.csproj" />
+    <Project Path="Modules/Common/ResourceMapper.Common.Server/ResourceMapper.Common.Server.csproj" />
+    <Project Path="Modules/Common/ResourceMapper.Common.Shared/ResourceMapper.Common.Shared.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Feature1/">
+    <Project Path="Modules/Feature1/ResourceMapper.Feature1.Client/ResourceMapper.Feature1.Client.csproj" />
+    <Project Path="Modules/Feature1/ResourceMapper.Feature1.Server/ResourceMapper.Feature1.Server.csproj" />
+    <Project Path="Modules/Feature1/ResourceMapper.Feature1.Shared/ResourceMapper.Feature1.Shared.csproj" />
   </Folder>
   <Folder Name="/UI/">
-    <Project Path="UI/HT.ResourceMapper.UI/HT.ResourceMapper.UI.Client/HT.ResourceMapper.UI.Client.csproj" Id="e46b82f2-aa59-451b-be11-1c1f443df03f" />
-    <Project Path="UI/HT.ResourceMapper.UI/HT.ResourceMapper.UI/HT.ResourceMapper.UI.csproj" Id="4c98f7e4-298f-42a4-b740-5809d3f332ee" />
+    <Project Path="UI/ResourceMapper.UI.Client/ResourceMapper.UI.Client.csproj" />
+    <Project Path="UI/ResourceMapper.UI.Server/ResourceMapper.UI.Server.csproj" />
   </Folder>
 </Solution>

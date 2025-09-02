@@ -1,0 +1,15 @@
+﻿@inherits LayoutComponentBase
+
+<FluentDesignTheme />
+
+<FluentStack Orientation="Orientation.Vertical" Style="height: 100vh;">
+    <FluentHeader Style="padding: 16px 24px; background: var(--accent-fill-rest);">
+        <FluentLabel Typo="Typography.H3" Style="color: white; margin: 0;">
+            ResourceMapper
+        </FluentLabel>
+    </FluentHeader>
+    
+    <FluentMain Style="flex: 1; padding: 24px;">
+        @Body
+    </FluentMain>
+</FluentStack>

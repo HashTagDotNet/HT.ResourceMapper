@@ -1,0 +1,34 @@
+﻿@page "/"
+
+<PageTitle>Home</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="32">
+    <div>
+        <FluentLabel Typo="Typography.PageTitle">Welcome to ResourceMapper</FluentLabel>
+        <FluentLabel Typo="Typography.Body">A Blazor WebAssembly application with Fluent UI and modular architecture.</FluentLabel>
+    </div>
+
+    <FluentCard Style="max-width: 600px;">
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="16" Style="padding: 24px;">
+            <FluentLabel Typo="Typography.Subject">Server Date & Time</FluentLabel>
+            
+            <DateTimeDisplay @ref="dateTimeDisplay" />
+            
+            <FluentButton Appearance="Appearance.Accent" @onclick="RefreshDateTime">
+                🔄 Refresh
+            </FluentButton>
+        </FluentStack>
+    </FluentCard>
+</FluentStack>
+
+@code {
+    private DateTimeDisplay? dateTimeDisplay;
+
+    private async Task RefreshDateTime()
+    {
+        if (dateTimeDisplay != null)
+        {
+            await dateTimeDisplay.RefreshAsync();
+        }
+    }
+}
