@@ -8,19 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="Properties\wwwroot\app.css" />
-    <Content Include="Properties\wwwroot\favicon.ico" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\..\Modules\HT.ResourceMapper.Server\HT.ResourceMapper.Server.csproj" />
     <ProjectReference Include="..\HT.ResourceMapper.UI.Client\HT.ResourceMapper.UI.Client.csproj" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="9.0.8" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components" Version="4.12.1" />
-    <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components.Icons" Version="4.12.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="9.0.8" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.4" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
