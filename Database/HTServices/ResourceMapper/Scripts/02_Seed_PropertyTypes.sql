@@ -10,14 +10,14 @@
 --AS
 --BEGIN
 --    UPDATE TOP(1)
---        [HTResourceMapper].PropertyTypes
+--        [HT.ResourceMapper].PropertyTypes
 --    SET
 --        PropertyCode = @PropertyCode
 --    WHERE
 --        PropertyTypeId = @PropertyTypeId
 --    IF @@ROWCOUNT = 0
 --    BEGIN
---        INSERT INTO [HTResourceMapper].PropertyTypes (
+--        INSERT INTO [HT.ResourceMapper].PropertyTypes (
 --            PropertyTypeId,
 --            PropertyCode
 --        ) VALUES (
@@ -31,7 +31,7 @@
 --EXEC #SeedPropertyType @PropertyTypeId=0, @PropertyCode='Text'
 --EXEC #SeedPropertyType @PropertyTypeId=1, @PropertyCode='Link'
 
---SELECT * FROM [HTResourceMapper].PropertyTypes
+--SELECT * FROM [HT.ResourceMapper].PropertyTypes
 --ROLLBACK
 ----COMMIT
 --GO

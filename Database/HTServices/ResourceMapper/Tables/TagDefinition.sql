@@ -1,4 +1,4 @@
-﻿CREATE TABLE [HTResourceMapper].[TagDefinition]
+﻿CREATE TABLE [HT.ResourceMapper].[TagDefinition]
 (
     [TagDefinitionId] INT NOT NULL IDENTITY(1,1)
         CONSTRAINT [PK_TagDefinitons_TagDefinitionId] PRIMARY KEY (TagDefinitionId)
@@ -7,7 +7,7 @@
     ,[TagDefinitionKey] NVARCHAR(50) NOT NULL
         CONSTRAINT [UK_TagDefinition_TagDefinitionKey] UNIQUE (TagDefinitionKey)
     ,[TagContentTypeId] INT NOT NULL
-        CONSTRAINT [FK_TagDefinition_TagContentTypeId] FOREIGN KEY (TagContentTypeId) REFERENCES [HTResourceMapper].TagContentType(TagContentTypeId)
+        CONSTRAINT [FK_TagDefinition_TagContentTypeId] FOREIGN KEY (TagContentTypeId) REFERENCES [HT.ResourceMapper].TagContentType(TagContentTypeId)
     ,[AllowCustomValue] BIT NOT NULL
         CONSTRAINT [DF_TagDefinition_AllowCustomValue] DEFAULT (1)
     ,[IsMultiValued] BIT NOT NULL

@@ -19,14 +19,14 @@
 --AS
 --BEGIN
 --    UPDATE TOP(1)
---        [HTResourceMapper].TagContentType
+--        [HT.ResourceMapper].TagContentType
 --    SET
 --        TagCode = @TagCode
 --    WHERE
 --        TagContentTypeId = @TagTypeId
 --    IF @@ROWCOUNT = 0
 --    BEGIN
---        INSERT INTO [HTResourceMapper].TagContentType (
+--        INSERT INTO [HT.ResourceMapper].TagContentType (
 --            TagContentTypeId,
 --            TagCode
 --        ) VALUES (
@@ -42,10 +42,10 @@
 --) AS
 --BEGIN
 --    DECLARE @ResourceTypeId INT
---    SELECT TOP(1) @ResourceTypeId=ResourceTypeId FROM [HTResourceMapper].ResourceType WHERE TypeName = @TypeName
+--    SELECT TOP(1) @ResourceTypeId=ResourceTypeId FROM [HT.ResourceMapper].ResourceType WHERE TypeName = @TypeName
 --    IF @ResourceTypeId IS NULL
 --    BEGIN
---        INSERT INTO [HTResourceMapper].[ResourceType] (
+--        INSERT INTO [HT.ResourceMapper].[ResourceType] (
 --            AllowCustomTags
 --            , ResourceTypeUid
 --            , TypeName
@@ -60,7 +60,7 @@
 --        RETURN
 --    END
 --    UPDATE TOP(1)
---        [HTResourceMapper].[ResourceType]
+--        [HT.ResourceMapper].[ResourceType]
 --    SET
 --        AllowCustomTags = @AllowCustomTags
 --        , UpdatedOn = SYSUTCDATETIME()
@@ -78,11 +78,11 @@
 --) AS
 --BEGIN
 --    DECLARE @TagDefinitonId INT, @ContentTypeId INT
---    SELECT TOP(1) @TagDefinitonId = TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = @TagKey
---	SELECT TOP(1) @ContentTypeId = TagContentTypeId FROM [HTResourceMapper].[TagContentType] WHERE TagCode = @ValueContentType
+--    SELECT TOP(1) @TagDefinitonId = TagDefinitionId FROM [HT.ResourceMapper].[TagDefinition] WHERE TagDefinitionKey = @TagKey
+--	SELECT TOP(1) @ContentTypeId = TagContentTypeId FROM [HT.ResourceMapper].[TagContentType] WHERE TagCode = @ValueContentType
 --    IF @TagDefinitonId IS NULL
 --    BEGIN
---       INSERT INTO [HTResourceMapper].[TagDefinition] (
+--       INSERT INTO [HT.ResourceMapper].[TagDefinition] (
 --            TagDefinitionUid
 --            , TagDefinitionKey
 --            , TagContentTypeId
@@ -107,7 +107,7 @@
 --       RETURN
 --    END
 --    UPDATE TOP(1)
---        [HTResourceMapper].[TagDefinition]
+--        [HT.ResourceMapper].[TagDefinition]
 --    SET
 --        TagContentTypeId = @ContentTypeId
 --        , AllowCustomValue = @AllowCustomValues
@@ -127,18 +127,18 @@
 --) AS
 --BEGIN
 --    DECLARE @ResourceTypeId INT, @TagId INT, @ResourceTypeTagId INT
---    SELECT TOP(1) @ResourceTypeId = ResourceTypeId FROM [HTResourceMapper].[ResourceType] WHERE TypeName = @ResourceTypeKey
---    SELECT TOP(1) @TagId = TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = @TagKey
+--    SELECT TOP(1) @ResourceTypeId = ResourceTypeId FROM [HT.ResourceMapper].[ResourceType] WHERE TypeName = @ResourceTypeKey
+--    SELECT TOP(1) @TagId = TagDefinitionId FROM [HT.ResourceMapper].[TagDefinition] WHERE TagDefinitionKey = @TagKey
 
 --    IF @ResourceTypeId IS NULL OR @TagId IS NULL
 --    BEGIN
 --        RETURN
 --    END
---    SELECT TOP(1) @ResourceTypeTagId = ResourceTypeTagId FROM [HTResourceMapper].[ResourceTypeTag] WHERE
+--    SELECT TOP(1) @ResourceTypeTagId = ResourceTypeTagId FROM [HT.ResourceMapper].[ResourceTypeTag] WHERE
 --        ResourceTypeId = @ResourceTypeId AND TagDefintionId = @TagId
 --    IF @ResourceTypeTagId IS NULL
 --    BEGIN
---        INSERT INTO [HTResourceMapper].[ResourceTypeTag] (
+--        INSERT INTO [HT.ResourceMapper].[ResourceTypeTag] (
 
 --            TagDefintionId
 --			,ResourceTypeId
@@ -150,7 +150,7 @@
 --        )
 --    END
 --    UPDATE TOP(1)
---        [HTResourceMapper].[ResourceTypeTag]
+--        [HT.ResourceMapper].[ResourceTypeTag]
 --    SET
 --        IsTagRequired = @IsTagRequired
 --    WHERE
@@ -165,12 +165,12 @@
 --) AS
 --BEGIN
 --    DECLARE @ResourceId INT,@ResourceTypeId INT
---    SELECT TOP(1) @ResourceId = ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = @ResourceKey
---    SELECT TOP(1) @ResourceTypeId=ResourceTypeId FROM [HTResourceMapper].[ResourceType] WHERE TypeName = @ResourceTypeKey
+--    SELECT TOP(1) @ResourceId = ResourceId FROM [HT.ResourceMapper].[Resource] WHERE ResourceKey = @ResourceKey
+--    SELECT TOP(1) @ResourceTypeId=ResourceTypeId FROM [HT.ResourceMapper].[ResourceType] WHERE TypeName = @ResourceTypeKey
 
 --    IF @ResourceId IS NULL 
 --    BEGIN
---        INSERT INTO [HTResourceMapper].[Resource] (
+--        INSERT INTO [HT.ResourceMapper].[Resource] (
 --            ResourceUid
 --            ,ResourceKey
 --            ,ResourceName
@@ -190,7 +190,7 @@
 --        RETURN
 --    END
 --    UPDATE TOP(1)
---        [HTResourceMapper].[Resource]
+--        [HT.ResourceMapper].[Resource]
 --    SET
 --        ResourceName = COALESCE(@ResourceName,@ResourceKey)
 --        ,[Description] = @Description
@@ -206,18 +206,18 @@
 --) AS
 --BEGIN
 --    DECLARE @ResourceId INT, @TagId INT, @ResourceTagId INT
---    SELECT TOP(1) @ResourceId = ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = @ResourceKey
---    SELECT TOP(1) @TagId = TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = @TagKey
+--    SELECT TOP(1) @ResourceId = ResourceId FROM [HT.ResourceMapper].[Resource] WHERE ResourceKey = @ResourceKey
+--    SELECT TOP(1) @TagId = TagDefinitionId FROM [HT.ResourceMapper].[TagDefinition] WHERE TagDefinitionKey = @TagKey
 --    IF @ResourceId IS NULL OR @TagId IS NULL
 --    BEGIN        
 --        RETURN
 --    END
---    SELECT TOP(1) @ResourceTagId FROM [HTResourceMapper].[ResourceTag] WHERE
+--    SELECT TOP(1) @ResourceTagId FROM [HT.ResourceMapper].[ResourceTag] WHERE
 --        TagDefinitionId = @TagId AND ResourceId = @ResourceId
 
 --    IF @ResourceTagId IS NULL
 --    BEGIN
---        INSERT INTO [HTResourceMapper].[ResourceTag] (
+--        INSERT INTO [HT.ResourceMapper].[ResourceTag] (
 --            ResourceId
 --            , TagDefinitionId
 --            , TagValue
@@ -232,7 +232,7 @@
 --    END
 
 --    UPDATE TOP(1)
---        [HTResourceMapper].[ResourceTag]
+--        [HT.ResourceMapper].[ResourceTag]
 --    SET
 --        TagValue = @TagValue
 
@@ -246,19 +246,19 @@
 --) AS
 --BEGIN
 --    DECLARE @ResourceId INT, @DependencyResourceId INT, @DependencyId INT
---    SELECT TOP(1) @ResourceId = ResourceId FROM [HTResourceMapper].[Resource] WHERE [ResourceKey] = @ResourceKey 
---    SELECT TOP(1) @DependencyResourceId = ResourceId FROM [HTResourceMapper].[Resource] WHERE [ResourceKey] = @DependsOnKey
+--    SELECT TOP(1) @ResourceId = ResourceId FROM [HT.ResourceMapper].[Resource] WHERE [ResourceKey] = @ResourceKey 
+--    SELECT TOP(1) @DependencyResourceId = ResourceId FROM [HT.ResourceMapper].[Resource] WHERE [ResourceKey] = @DependsOnKey
 --    IF @ResourceId IS NULL OR @DependencyResourceId IS NULL
 --    BEGIN
 --	SELECT
 --		'NULL FOUND'
 --	RETURN
 --    END
---    SELECT TOP(1) @DependencyId = [ResourceDependencyId] FROM [HTResourceMapper].[ResourceDependency] WHERE
+--    SELECT TOP(1) @DependencyId = [ResourceDependencyId] FROM [HT.ResourceMapper].[ResourceDependency] WHERE
 --        ResourceId = @ResourceId AND DependencyResourceId = @DependencyResourceId
 --    IF @DependencyId IS NULL
 --    BEGIN
---        INSERT INTO [HTResourceMapper].[ResourceDependency] (
+--        INSERT INTO [HT.ResourceMapper].[ResourceDependency] (
 --            ResourceId
 --            ,DependencyResourceId
 --            ,CreatedOn
@@ -278,26 +278,26 @@
 --) AS
 --BEGIN
 --	DECLARE @TagDefinitionId INT, @ResourceTagId INT,@IsMultiValued BIT=0,@ResourceId INT
---	SELECT TOP(1) @ResourceId = ResourceId from [HTResourceMapper].[Resource] WHERE ResourceKey = @ResourceKey
+--	SELECT TOP(1) @ResourceId = ResourceId from [HT.ResourceMapper].[Resource] WHERE ResourceKey = @ResourceKey
 --	IF @ResourceId IS NULL
 --	BEGIN
 --		RETURN
 --	END
---	SELECT TOP(1) @TagDefinitionId = TagDefinitionId,@IsMultiValued=IsMultiValued FROM [HTResourceMapper].TagDefinition WHERE TagDefinitionKey = @TagKey
+--	SELECT TOP(1) @TagDefinitionId = TagDefinitionId,@IsMultiValued=IsMultiValued FROM [HT.ResourceMapper].TagDefinition WHERE TagDefinitionKey = @TagKey
 
 --	IF @TagDefinitionId IS NULL -- CREATE TAG DEFINTION IF IT DOESN'T ALREADY EXIST
 --	BEGIN
 --		DECLARE @TagValueTypeId INT
 --		IF CHARINDEX('://',@TagValue) > 0
 --		BEGIN
---			SELECT top(1) @TagValueTypeId = TagContentTypeId FROM [HTResourceMapper].[TagContentType] WHERE TagCode = 'Link'
+--			SELECT top(1) @TagValueTypeId = TagContentTypeId FROM [HT.ResourceMapper].[TagContentType] WHERE TagCode = 'Link'
 --		END
 --		ELSE
 --		BEGIN
---			SELECT top(1) @TagValueTypeId = TagContentTypeId FROM [HTResourceMapper].[TagContentType] WHERE TagCode = 'Text'						
+--			SELECT top(1) @TagValueTypeId = TagContentTypeId FROM [HT.ResourceMapper].[TagContentType] WHERE TagCode = 'Text'						
 --		END
 		
---		INSERT INTO [HTResourceMapper].[TagDefinition] (
+--		INSERT INTO [HT.ResourceMapper].[TagDefinition] (
 --			TagDefinitionUid
 --			,TagDefinitionKey
 --			,TagContentTypeId
@@ -328,14 +328,14 @@
 --		@TagDefinitionId = TagDefinitionId
 --		,@IsMultiValued = IsMultiValued
 --	FROM
---		[HTResourceMapper].[TagDefinition]
+--		[HT.ResourceMapper].[TagDefinition]
 --	WHERE
 --		TagDefinitionKey = @TagKey
 
 --	SELECT TOP(1)
 --		@ResourceTagId = ResourceTagId
 --	FROM
---		[HTResourceMapper].[ResourceTag]
+--		[HT.ResourceMapper].[ResourceTag]
 --	WHERE
 --		ResourceId = @ResourceId
 --	AND
@@ -345,7 +345,7 @@
 --	IF @ResourceTagId IS NULL
 --	BEGIN
 --	--   select 'inserting into resource tag',@tagkey,@tagvalue,@TagDefinitionId 'TAG DEFINTION ID', @IsMultiValued 'MULTI-VALUE', @ResourceTagId 'EXISTING RESOURCE TAG ID'
---		INSERT INTO [HTResourceMapper].[ResourceTag] (
+--		INSERT INTO [HT.ResourceMapper].[ResourceTag] (
 --			ResourceId
 --			,TagDefinitionId
 --			,TagValue
@@ -364,7 +364,7 @@
 --	BEGIN
 --	--select 'updating singleton key',@Tagkey,@tagvalue,@TagDefinitionId 'TAG DEFINTION ID', @IsMultiValued 'MULTI-VALUE', @ResourceTagId 'EXISTING RESOURCE TAG ID',@ResourceId 'resource id'
 --		UPDATE
---			[HTResourceMapper].[ResourceTag]
+--			[HT.ResourceMapper].[ResourceTag]
 --		SET
 --			TagValue = @TagValue
 --		WHERE
@@ -379,14 +379,14 @@
 --		SELECT 
 --			1
 --		FROM
---			[HTResourceMapper].[ResourceTag]
+--			[HT.ResourceMapper].[ResourceTag]
 --		WHERE
 --			TagDefinitionId = @TagDefinitionId
 --		AND
 --			TagValue = @TagValue
 --	) BEGIN
 --	--	selecT 'adding multi-value key',@Tagkey,@tagvalue,@TagDefinitionId 'TAG DEFINTION ID', @IsMultiValued 'MULTI-VALUE', @ResourceTagId 'EXISTING RESOURCE TAG ID',@ResourceId 'resource id'		
---		INSERT INTO [HTResourceMapper].[ResourceTag] (
+--		INSERT INTO [HT.ResourceMapper].[ResourceTag] (
 --			ResourceId
 --			,TagDefinitionId
 --			,TagValue
@@ -402,12 +402,12 @@
 --GO
 --BEGIN TRANSACTION
 --/*
---DELETE [HTResourceMapper].[ResourceDependency]
---DELETE [HTResourceMapper].[ResourceTag]
---DELETE [HTResourceMapper].[Resource]
---DELETE [HTResourceMapper].[ResourceTypeTag]
---DELETE [HTResourceMapper].[TagDefinition]
---DELETE [HTResourceMapper].[TagContentType]
+--DELETE [HT.ResourceMapper].[ResourceDependency]
+--DELETE [HT.ResourceMapper].[ResourceTag]
+--DELETE [HT.ResourceMapper].[Resource]
+--DELETE [HT.ResourceMapper].[ResourceTypeTag]
+--DELETE [HT.ResourceMapper].[TagDefinition]
+--DELETE [HT.ResourceMapper].[TagContentType]
 --*/
 --EXEC #SeedTagType @TagTypeId=0, @TagCode='Text'
 --EXEC #SeedTagType @TagTypeId=1, @TagCode='Link'
@@ -448,9 +448,9 @@
 
 --EXEC #ResourceDependsOn 'dev-visibility-api','dev-access-api'
 
-----SELECT * FROM [HTResourceMapper].[TagContentType]
-----SELECT * FROM [HTResourceMapper].ResourceType
-----SELECT * FROM [HTResourceMapper].TagDefinition
+----SELECT * FROM [HT.ResourceMapper].[TagContentType]
+----SELECT * FROM [HT.ResourceMapper].ResourceType
+----SELECT * FROM [HT.ResourceMapper].TagDefinition
 
 --SELECT 
 --	R.ResourceId
@@ -462,11 +462,11 @@
 --	,TD.TagDefinitionKey 'TagKey'
 --	,RT.TagValue 'TagValue'
 --	,TC.TagCode
---FROM [HTResourceMapper].[Resource] R
---LEFT OUTER JOIN [HTResourceMapper].[ResourceType] RTYPE ON R.ResourceTypeId = RTYPE.ResourceTypeId
---LEFT OUTER JOIN [HTResourceMapper].[ResourceTag] RT  ON R.ResourceId = RT.ResourceId
---LEFT OUTER JOIN [HTResourceMapper].[TagDefinition] TD ON RT.TagDefinitionId = TD.TagDefinitionId
---LEFT OUTER JOIN [HTResourceMapper].[TagContentType] TC ON TD.TagContentTypeId = TC.TagContentTypeId
+--FROM [HT.ResourceMapper].[Resource] R
+--LEFT OUTER JOIN [HT.ResourceMapper].[ResourceType] RTYPE ON R.ResourceTypeId = RTYPE.ResourceTypeId
+--LEFT OUTER JOIN [HT.ResourceMapper].[ResourceTag] RT  ON R.ResourceId = RT.ResourceId
+--LEFT OUTER JOIN [HT.ResourceMapper].[TagDefinition] TD ON RT.TagDefinitionId = TD.TagDefinitionId
+--LEFT OUTER JOIN [HT.ResourceMapper].[TagContentType] TC ON TD.TagContentTypeId = TC.TagContentTypeId
 
 
 
@@ -478,9 +478,9 @@
 --	,DEST.[ResourceName] 'DependsOnResourceName'
 --	,DEST.[Description] 'DependsOnResourceDescription'
 --FROM
---	[HTResourceMapper].[ResourceDependency] RD
---	JOIN [HTResourceMapper].[Resource] R ON RD.ResourceId = R.ResourceId
---	JOIN [HTResourceMapper].[Resource] DEST ON RD.DependencyResourceId = DEST.ResourceId
+--	[HT.ResourceMapper].[ResourceDependency] RD
+--	JOIN [HT.ResourceMapper].[Resource] R ON RD.ResourceId = R.ResourceId
+--	JOIN [HT.ResourceMapper].[Resource] DEST ON RD.DependencyResourceId = DEST.ResourceId
 
 ----ROLLBACK
 --COMMIT

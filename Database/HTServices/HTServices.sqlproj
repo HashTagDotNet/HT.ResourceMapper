@@ -8,4 +8,7 @@
     <RootNamespace>HTServices</RootNamespace>
     <AssemblyName>HTServices</AssemblyName>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="HTServices.publish.xml" />
+  </ItemGroup>
 </Project>

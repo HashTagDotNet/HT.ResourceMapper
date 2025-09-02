@@ -1,4 +1,4 @@
-﻿CREATE TABLE [HTResourceMapper].[TagContentType]
+﻿CREATE TABLE [HT.ResourceMapper].[TagContentType]
 (
     [TagContentTypeId] INT NOT NULL
         CONSTRAINT [PK_TagContentType_TagTypeId] PRIMARY KEY

@@ -1,4 +1,4 @@
-CREATE PROCEDURE [HTResourceMapper].[Resource_Create]
+CREATE PROCEDURE [HT.ResourceMapper].[Resource_Create]
     @ResourceUid VARCHAR(40),
     @ResourceKey NVARCHAR(250),
     @ResourceTypeCode NVARCHAR(250),
@@ -15,11 +15,11 @@ BEGIN
     
     -- Lookup ResourceTypeId by ResourceTypeCode
     SELECT @ResourceTypeId = ResourceTypeId
-    FROM [HTResourceMapper].[ResourceType] WITH(NOLOCK)
+    FROM [HT.ResourceMapper].[ResourceType] WITH(NOLOCK)
     WHERE TypeName = @ResourceTypeCode;
     
     -- Insert the new Resource
-    INSERT INTO [HTResourceMapper].[Resource]
+    INSERT INTO [HT.ResourceMapper].[Resource]
     (
         ResourceUid,
         ResourceKey,
