@@ -1,6 +1,6 @@
 ﻿using System.Runtime.Serialization;
 
-namespace HT.Api.Contracts.Client.Models
+namespace HT.ApiContracts.Client.Models
 {
     /// <summary>
     /// Severity level of the message.  This is not a standard HTTP status code, but a message severity level, similar to log levels.

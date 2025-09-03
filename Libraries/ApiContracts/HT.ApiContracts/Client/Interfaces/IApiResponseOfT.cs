@@ -1,4 +1,4 @@
-﻿namespace HT.Api.Contracts.Client.Interfaces
+﻿namespace HT.ApiContracts.Client.Interfaces
 {
     public interface IApiResponse<TApiData>:IApiResponse where TApiData : class,new()
     {

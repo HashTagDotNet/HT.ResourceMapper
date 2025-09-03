@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 
 // ReSharper disable InconsistentNaming
 
-namespace HT.Msft.ILogger.Extensions
+namespace HT.Microsoft.ILogger.Extensions
 {
     /// <summary>
     /// Logger extensions that provide deconstruction of scope, context on log calls, and log prefixes./// 

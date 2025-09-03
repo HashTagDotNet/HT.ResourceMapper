@@ -2,7 +2,7 @@
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 
-namespace HT.Msft.SqlClient.Extensions.Abstractions.Interfaces
+namespace HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces
 {
     /// <summary>
     /// Returns connections or contexts to a database.  Connection might be open or closed depending on connection type or connection reusable state.

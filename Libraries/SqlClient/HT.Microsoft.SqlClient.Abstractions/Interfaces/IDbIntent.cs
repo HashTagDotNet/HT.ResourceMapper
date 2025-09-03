@@ -2,7 +2,7 @@
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 
-namespace HT.Msft.SqlClient.Extensions.Abstractions.Interfaces
+namespace HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces
 {
     /// <summary>
     /// Generate Read/Write or Read/Only connections to the base

@@ -14,6 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Libraries\ApiContracts\HT.Api.Service.Contracts\HT.Api.Service.Contracts.csproj" />
     <ProjectReference Include="..\..\Libraries\ApiContracts\HT.ApiContracts\HT.ApiContracts.csproj" />
     <ProjectReference Include="..\..\Modules\Feature1\ResourceMapper.Feature1.Server\ResourceMapper.Feature1.Server.csproj" />
     <ProjectReference Include="..\ResourceMapper.UI.Client\ResourceMapper.UI.Client.csproj" />

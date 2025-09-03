@@ -1,11 +1,11 @@
-﻿using HT.Msft.SqlClient.Extensions.Abstractions;
-using HT.Msft.SqlClient.Extensions.Abstractions.Interfaces;
+﻿using HT.Microsoft.SqlClient.Extensions.Abstractions;
+using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 // ReSharper disable InconsistentNaming
 
-namespace HT.Msft.SqlClient.Extensions
+namespace HT.Microsoft.SqlClient.Extensions
 {
     public static class ServiceRegistration
     {

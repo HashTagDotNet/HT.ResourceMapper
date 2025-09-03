@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 // ReSharper disable ArrangeMethodOrOperatorBody
 
-namespace HT.Msft.ILogger.Extensions
+namespace HT.Microsoft.ILogger.Extensions
 {
     // ReSharper disable once InconsistentNaming
 

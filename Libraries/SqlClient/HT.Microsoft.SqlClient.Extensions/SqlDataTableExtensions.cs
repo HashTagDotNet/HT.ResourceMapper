@@ -2,7 +2,7 @@
 using System.Data;
 using System.Text.Json;
 
-namespace HT.Msft.SqlClient.Extensions
+namespace HT.Microsoft.SqlClient.Extensions
 {
     public static class SqlDataTableExtensions
     {

@@ -1,7 +1,7 @@
 ﻿using System;
 using Microsoft.Extensions.Logging;
 
-namespace HT.Msft.ILogger.Extensions
+namespace HT.Microsoft.ILogger.Extensions
 {
     public class LogMessageBuilder
     {

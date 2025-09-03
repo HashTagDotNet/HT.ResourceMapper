@@ -1,6 +1,6 @@
-﻿using HT.Api.Contracts.Client.Models;
+﻿using HT.ApiContracts.Client.Models;
 
-namespace HT.Api.Contracts.Client.Interfaces
+namespace HT.ApiContracts.Client.Interfaces
 {
     public interface IApiResponse
     {

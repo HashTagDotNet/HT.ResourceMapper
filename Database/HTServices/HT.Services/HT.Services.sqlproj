@@ -2,13 +2,10 @@
 <Project DefaultTargets="Build">
   <Sdk Name="Microsoft.Build.Sql" Version="0.2.3-preview" />
   <PropertyGroup>
-    <Name>HTServices</Name>
+    <Name>HT.Services</Name>
     <DSP>Microsoft.Data.Tools.Schema.Sql.Sql160DatabaseSchemaProvider</DSP>
     <ModelCollation>1033, CI</ModelCollation>
-    <RootNamespace>HTServices</RootNamespace>
-    <AssemblyName>HTServices</AssemblyName>
+    <RootNamespace>HT.Services</RootNamespace>
+    <AssemblyName>HT.Services</AssemblyName>
   </PropertyGroup>
-  <ItemGroup>
-    <None Include="HTServices.publish.xml" />
-  </ItemGroup>
 </Project>

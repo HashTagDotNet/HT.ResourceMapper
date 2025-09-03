@@ -2,7 +2,7 @@
 
 // ReSharper disable UnusedMember.Global
 
-namespace HT.Api.Contracts.Client.Models
+namespace HT.ApiContracts.Client.Models
 {
     /// <summary>
     /// https://jsonapi.org/format/#errors

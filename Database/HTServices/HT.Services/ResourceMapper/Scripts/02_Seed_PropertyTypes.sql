@@ -1,0 +1,38 @@
+﻿---- NOTE:  Remember to enable COMMIT below
+--USE [HT.Services]
+--GO
+--DROP PROC IF EXISTS #SeedPropertyType
+--GO
+--CREATE PROC #SeedPropertyType(
+--    @PropertyTypeId INT
+--    ,@PropertyCode VARCHAR(50)
+--)
+--AS
+--BEGIN
+--    UPDATE TOP(1)
+--        [HT.ResourceMapper].PropertyTypes
+--    SET
+--        PropertyCode = @PropertyCode
+--    WHERE
+--        PropertyTypeId = @PropertyTypeId
+--    IF @@ROWCOUNT = 0
+--    BEGIN
+--        INSERT INTO [HT.ResourceMapper].PropertyTypes (
+--            PropertyTypeId,
+--            PropertyCode
+--        ) VALUES (
+--            @PropertyTypeId
+--            ,@PropertyCode
+--        )
+--    END
+--END
+--GO
+
+--EXEC #SeedPropertyType @PropertyTypeId=0, @PropertyCode='Text'
+--EXEC #SeedPropertyType @PropertyTypeId=1, @PropertyCode='Link'
+
+--SELECT * FROM [HT.ResourceMapper].PropertyTypes
+--ROLLBACK
+----COMMIT
+--GO
+--DROP PROC IF EXISTS #SeedPropertyType

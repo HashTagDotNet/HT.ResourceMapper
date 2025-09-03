@@ -1,4 +1,5 @@
 
+using ResourceMapper.Common.Client.Utils;
 using Serilog;
 using ResourceMapper.Feature1.Server.Utils;
 
@@ -19,6 +20,8 @@ builder.Services.AddCors(options =>
     });
 });
 builder.Services.AddFeature1Services();
+builder.Services.RegisterCommonDependencies();
+
 builder.WebHost.UseStaticWebAssets();
 
 var app = builder.Build();

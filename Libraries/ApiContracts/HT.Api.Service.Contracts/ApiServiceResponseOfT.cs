@@ -1,5 +1,5 @@
-﻿using System.Text.Json.Serialization;
-using HT.Api.Contracts.Client.Response;
+﻿using HT.ApiContracts.Client.Models;
+using System.Text.Json.Serialization;
 
 namespace HT.Api.Service.Contracts
 {
@@ -21,11 +21,11 @@ namespace HT.Api.Service.Contracts
         [JsonIgnore]
         public TApiPayload? Data
         {
-            get => ApiResponse?._data;
+            get => ApiResponse?.Data;
 
             set
             {
-                if (ApiResponse != null) ApiResponse._data = value;
+                if (ApiResponse != null) ApiResponse.Data = value;
             }
         }
 

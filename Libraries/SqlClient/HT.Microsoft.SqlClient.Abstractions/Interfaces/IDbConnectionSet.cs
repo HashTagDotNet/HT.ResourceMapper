@@ -1,6 +1,6 @@
 ﻿using Microsoft.Data.SqlClient;
 
-namespace HT.Msft.SqlClient.Extensions.Abstractions.Interfaces
+namespace HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces
 {
 
     /// <summary>

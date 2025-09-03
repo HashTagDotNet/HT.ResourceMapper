@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Data.SqlClient;
 
-namespace HT.Msft.SqlClient.Extensions
+namespace HT.Microsoft.SqlClient.Extensions
 {
     public  static partial class SqlDataReaderExtensions
     {

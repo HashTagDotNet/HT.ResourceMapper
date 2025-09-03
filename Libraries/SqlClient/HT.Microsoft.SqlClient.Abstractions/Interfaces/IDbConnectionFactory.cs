@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 
-namespace HT.Msft.SqlClient.Extensions.Abstractions.Interfaces
+namespace HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces
 {
     /// <summary>
     /// Create, open, and close SQL connections to the database

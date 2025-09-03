@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace HT.Msft.SqlClient.Extensions.Abstractions
+namespace HT.Microsoft.SqlClient.Extensions.Abstractions
 {
     /// <summary>
     /// Settings that determine how application connects to the database

@@ -1,7 +1,7 @@
 ﻿using System.Text.Json.Serialization;
-using HT.Api.Contracts.Client.Interfaces;
+using HT.ApiContracts.Client.Interfaces;
 
-namespace HT.Api.Contracts.Client.Models
+namespace HT.ApiContracts.Client.Models
 {
     public partial class ApiResponse:IApiResponse 
     {

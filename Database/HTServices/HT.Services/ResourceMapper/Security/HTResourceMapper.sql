@@ -1,0 +1,1 @@
+﻿CREATE SCHEMA [HT.ResourceMapper]  AUTHORIZATION [dbo];

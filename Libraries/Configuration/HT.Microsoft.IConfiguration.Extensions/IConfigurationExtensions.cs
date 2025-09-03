@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 
-namespace HT.Msft.IConfiguration.Extensions
+namespace HT.Microsoft.IConfiguration.Extensions
 {
     // ReSharper disable once InconsistentNaming
     public static class IConfigurationExtensions

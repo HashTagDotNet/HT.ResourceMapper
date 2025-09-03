@@ -6,7 +6,7 @@ using Microsoft.Data.SqlClient;
 
 // ReSharper disable InconsistentNaming
 
-namespace HT.Msft.SqlClient.Extensions.Abstractions.Interfaces
+namespace HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces
 {
     /// <summary>
     /// Executes a <see cref="SqlCommand"/> on the database using configured retry parameters.

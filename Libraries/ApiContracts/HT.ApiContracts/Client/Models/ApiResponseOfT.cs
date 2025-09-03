@@ -1,9 +1,9 @@
 ﻿using System.Text.Json.Serialization;
-using HT.Api.Contracts.Client.Interfaces;
+using HT.ApiContracts.Client.Interfaces;
 
 // ReSharper disable InconsistentNaming
 
-namespace HT.Api.Contracts.Client.Models
+namespace HT.ApiContracts.Client.Models
 {
 
     /// <summary>

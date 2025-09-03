@@ -1,11 +1,11 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
-using HT.Msft.SqlClient.Extensions.Abstractions;
-using HT.Msft.SqlClient.Extensions.Abstractions.Interfaces;
+using HT.Microsoft.SqlClient.Extensions.Abstractions;
+using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces;
 using Microsoft.Data.SqlClient;
 
-namespace HT.Msft.SqlClient.Extensions
+namespace HT.Microsoft.SqlClient.Extensions
 {
     /// <summary>
     /// <inheritdoc cref="IDbConnector"/>

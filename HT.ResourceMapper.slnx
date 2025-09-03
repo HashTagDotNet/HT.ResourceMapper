@@ -1,9 +1,10 @@
 <Solution>
   <Folder Name="/Database/">
-    <Project Path="Database/HTServices/HTServices.sqlproj" Type="42ea0dbd-9cf1-443e-919e-be9c484e4577" />
+    <Project Path="Database/HTServices/HT.Services/HT.Services.sqlproj" Type="42ea0dbd-9cf1-443e-919e-be9c484e4577" Id="9252ed19-5266-4d80-be79-a19849f6de9a" />
   </Folder>
   <Folder Name="/Libraries/" />
   <Folder Name="/Libraries/ApiContracts/">
+    <Project Path="Libraries/ApiContracts/HT.Api.Service.Contracts/HT.Api.Service.Contracts.csproj" />
     <Project Path="Libraries/ApiContracts/HT.ApiContracts/HT.ApiContracts.csproj" />
   </Folder>
   <Folder Name="/Libraries/Collections/">
@@ -30,8 +31,11 @@
     <Project Path="Modules/Feature1/ResourceMapper.Feature1.Server/ResourceMapper.Feature1.Server.csproj" />
     <Project Path="Modules/Feature1/ResourceMapper.Feature1.Shared/ResourceMapper.Feature1.Shared.csproj" />
   </Folder>
-  <Folder Name="/UI/">
+  <Folder Name="/UI &amp; Hosts/">
     <Project Path="UI/ResourceMapper.UI.Client/ResourceMapper.UI.Client.csproj" />
     <Project Path="UI/ResourceMapper.UI.Server/ResourceMapper.UI.Server.csproj" />
+  </Folder>
+  <Folder Name="/_Solution Documents/">
+    <File Path="README.md" />
   </Folder>
 </Solution>

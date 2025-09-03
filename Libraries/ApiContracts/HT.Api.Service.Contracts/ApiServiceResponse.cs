@@ -1,7 +1,6 @@
-﻿using System.Net;
-using System.Runtime.CompilerServices;
+﻿using HT.ApiContracts.Client.Models;
+using System.Net;
 using System.Text.Json.Serialization;
-using HT.Api.Contracts.Client.Response;
 
 namespace HT.Api.Service.Contracts
 {

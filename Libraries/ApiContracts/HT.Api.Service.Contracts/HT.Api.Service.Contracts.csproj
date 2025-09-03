@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\HT.ApiContracts\HT.Api.Contracts.csproj" />
+    <ProjectReference Include="..\HT.ApiContracts\HT.ApiContracts.csproj" />
   </ItemGroup>
 
 </Project>

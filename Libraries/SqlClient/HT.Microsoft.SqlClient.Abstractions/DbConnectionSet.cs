@@ -1,7 +1,7 @@
-﻿using HT.Msft.SqlClient.Extensions.Abstractions.Interfaces;
+﻿using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces;
 using Microsoft.Data.SqlClient;
 
-namespace HT.Msft.SqlClient.Extensions.Abstractions
+namespace HT.Microsoft.SqlClient.Extensions.Abstractions
 {
     /// <summary>
     /// Generate a new, closed, <see cref="SqlConnection"/> based on <see cref="ConnectionString"/>. Caller is responsible for disposing returned connection.

@@ -2,7 +2,7 @@
 using System.Data;
 using Microsoft.Data.SqlClient;
 
-namespace HT.Msft.SqlClient.Extensions
+namespace HT.Microsoft.SqlClient.Extensions
 {
     // ReSharper disable once InconsistentNaming
     public static partial class SqlParametersExtensions
