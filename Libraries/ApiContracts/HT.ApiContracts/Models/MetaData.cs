@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace HT.ApiContracts.Client.Models
+namespace HT.Api.Client.Contracts.Models
 {
     ///<summary>
     /// System information about the API call and not specifically bound to the response payload (e.g. timings, correlation ids, timestamps, validation errors)

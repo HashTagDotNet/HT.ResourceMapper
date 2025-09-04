@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace HT.ApiContracts.Client.Models
+namespace HT.Api.Client.Contracts.Models
 {
     /// <summary>
     /// A message the API wishes to send back to the caller about this request.  Often validation results

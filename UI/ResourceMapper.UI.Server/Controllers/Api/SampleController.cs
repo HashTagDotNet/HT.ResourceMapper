@@ -10,12 +10,12 @@ namespace ResourceMapper.UI.Server.Controllers.Api;
 
 [ApiController]
 [Route("api/[controller]")]
-public class DateController : ControllerBase
+public class SampleController : ControllerBase
 {
     private readonly ISampleService _dateTimeService;
-    private readonly ILogger<DateController> _logger;
+    private readonly ILogger<SampleController> _logger;
 
-    public DateController(ISampleService dateTimeService, ILogger<DateController> logger, GlobalConfig config)
+    public SampleController(ISampleService dateTimeService, ILogger<SampleController> logger, GlobalConfig config)
     {
         _dateTimeService = dateTimeService;
         _logger = logger;

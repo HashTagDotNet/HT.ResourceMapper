@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using HT.Microsoft.SqlClient.Extensions;
+using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -21,6 +23,12 @@ namespace ResourceMapper.Common.Client.Utils
 
             services.AddTransient<ISampleService, SampleService>();
             services.AddTransient<ISampleRepository, SampleSqlRepository>();
+
+            services.AddHTSqlClient()
+            services.TryAddSingleton<IDbConnector>(services =>
+            {
+
+            });
         }
     }
 }

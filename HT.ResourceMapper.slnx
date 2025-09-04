@@ -5,7 +5,7 @@
   <Folder Name="/Libraries/" />
   <Folder Name="/Libraries/ApiContracts/">
     <Project Path="Libraries/ApiContracts/HT.Api.Service.Contracts/HT.Api.Service.Contracts.csproj" />
-    <Project Path="Libraries/ApiContracts/HT.ApiContracts/HT.ApiContracts.csproj" />
+    <Project Path="Libraries/ApiContracts/HT.ApiContracts/HT.Api.Client.Contracts.csproj" />
   </Folder>
   <Folder Name="/Libraries/Collections/">
     <Project Path="Libraries/Collections/HT.Collections/HT.Collections.csproj" />

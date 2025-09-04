@@ -1,10 +1,6 @@
-﻿using ResourceMapper.Feature1.Shared.Contracts;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using HT.Api.Client.Contracts.Models;
+using ResourceMapper.Common.Shared.Contracts;
 using System.Net.Http.Json;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ResourceMapper.Feature1.Client
 {
@@ -14,7 +10,7 @@ namespace ResourceMapper.Feature1.Client
         {
 
         }
-        private GetDateTimeResponse? dateTimeResponse;
+        private SampleGetDateTimeResponse? dateTimeResponse;
         private bool isLoading = false;
         private string? errorMessage;
 
@@ -41,8 +37,8 @@ namespace ResourceMapper.Feature1.Client
 
             try
             {
-                var t = await HttpClient.GetFromJsonAsync<GetDateTimeResponse>("api/date");
-                dateTimeResponse = t;
+                var t = await HttpClient.GetFromJsonAsync<ApiResponse<SampleGetDateTimeResponse>>("api/date");
+                dateTimeResponse = t.Data;
             }
             catch (Exception ex)
             {

@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace HT.ApiContracts.Client.Models
+namespace HT.Api.Client.Contracts.Models
 {
     /// <summary>
     /// Component in HTTP request that is being referenced

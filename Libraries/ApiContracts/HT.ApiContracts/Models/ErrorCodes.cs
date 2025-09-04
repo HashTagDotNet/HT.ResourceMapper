@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace HT.ApiContracts.Client.Models
+namespace HT.Api.Client.Contracts.Models
 {
     /// <summary>
     /// A list of error specific status codes that are parallel to HttpStatusCodes but

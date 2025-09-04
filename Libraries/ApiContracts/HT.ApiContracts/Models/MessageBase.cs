@@ -2,7 +2,7 @@
 
 // ReSharper disable UnusedMember.Global
 
-namespace HT.ApiContracts.Client.Models
+namespace HT.Api.Client.Contracts.Models
 {
     public class MessageBase
     {

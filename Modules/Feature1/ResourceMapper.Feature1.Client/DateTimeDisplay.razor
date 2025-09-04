@@ -24,7 +24,7 @@
         else if (dateTimeResponse != null)
         {
             <p class="card-text">
-                Current server date: <strong>@dateTimeResponse.CurrentDateTime.ToString("yyyy-MM-dd HH:mm:ss")</strong>
+                Current server date: <strong>@dateTimeResponse.FoundDate.ToString("yyyy-MM-dd HH:mm:ss")</strong>
             </p>
         }
         <button class="btn btn-primary" @onclick="RefreshDate" disabled="@isLoading">

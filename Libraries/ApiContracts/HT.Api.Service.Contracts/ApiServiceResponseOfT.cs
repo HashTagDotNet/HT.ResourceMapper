@@ -1,5 +1,5 @@
-﻿using HT.ApiContracts.Client.Models;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
+using HT.Api.Client.Contracts.Models;
 
 namespace HT.Api.Service.Contracts
 {

@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace HT.ApiContracts.Client.Models
+namespace HT.Api.Client.Contracts.Models
 {
     /// <summary>
     /// A standard way to describing a link in the API response structure.  It is based on the informational RFC 8631
