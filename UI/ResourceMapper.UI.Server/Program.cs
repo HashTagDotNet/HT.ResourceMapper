@@ -8,7 +8,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration));
 
+// Add services for Blazor WebAssembly
+builder.Services.AddRazorPages();
 builder.Services.AddControllers();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowBlazorWasm", policy =>
@@ -21,19 +24,28 @@ builder.Services.AddCors(options =>
 
 builder.Services.RegisterCommonDependencies();
 
-builder.WebHost.UseStaticWebAssets();
-
 var app = builder.Build();
 
+// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
-    app.UseBlazorFrameworkFiles();
+    app.UseDeveloperExceptionPage();
+    app.UseWebAssemblyDebugging();
+}
+else
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
 }
 
+app.UseHttpsRedirection();
+app.UseBlazorFrameworkFiles();
 app.UseStaticFiles();
+
 app.UseRouting();
 app.UseCors("AllowBlazorWasm");
 
+app.MapRazorPages();
 app.MapControllers();
 app.MapFallbackToFile("index.html");
 

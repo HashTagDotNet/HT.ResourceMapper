@@ -1,6 +1,6 @@
 <Solution>
   <Folder Name="/Database/">
-    <Project Path="Database/HTServices/HT.Services/HT.Services.sqlproj" Type="42ea0dbd-9cf1-443e-919e-be9c484e4577" Id="9252ed19-5266-4d80-be79-a19849f6de9a" />
+    <Project Path="Database/HT.Services.sqlproj" Type="42ea0dbd-9cf1-443e-919e-be9c484e4577" />
   </Folder>
   <Folder Name="/Libraries/" />
   <Folder Name="/Libraries/ApiContracts/">

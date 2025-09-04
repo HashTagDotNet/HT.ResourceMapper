@@ -1,4 +1,4 @@
-﻿CREATE TABLE [HT.ResourceMapper].[Resource]
+﻿CREATE TABLE [HTResourceMapper].[Resource]
 (
     [ResourceId] INT NOT NULL IDENTITY(1,1)
         CONSTRAINT [PK_Resource_ResourceId] PRIMARY KEY (ResourceId)
@@ -7,7 +7,7 @@
     ,[ResourceKey] NVARCHAR(250) NOT NULL
         CONSTRAINT [UK_Resource_ResourceKey] UNIQUE(ResourceKey)
     ,[ResourceTypeId] INT NULL
-        CONSTRAINT [FK_Resource_ResourceTypeId] FOREIGN KEY (ResourceTypeId) REFERENCES [HT.ResourceMapper].[ResourceType](ResourceTypeId)
+        CONSTRAINT [FK_Resource_ResourceTypeId] FOREIGN KEY (ResourceTypeId) REFERENCES [HTResourceMapper].[ResourceType](ResourceTypeId)
     ,[ResourceName] NVARCHAR(250) NOT NULL       
     ,[Description] NVARCHAR(2000) NOT NULL
     ,[CreatedOn] DateTime2(0) NOT NULL

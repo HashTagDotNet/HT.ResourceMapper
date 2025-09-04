@@ -1,5 +1,5 @@
 ﻿-- Please edit the table name accordingly.
-CREATE TABLE [HT.ResourceMapper].[TagValueType]
+CREATE TABLE [HTResourceMapper].[TagValueType]
 (
 	[TagValueTypeId] INT NOT NULL
 		CONSTRAINT PK_TagValueType_TagValueTypeId PRIMARY KEY,

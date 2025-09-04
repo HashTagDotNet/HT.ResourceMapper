@@ -1,46 +1,53 @@
-﻿@using System.Net.Http.Json
-
+@using ResourceMapper.Common.Shared.Contracts
 @inject HttpClient HttpClient
 
-<div class="card my-component">
-    <div class="card-header">
-        <h5 class="card-title">Server Date</h5>
-    </div>
-    <div class="card-body">
+<FluentCard Style="width: 100%;">
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="16" Style="padding: 24px;">
+        <FluentLabel Typo="Typography.Subject">Server Date & Time</FluentLabel>
+        
         @if (isLoading)
         {
-            <div class="d-flex justify-content-center">
-                <div class="spinner-border" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>
+            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" HorizontalGap="8">
+                <FluentProgressRing Style="width: 20px; height: 20px;" />
+                <FluentLabel>Loading server date...</FluentLabel>
+            </FluentStack>
         }
         else if (!string.IsNullOrEmpty(errorMessage))
         {
-            <div class="alert alert-danger" role="alert">
+            <FluentMessageBar Intent="MessageIntent.Error" Style="width: 100%;">
                 @errorMessage
-            </div>
+            </FluentMessageBar>
         }
         else if (dateTimeResponse != null)
         {
-            <p class="card-text">
-                Current server date: <strong>@dateTimeResponse.FoundDate.ToString("yyyy-MM-dd HH:mm:ss")</strong>
-            </p>
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                <FluentLabel Typo="Typography.Body">
+                    <strong>Current server date:</strong> @dateTimeResponse.FoundDate.ToString("dddd, MMMM dd, yyyy")
+                </FluentLabel>
+                <FluentLabel Typo="Typography.Body" Style="font-size: 0.85em; color: var(--neutral-foreground-rest);">
+                    <strong>Time:</strong> @dateTimeResponse.FoundDate.ToString("hh:mm:ss tt")
+                </FluentLabel>
+            </FluentStack>
         }
-        <button class="btn btn-primary" @onclick="RefreshDate" disabled="@isLoading">
-            @if (isLoading)
-            {
-                <span class="spinner-border spinner-border-sm" role="status"></span>
-                <text> Loading...</text>
-            }
-            else
-            {
-                <text>Refresh Date</text>
-            }
-        </button>
-    </div>
-</div>
-
-@code {
-  
-}
+        
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
+            <FluentButton Appearance="Appearance.Accent" 
+                         @onclick="RefreshDateTime" 
+                         Disabled="@isLoading">
+                ?? Refresh Date
+            </FluentButton>
+            
+            <FluentNumberField @bind-Value="daysOffset" 
+                              Label="Days offset" 
+                              Style="width: 120px;" 
+                              Min="-365" 
+                              Max="365" />
+            
+            <FluentButton Appearance="Appearance.Outline" 
+                         @onclick="GetDateWithOffset" 
+                         Disabled="@isLoading">
+                Get Date
+            </FluentButton>
+        </FluentStack>
+    </FluentStack>
+</FluentCard>

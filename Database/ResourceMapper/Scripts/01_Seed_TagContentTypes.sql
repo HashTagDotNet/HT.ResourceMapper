@@ -10,14 +10,14 @@
 --AS
 --BEGIN
 --    UPDATE TOP(1)
---        [HT.ResourceMapper].TagContentTypes
+--        [HTResourceMapper].TagContentTypes
 --    SET
 --        TagCode = @TagCode
 --    WHERE
 --        TagTypeId = @TagTypeId
 --    IF @@ROWCOUNT = 0
 --    BEGIN
---        INSERT INTO [HT.ResourceMapper].TagContentTypes (
+--        INSERT INTO [HTResourceMapper].TagContentTypes (
 --            TagTypeId,
 --            TagCode
 --        ) VALUES (
@@ -31,7 +31,7 @@
 --EXEC #SeedTagType @TagTypeId=0, @TagCode='Text'
 --EXEC #SeedTagType @TagTypeId=1, @TagCode='Link'
 
---SELECT * FROM [HT.ResourceMapper].TagContentTypes
+--SELECT * FROM [HTResourceMapper].TagContentTypes
 --ROLLBACK
 ----COMMIT
 --GO
