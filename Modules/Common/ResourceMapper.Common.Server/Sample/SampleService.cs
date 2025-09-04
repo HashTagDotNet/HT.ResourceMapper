@@ -7,7 +7,7 @@ using ResourceMapper.Common.Shared.Contracts;
 
 namespace ResourceMapper.Common.Server.Sample
 {
-    public class SampleService: ISampleService
+    public class SampleService : ISampleService
     {
         private readonly ILogger _logger;
         private readonly ISampleRepository _repo;
@@ -26,11 +26,16 @@ namespace ResourceMapper.Common.Server.Sample
             var response = new ApiServiceResponse<SampleGetDateTimeResponse>();
             try
             {
-                _logger.Information("Getting {daySpan} days ago", request);
-                response.Data ??=new SampleGetDateTimeResponse();
+                if (ValidateRequest(request, response))
+                {
+                    return response;
+                }
+
+
+                response.Data ??= new SampleGetDateTimeResponse();
                 response.Data.FoundDate = await _repo.GetDaysAgoAysnc(request.DateOffsetToGet, cancellationToken);
-               response.SetStatusCode(HttpStatusCode.OK);
-               return response;
+                response.SetStatusCode(HttpStatusCode.OK);
+                return response;
             }
             catch (Exception ex)
             {
@@ -38,6 +43,25 @@ namespace ResourceMapper.Common.Server.Sample
                 response.SetStatusMessage("Unexpected error retrieving date span");
                 return response;
             }
+        }
+
+        private bool ValidateRequest(SampleGetDateTimeRequest request, ApiServiceResponse<SampleGetDateTimeResponse> response)
+        {
+
+            if (request.DateOffsetToGet <= -10)
+            {
+                response.SetStatusMessage("Date offset must be greater than -10");
+                response.SetStatusCode(HttpStatusCode.BadRequest);
+                return false;
+            }
+
+            if (request.DateOffsetToGet >= 10)
+            {
+                response.SetStatusMessage("Date offset must be less than 10");
+                response.SetStatusCode(HttpStatusCode.BadRequest);
+                return false;
+            }
+            return true;
         }
     }
 }

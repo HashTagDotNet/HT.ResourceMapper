@@ -7,6 +7,9 @@
     <Project Path="Libraries/ApiContracts/HT.Api.Service.Contracts/HT.Api.Service.Contracts.csproj" />
     <Project Path="Libraries/ApiContracts/HT.ApiContracts/HT.Api.Client.Contracts.csproj" />
   </Folder>
+  <Folder Name="/Libraries/ApiContracts/_Tests/">
+    <Project Path="Libraries/ApiContracts/__Tests/HT.Api.Client.Contracts.Tests/HT.Api.Client.Contracts.Tests.csproj" Id="72111eaa-2191-410a-baad-3ccf59827784" />
+  </Folder>
   <Folder Name="/Libraries/Collections/">
     <Project Path="Libraries/Collections/HT.Collections/HT.Collections.csproj" />
   </Folder>
@@ -32,5 +35,8 @@
   </Folder>
   <Folder Name="/_Solution Documents/">
     <File Path="README.md" />
+  </Folder>
+  <Folder Name="/_Tests/">
+    <Project Path="_Tests/Common/Server/ResourceMapper.Common.Server.Tests/ResourceMapper.Common.Server.Tests.csproj" Id="88712550-c467-4d7e-9981-6df973495f58" />
   </Folder>
 </Solution>

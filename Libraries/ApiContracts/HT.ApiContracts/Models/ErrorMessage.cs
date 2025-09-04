@@ -7,7 +7,7 @@ namespace HT.Api.Client.Contracts.Models
     /// <summary>
     /// https://jsonapi.org/format/#errors
     /// </summary>
-    public class ErrorMessage:MessageBase
+    public class ErrorMessage : MessageBase
     {
         /// <summary>
         /// <inheritdoc cref="ErrorCodes"/>
@@ -18,7 +18,79 @@ namespace HT.Api.Client.Contracts.Models
         /// <inheritdoc cref="ErrorCodes"/>
         /// </summary>
         public ErrorCodes StatusCode { get; set; } = ErrorCodes.Ok;
-        
+
+        /// <summary>
+        /// Indicates if this error represents a success state
+        /// </summary>
+        [JsonIgnore]
+        public bool IsSuccess => StatusCode.IsSuccess();
+
+        /// <summary>
+        /// Indicates if this error represents a failure state
+        /// </summary>
+        [JsonIgnore]
+        public bool IsFailure => StatusCode.IsFailure();
+
+        /// <summary>
+        /// Indicates if this error represents a cancelled operation
+        /// </summary>
+        [JsonIgnore]
+        public bool IsCancelled => StatusCode.IsCancelled();
+
+        /// <summary>
+        /// Indicates if this is a client error (4xx equivalent)
+        /// </summary>
+        [JsonIgnore]
+        public bool IsClientError => StatusCode.IsClientError();
+
+        /// <summary>
+        /// Indicates if this is a server error (5xx equivalent)
+        /// </summary>
+        [JsonIgnore]
+        public bool IsServerError => StatusCode.IsServerError();
+
+        /// <summary>
+        /// Indicates if the operation can be retried
+        /// </summary>
+        [JsonIgnore]
+        public bool IsRetryable => StatusCode.IsRetryable();
+
+        /// <summary>
+        /// Gets the CSS class for UI severity display
+        /// </summary>
+        [JsonIgnore]
+        public string SeverityClass => StatusCode.GetSeverityClass();
+
+        /// <summary>
+        /// Gets the CSS alert class for UI display (Bootstrap compatible)
+        /// </summary>
+        [JsonIgnore]
+        public string AlertClass => StatusCode.GetAlertClass();
+
+        /// <summary>
+        /// Gets the icon class for UI display (Font Awesome compatible)
+        /// </summary>
+        [JsonIgnore]
+        public string IconClass => StatusCode.GetIconClass();
+
+        /// <summary>
+        /// Gets the priority level for error handling (1 = highest, 5 = lowest)
+        /// </summary>
+        [JsonIgnore]
+        public int Priority => StatusCode.GetPriority();
+
+        /// <summary>
+        /// Gets the result category for business logic decisions
+        /// </summary>
+        [JsonIgnore]
+        public ResultCategory ResultCategory => StatusCode.GetResultCategory();
+
+        /// <summary>
+        /// Gets the corresponding HTTP status code (derived from ErrorCode)
+        /// </summary>
+        [JsonIgnore]
+        public System.Net.HttpStatusCode HttpStatusCode => StatusCode.ToHttpStatusCode();
+
         /// <summary>
         /// Practical actions that the developer of application consuming the API could take in order to resolve the error condition.  May be localized to callers language, resource code, or other content. 
         /// </summary>
@@ -30,5 +102,114 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? SuggestedUserActions { get; set; }
+
+        /// <summary>
+        /// Gets a user-friendly description of the error
+        /// </summary>
+        public string GetDescription()
+        {
+            return StatusCode.GetDescription();
+        }
+
+        /// <summary>
+        /// Gets user-friendly action suggestions (auto-generated from ErrorCode if SuggestedUserActions is null)
+        /// </summary>
+        public string GetUserActionSuggestion()
+        {
+            return SuggestedUserActions ?? StatusCode.GetUserActionSuggestion();
+        }
+
+        /// <summary>
+        /// Gets developer action suggestions (auto-generated from ErrorCode if SuggestedApplicationActions is null)
+        /// </summary>
+        public string GetDeveloperActionSuggestion()
+        {
+            return SuggestedApplicationActions ?? StatusCode.GetDeveloperActionSuggestion();
+        }
+
+        /// <summary>
+        /// Creates an ErrorMessage with a specific error code
+        /// </summary>
+        public static ErrorMessage Create(ErrorCodes errorCode, string? detail = null, string? property = null)
+        {
+            return new ErrorMessage
+            {
+                StatusCode = errorCode,
+                Detail = detail ?? errorCode.GetDescription(),
+                Property = property
+            };
+        }
+
+        /// <summary>
+        /// Creates a success ErrorMessage
+        /// </summary>
+        public static ErrorMessage CreateSuccess(string? detail = null)
+        {
+            return Create(ErrorCodes.Ok, detail);
+        }
+
+        /// <summary>
+        /// Creates an invalid argument ErrorMessage for validation failures
+        /// </summary>
+        public static ErrorMessage CreateInvalidArgument(string property, string detail)
+        {
+            return Create(ErrorCodes.InvalidArgument, detail, property);
+        }
+
+        /// <summary>
+        /// Creates a not found ErrorMessage
+        /// </summary>
+        public static ErrorMessage CreateNotFound(string? detail = null, string? property = null)
+        {
+            return Create(ErrorCodes.NotFound, detail, property);
+        }
+
+        /// <summary>
+        /// Creates an internal error ErrorMessage
+        /// </summary>
+        public static ErrorMessage CreateInternalError(string? detail = null)
+        {
+            return Create(ErrorCodes.InternalError, detail);
+        }
+
+        /// <summary>
+        /// Creates an unauthenticated ErrorMessage
+        /// </summary>
+        public static ErrorMessage CreateUnauthenticated(string? detail = null)
+        {
+            return Create(ErrorCodes.Unauthenticated, detail);
+        }
+
+        /// <summary>
+        /// Creates a permission denied ErrorMessage
+        /// </summary>
+        public static ErrorMessage CreatePermissionDenied(string? detail = null, string? property = null)
+        {
+            return Create(ErrorCodes.PermissionDenied, detail, property);
+        }
+
+        /// <summary>
+        /// Creates an already exists ErrorMessage
+        /// </summary>
+        public static ErrorMessage CreateAlreadyExists(string? detail = null, string? property = null)
+        {
+            return Create(ErrorCodes.AlreadyExists, detail, property);
+        }
+
+        /// <summary>
+        /// Creates a timeout ErrorMessage
+        /// </summary>
+        public static ErrorMessage CreateTimeout(string? detail = null)
+        {
+            return Create(ErrorCodes.OperationTimeOut, detail);
+        }
+
+        /// <summary>
+        /// Creates a service unavailable ErrorMessage
+        /// </summary>
+        public static ErrorMessage CreateUnavailable(string? detail = null)
+        {
+            return Create(ErrorCodes.Unavailable, detail);
+        }
     }
 }
