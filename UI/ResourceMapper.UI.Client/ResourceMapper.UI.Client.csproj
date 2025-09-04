@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Modules\Feature1\ResourceMapper.Feature1.Client\ResourceMapper.Feature1.Client.csproj" />
+    <ProjectReference Include="..\..\Modules\Common\ResourceMapper.Common.Client\ResourceMapper.Common.Client.csproj" />
   </ItemGroup>
 
 </Project>

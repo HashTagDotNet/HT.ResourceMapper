@@ -26,11 +26,6 @@
     <Project Path="Modules/Common/ResourceMapper.Common.Server/ResourceMapper.Common.Server.csproj" />
     <Project Path="Modules/Common/ResourceMapper.Common.Shared/ResourceMapper.Common.Shared.csproj" />
   </Folder>
-  <Folder Name="/Modules/Feature1/">
-    <Project Path="Modules/Feature1/ResourceMapper.Feature1.Client/ResourceMapper.Feature1.Client.csproj" />
-    <Project Path="Modules/Feature1/ResourceMapper.Feature1.Server/ResourceMapper.Feature1.Server.csproj" />
-    <Project Path="Modules/Feature1/ResourceMapper.Feature1.Shared/ResourceMapper.Feature1.Shared.csproj" />
-  </Folder>
   <Folder Name="/UI &amp; Hosts/">
     <Project Path="UI/ResourceMapper.UI.Client/ResourceMapper.UI.Client.csproj" />
     <Project Path="UI/ResourceMapper.UI.Server/ResourceMapper.UI.Server.csproj" />

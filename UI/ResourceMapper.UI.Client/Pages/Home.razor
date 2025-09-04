@@ -1,4 +1,5 @@
 ﻿@page "/"
+@using ResourceMapper.Common.Client
 
 <PageTitle>Home</PageTitle>
 
@@ -12,7 +13,7 @@
         <FluentStack Orientation="Orientation.Vertical" VerticalGap="16" Style="padding: 24px;">
             <FluentLabel Typo="Typography.Subject">Server Date & Time</FluentLabel>
             
-            <DateTimeDisplay @ref="dateTimeDisplay" />
+            <SampleComponent @ref="dateTimeDisplay" />
             
             <FluentButton Appearance="Appearance.Accent" @onclick="RefreshDateTime">
                 🔄 Refresh
@@ -22,7 +23,7 @@
 </FluentStack>
 
 @code {
-    private DateTimeDisplay? dateTimeDisplay;
+    private SampleComponent? dateTimeDisplay;
 
     private async Task RefreshDateTime()
     {

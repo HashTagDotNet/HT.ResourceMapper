@@ -1,8 +1,8 @@
 ﻿using HT.Microsoft.SqlClient.Extensions;
 using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces;
-using ResourceMapper.Common.Client.Sample.Interfaces;
+using ResourceMapper.Common.Server.Sample.Interfaces;
 
-namespace ResourceMapper.Common.Client.Sample
+namespace ResourceMapper.Common.Server.Sample
 {
     public class SampleSqlRepository:ISampleRepository
     {

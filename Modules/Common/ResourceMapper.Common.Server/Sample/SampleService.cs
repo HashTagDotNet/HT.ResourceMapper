@@ -2,10 +2,10 @@
 using HT.Api.Service.Contracts;
 using HT.Microsoft.ILogger.Extensions;
 using Microsoft.Extensions.Logging;
-using ResourceMapper.Common.Client.Sample.Interfaces;
+using ResourceMapper.Common.Server.Sample.Interfaces;
 using ResourceMapper.Common.Shared.Contracts;
 
-namespace ResourceMapper.Common.Client.Sample
+namespace ResourceMapper.Common.Server.Sample
 {
     public class SampleService: ISampleService
     {

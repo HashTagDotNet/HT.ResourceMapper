@@ -1,12 +1,13 @@
-﻿using HT.Api.Client.Contracts.Models;
+﻿using System.Net.Http.Json;
+using HT.Api.Client.Contracts.Models;
+using Microsoft.AspNetCore.Components;
 using ResourceMapper.Common.Shared.Contracts;
-using System.Net.Http.Json;
 
-namespace ResourceMapper.Feature1.Client
+namespace ResourceMapper.Common.Client
 {
-    public partial class DateTimeDisplay
+    public partial class SampleComponent:ComponentBase
     {
-        public DateTimeDisplay()
+        public SampleComponent()
         {
 
         }

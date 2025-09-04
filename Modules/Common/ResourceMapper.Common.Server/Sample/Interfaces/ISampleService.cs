@@ -1,7 +1,7 @@
 ﻿using HT.Api.Service.Contracts;
 using ResourceMapper.Common.Shared.Contracts;
 
-namespace ResourceMapper.Common.Client.Sample.Interfaces
+namespace ResourceMapper.Common.Server.Sample.Interfaces
 {
     public interface ISampleService
     {

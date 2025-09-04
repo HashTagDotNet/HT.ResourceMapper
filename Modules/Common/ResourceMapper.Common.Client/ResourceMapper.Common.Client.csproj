@@ -17,10 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Libraries\ApiContracts\HT.Api.Service.Contracts\HT.Api.Service.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\Libraries\Configuration\HT.Microsoft.IConfiguration.Extensions\HT.Microsoft.IConfiguration.Extensions.csproj" />
-    <ProjectReference Include="..\..\..\Libraries\Logging\HT.Microsoft.ILogger.Extensions\HT.Microsoft.ILogger.Extensions.csproj" />
-    <ProjectReference Include="..\..\..\Libraries\SqlClient\HT.Microsoft.SqlClient.Extensions\HT.Microsoft.SqlClient.Extensions.csproj" />
     <ProjectReference Include="..\ResourceMapper.Common.Shared\ResourceMapper.Common.Shared.csproj" />
   </ItemGroup>
 

@@ -1,7 +1,7 @@
 ﻿using HT.Microsoft.IConfiguration.Extensions;
 using Microsoft.Extensions.Configuration;
-using System.Text;
-namespace ResourceMapper.Common.Client.Config
+
+namespace ResourceMapper.Common.Server.Config
 {
     public class GlobalConfig
     {
