@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build">
+  <Sdk Name="Microsoft.Build.Sql" Version="0.2.3-preview" />
+  <PropertyGroup>
+    <Name>HT.Services</Name>
+    <DSP>Microsoft.Data.Tools.Schema.Sql.Sql160DatabaseSchemaProvider</DSP>
+    <ModelCollation>1033, CI</ModelCollation>
+    <RootNamespace>HT.Services</RootNamespace>
+    <AssemblyName>HT.Services</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="localhost.publish.xml" />
+  </ItemGroup>
+</Project>

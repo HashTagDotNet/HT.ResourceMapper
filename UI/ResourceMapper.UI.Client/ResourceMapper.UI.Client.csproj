@@ -4,15 +4,22 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <BlazorWebAssemblyDebugAssemblyInformation>true</BlazorWebAssemblyDebugAssemblyInformation>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.8" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components" Version="4.12.1" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Modules\Feature1\ResourceMapper.Feature1.Client\ResourceMapper.Feature1.Client.csproj" />
+    <ProjectReference Include="..\..\Modules\Common\ResourceMapper.Common.Client\ResourceMapper.Common.Client.csproj" />
   </ItemGroup>
 
 </Project>

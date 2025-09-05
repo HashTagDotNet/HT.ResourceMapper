@@ -1,11 +1,15 @@
 <Solution>
   <Folder Name="/Database/">
-    <Project Path="Database/HTServices/HT.Services/HT.Services.sqlproj" Type="42ea0dbd-9cf1-443e-919e-be9c484e4577" Id="9252ed19-5266-4d80-be79-a19849f6de9a" />
+    <Project Path="Database/HT.Services.sqlproj" Type="42ea0dbd-9cf1-443e-919e-be9c484e4577" />
   </Folder>
   <Folder Name="/Libraries/" />
   <Folder Name="/Libraries/ApiContracts/">
     <Project Path="Libraries/ApiContracts/HT.Api.Service.Contracts/HT.Api.Service.Contracts.csproj" />
-    <Project Path="Libraries/ApiContracts/HT.ApiContracts/HT.ApiContracts.csproj" />
+    <Project Path="Libraries/ApiContracts/HT.ApiContracts/HT.Api.Client.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/ApiContracts/_Tests/">
+    <Project Path="Libraries/ApiContracts/__Tests/HT.Api.Client.Contracts.Tests/HT.Api.Client.Contracts.Tests.csproj" Id="72111eaa-2191-410a-baad-3ccf59827784" />
+    <Project Path="Libraries/ApiContracts/__Tests/HT.Api.Service.Contracts.Tests/HT.Api.Service.Contracts.Tests.csproj" Id="638347df-92c5-4f15-90b5-149fd126467e" />
   </Folder>
   <Folder Name="/Libraries/Collections/">
     <Project Path="Libraries/Collections/HT.Collections/HT.Collections.csproj" />
@@ -26,16 +30,14 @@
     <Project Path="Modules/Common/ResourceMapper.Common.Server/ResourceMapper.Common.Server.csproj" />
     <Project Path="Modules/Common/ResourceMapper.Common.Shared/ResourceMapper.Common.Shared.csproj" />
   </Folder>
-  <Folder Name="/Modules/Feature1/">
-    <Project Path="Modules/Feature1/ResourceMapper.Feature1.Client/ResourceMapper.Feature1.Client.csproj" />
-    <Project Path="Modules/Feature1/ResourceMapper.Feature1.Server/ResourceMapper.Feature1.Server.csproj" />
-    <Project Path="Modules/Feature1/ResourceMapper.Feature1.Shared/ResourceMapper.Feature1.Shared.csproj" />
-  </Folder>
   <Folder Name="/UI &amp; Hosts/">
     <Project Path="UI/ResourceMapper.UI.Client/ResourceMapper.UI.Client.csproj" />
     <Project Path="UI/ResourceMapper.UI.Server/ResourceMapper.UI.Server.csproj" />
   </Folder>
   <Folder Name="/_Solution Documents/">
     <File Path="README.md" />
+  </Folder>
+  <Folder Name="/_Tests/">
+    <Project Path="_Tests/Common/Server/ResourceMapper.Common.Server.Tests/ResourceMapper.Common.Server.Tests.csproj" Id="88712550-c467-4d7e-9981-6df973495f58" />
   </Folder>
 </Solution>

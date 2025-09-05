@@ -7,8 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\HT.ApiContracts\HT.Api.Contracts.csproj" />
-    <ProjectReference Include="..\HT.ApiContracts\HT.ApiContracts.csproj" />
+    <ProjectReference Include="..\HT.ApiContracts\HT.Api.Client.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

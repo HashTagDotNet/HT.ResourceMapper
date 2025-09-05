@@ -1,4 +1,4 @@
-﻿CREATE TABLE [HT.ResourceMapper].[ResourceType]
+﻿CREATE TABLE [HTResourceMapper].[ResourceType]
 (
     [ResourceTypeId] INT NOT NULL IDENTITY(1,1)
         CONSTRAINT [PK_ResourceType_ResourceTypeId] PRIMARY KEY

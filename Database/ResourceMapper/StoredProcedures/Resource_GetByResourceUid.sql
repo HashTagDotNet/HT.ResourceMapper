@@ -1,10 +1,10 @@
-CREATE PROCEDURE [HT.ResourceMapper].[Resource_GetByResourceUid]
+CREATE PROCEDURE [HTResourceMapper].[Resource_GetByResourceUid]
     @ResourceUid VARCHAR(40)
 AS
 BEGIN
     SET NOCOUNT ON;
 
     SELECT *
-    FROM [HT.ResourceMapper].[Resource] WITH(NOLOCK)
+    FROM [HTResourceMapper].[Resource] WITH(NOLOCK)
     WHERE ResourceUid = @ResourceUid;
 END

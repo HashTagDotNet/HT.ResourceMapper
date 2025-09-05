@@ -1,7 +1,6 @@
-
-using ResourceMapper.Common.Client.Utils;
+using ResourceMapper.Common.Server.Utils;
 using Serilog;
-using ResourceMapper.Feature1.Server.Utils;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,7 +8,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration));
 
+// Add services for Blazor WebAssembly
+builder.Services.AddRazorPages();
 builder.Services.AddControllers();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowBlazorWasm", policy =>
@@ -19,22 +21,31 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader();
     });
 });
-builder.Services.AddFeature1Services();
-builder.Services.RegisterCommonDependencies();
 
-builder.WebHost.UseStaticWebAssets();
+builder.Services.RegisterCommonDependencies();
 
 var app = builder.Build();
 
+// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
-    app.UseBlazorFrameworkFiles();
+    app.UseDeveloperExceptionPage();
+    app.UseWebAssemblyDebugging();
+}
+else
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
 }
 
+app.UseHttpsRedirection();
+app.UseBlazorFrameworkFiles();
 app.UseStaticFiles();
+
 app.UseRouting();
 app.UseCors("AllowBlazorWasm");
 
+app.MapRazorPages();
 app.MapControllers();
 app.MapFallbackToFile("index.html");
 

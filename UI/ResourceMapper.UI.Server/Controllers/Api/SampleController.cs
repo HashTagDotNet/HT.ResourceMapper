@@ -1,31 +1,34 @@
-using System.Net;
-using HT.Api.Service.Contracts;
+using HT.Api.Client.Contracts.Models;
 using Microsoft.AspNetCore.Mvc;
-using ResourceMapper.Common.Client.Config;
-using ResourceMapper.Common.Client.Sample.Interfaces;
 using ResourceMapper.Common.Shared.Contracts;
-using ResourceMapper.Feature1.Server.Interfaces;
+using System.Net;
+using Microsoft.Data.SqlClient;
+using ResourceMapper.Common.Server.Sample.Interfaces;
 
 namespace ResourceMapper.UI.Server.Controllers.Api;
 
 [ApiController]
 [Route("api/[controller]")]
-public class DateController : ControllerBase
+public class SampleController : ControllerBase
 {
     private readonly ISampleService _dateTimeService;
-    private readonly ILogger<DateController> _logger;
 
-    public DateController(ISampleService dateTimeService, ILogger<DateController> logger, GlobalConfig config)
+    public SampleController(ISampleService dateTimeService)
     {
         _dateTimeService = dateTimeService;
-        _logger = logger;
-       
     }
 
     [HttpGet]
-    public async Task<ActionResult<ApiServiceResponse<SampleGetDateTimeResponse>>> GetCurrentDate(SampleGetDateTimeRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResponse<SampleGetDateTimeResponse>>> GetCurrentDate([FromQuery] SampleGetDateTimeRequest request, CancellationToken cancellationToken = default)
     {
         var svcResponse = await _dateTimeService.GetDaysAgoAsync(request, cancellationToken);
-        return StatusCode((int)(svcResponse.HttpStatusCode ?? HttpStatusCode.OK), svcResponse);
+        return StatusCode((int)(svcResponse.HttpStatusCode ?? HttpStatusCode.OK), svcResponse.ApiResponse);
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<ApiResponse<SampleGetDateTimeResponse>>> GetCurrentDatePost([FromBody] SampleGetDateTimeRequest request, CancellationToken cancellationToken = default)
+    {
+        var svcResponse = await _dateTimeService.GetDaysAgoAsync(request, cancellationToken);
+        return StatusCode((int)(svcResponse.HttpStatusCode ?? HttpStatusCode.OK), svcResponse.ApiResponse);
     }
 }
