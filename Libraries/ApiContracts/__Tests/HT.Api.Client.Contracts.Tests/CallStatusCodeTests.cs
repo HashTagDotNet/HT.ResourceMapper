@@ -644,41 +644,7 @@ namespace HT.Api.Client.Contracts.Tests
 
         #endregion
 
-        #region Helper Methods
-
-        private static IEnumerable<CallStatusCode> GetAllCallStatusCodes()
-        {
-            return Enum.GetValues<CallStatusCode>();
-        }
-
-        private static IEnumerable<CallStatusCode> GetClientErrorCallStatusCodes()
-        {
-            return
-            [
-                CallStatusCode.InvalidArgument,
-                CallStatusCode.NotFound,
-                CallStatusCode.AlreadyExists,
-                CallStatusCode.PermissionDenied,
-                CallStatusCode.Unauthenticated,
-                CallStatusCode.FailedPrecondition,
-                CallStatusCode.OutOfRange
-            ];
-        }
-
-        private static IEnumerable<CallStatusCode> GetServerErrorCallStatusCodes()
-        {
-            return
-            [
-                CallStatusCode.InternalError,
-                CallStatusCode.NotImplemented,
-                CallStatusCode.Unavailable,
-                CallStatusCode.ResourceExhausted,
-                CallStatusCode.OperationTimeOut,
-                CallStatusCode.Aborted
-            ];
-        }
-
-        #endregion
+        
 
         #region GetUserMessage Tests
 
