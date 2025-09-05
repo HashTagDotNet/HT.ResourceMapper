@@ -40,7 +40,7 @@ namespace HT.Api.Client.Contracts.Models
         /// <summary>
         /// Adds a validation error using ErrorCode approach (developer sets ErrorCode, HTTP status derived)
         /// </summary>
-        public void AddValidation(string propertyName, string message, ErrorCodes errorCode = ErrorCodes.InvalidArgument)
+        public ApiResponse AddValidation(string propertyName, string message, ErrorCodes errorCode = ErrorCodes.InvalidArgument)
         {
             Errors ??= new List<ErrorMessage>();
             var errorMessage = new ErrorMessage
@@ -50,21 +50,23 @@ namespace HT.Api.Client.Contracts.Models
                 StatusCode = errorCode
             };
             Errors.Add(errorMessage);
+            return this;
         }
 
         /// <summary>
         /// Adds an error using ErrorCode approach
         /// </summary>
-        public void AddError(ErrorCodes errorCode, string? detail = null, string? property = null)
+        public ApiResponse AddError(ErrorCodes errorCode, string? detail = null, string? property = null)
         {
             Errors ??= new List<ErrorMessage>();
             Errors.Add(ErrorMessage.Create(errorCode, detail, property));
+            return this;
         }
 
         /// <summary>
         /// Adds an error with custom user and developer action suggestions
         /// </summary>
-        public void AddError(ErrorCodes errorCode, string? detail, string? property, 
+        public ApiResponse AddError(ErrorCodes errorCode, string? detail, string? property, 
             string? userActions, string? developerActions)
         {
             Errors ??= new List<ErrorMessage>();
@@ -72,6 +74,7 @@ namespace HT.Api.Client.Contracts.Models
             error.SuggestedUserActions = userActions;
             error.SuggestedApplicationActions = developerActions;
             Errors.Add(error);
+            return this;
         }
 
         #endregion
@@ -81,38 +84,114 @@ namespace HT.Api.Client.Contracts.Models
         /// <summary>
         /// Convenience method to add common errors
         /// </summary>
-        public void AddNotFoundError(string? detail = null, string? property = null)
-            => AddError(ErrorCodes.NotFound, detail, property);
+        public ApiResponse AddNotFoundError(string? detail = null, string? property = null)
+        {
+            AddError(ErrorCodes.NotFound, detail, property);
+            return this;
+        }
 
         /// <summary>
         /// Convenience method to add validation errors
         /// </summary>
-        public void AddValidationError(string property, string detail)
-            => AddError(ErrorCodes.InvalidArgument, detail, property);
+        public ApiResponse AddValidationError(string property, string detail)
+        {
+            AddError(ErrorCodes.InvalidArgument, detail, property);
+            return this;
+        }
 
         /// <summary>
         /// Convenience method to add permission errors
         /// </summary>
-        public void AddPermissionError(string? detail = null, string? property = null)
-            => AddError(ErrorCodes.PermissionDenied, detail, property);
+        public ApiResponse AddPermissionError(string? detail = null, string? property = null)
+        {
+            AddError(ErrorCodes.PermissionDenied, detail, property);
+            return this;
+        }
 
         /// <summary>
         /// Convenience method to add authentication errors
         /// </summary>
-        public void AddAuthenticationError(string? detail = null)
-            => AddError(ErrorCodes.Unauthenticated, detail);
+        public ApiResponse AddAuthenticationError(string? detail = null)
+        {
+            AddError(ErrorCodes.Unauthenticated, detail);
+            return this;
+        }
 
         /// <summary>
         /// Convenience method to add internal server errors
         /// </summary>
-        public void AddInternalError(string? detail = null)
-            => AddError(ErrorCodes.InternalError, detail);
+        public ApiResponse AddInternalError(string? detail = null)
+        {
+            AddError(ErrorCodes.InternalError, detail);
+            return this;
+        }
 
         /// <summary>
         /// Convenience method to add cancellation errors
         /// </summary>
-        public void AddCancellationError(string? detail = null)
-            => AddError(ErrorCodes.Cancelled, detail);
+        public ApiResponse AddCancellationError(string? detail = null)
+        {
+            AddError(ErrorCodes.Cancelled, detail);
+            return this;
+        }
+
+        #endregion
+
+        #region Error Management
+
+        /// <summary>
+        /// Clears all errors
+        /// </summary>
+        public ApiResponse ClearErrors()
+        {
+            Errors?.Clear();
+            return this;
+        }
+
+        #endregion
+
+        #region Bulk Error Operations
+
+        /// <summary>
+        /// Adds multiple validation errors for a property
+        /// </summary>
+        public ApiResponse AddValidationErrors(string propertyName, IEnumerable<string> messages)
+        {
+            foreach (var message in messages)
+            {
+                AddValidationError(propertyName, message);
+            }
+            return this;
+        }
+
+        /// <summary>
+        /// Adds validation errors from a dictionary
+        /// </summary>
+        public ApiResponse AddValidationErrors(Dictionary<string, List<string>> validationErrors)
+        {
+            foreach (var kvp in validationErrors)
+            {
+                foreach (var error in kvp.Value)
+                {
+                    AddValidationError(kvp.Key, error);
+                }
+            }
+            return this;
+        }
+
+        #endregion
+
+        #region JSON Serialization Helpers
+
+        /// <summary>
+        /// Determines whether to serialize the Errors property
+        /// </summary>
+        public bool ShouldSerializeErrors() => Errors is { Count: > 0 };
+
+        /// <summary>
+        /// Determines whether to serialize the Links property
+        /// </summary>
+        public bool ShouldSerializeLinks() => Links is { Count: > 0 };
 
         #endregion
 
@@ -141,18 +220,6 @@ namespace HT.Api.Client.Contracts.Models
         public bool HasErrorCode(ErrorCodes errorCode)
         {
             return Errors?.Any(e => e.StatusCode == errorCode) ?? false;
-        }
-
-        #endregion
-
-        #region Error Management
-
-        /// <summary>
-        /// Clears all errors
-        /// </summary>
-        public void ClearErrors()
-        {
-            Errors?.Clear();
         }
 
         /// <summary>
@@ -185,49 +252,6 @@ namespace HT.Api.Client.Contracts.Models
             AddValidationError(property, detail);
             return this;
         }
-
-        #endregion
-
-        #region Bulk Error Operations
-
-        /// <summary>
-        /// Adds multiple validation errors for a property
-        /// </summary>
-        public void AddValidationErrors(string propertyName, IEnumerable<string> messages)
-        {
-            foreach (var message in messages)
-            {
-                AddValidationError(propertyName, message);
-            }
-        }
-
-        /// <summary>
-        /// Adds validation errors from a dictionary
-        /// </summary>
-        public void AddValidationErrors(Dictionary<string, List<string>> validationErrors)
-        {
-            foreach (var kvp in validationErrors)
-            {
-                foreach (var error in kvp.Value)
-                {
-                    AddValidationError(kvp.Key, error);
-                }
-            }
-        }
-
-        #endregion
-
-        #region JSON Serialization Helpers
-
-        /// <summary>
-        /// Determines whether to serialize the Errors property
-        /// </summary>
-        public bool ShouldSerializeErrors() => Errors is { Count: > 0 };
-
-        /// <summary>
-        /// Determines whether to serialize the Links property
-        /// </summary>
-        public bool ShouldSerializeLinks() => Links is { Count: > 0 };
 
         #endregion
     }

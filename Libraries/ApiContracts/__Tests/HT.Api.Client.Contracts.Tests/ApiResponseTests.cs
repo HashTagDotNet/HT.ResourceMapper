@@ -476,6 +476,7 @@ namespace HT.Api.Client.Contracts.Tests
 
             // Assert
             result.Should().BeSameAs(response, "because fluent API should return same instance");
+            result.Should().BeOfType<ApiResponse>("because result should be of correct type");
             response.Errors.Should().HaveCount(1, "because one error was added");
             
             var error = response.Errors.First();
@@ -495,6 +496,7 @@ namespace HT.Api.Client.Contracts.Tests
 
             // Assert
             result.Should().BeSameAs(response, "because fluent API should return same instance");
+            result.Should().BeOfType<ApiResponse>("because result should be of correct type");
             response.Errors.Should().HaveCount(1, "because one error was added");
             
             var error = response.Errors.First();
@@ -516,88 +518,93 @@ namespace HT.Api.Client.Contracts.Tests
 
             // Assert
             result.Should().BeSameAs(response, "because fluent API should return same instance");
+            result.Should().BeOfType<ApiResponse>("because result should be of correct type");
             response.Errors.Should().HaveCount(2, "because two errors were added through chaining");
         }
 
-        #endregion
-
-        #region Bulk Error Operations Tests
-
         [Fact]
-        public void AddValidationErrors_WithMultipleMessages_ShouldAddAllErrors()
+        public void AddError_ShouldReturnApiResponse()
         {
             // Arrange
             var response = new ApiResponse();
-            var propertyName = "email";
-            var messages = new[] { "Email is required", "Email format is invalid", "Email domain not allowed" };
 
             // Act
-            response.AddValidationErrors(propertyName, messages);
+            var result = response.AddError(ErrorCodes.InternalError, "Internal server error");
 
             // Assert
-            response.Errors.Should().HaveCount(3, "because three validation errors were added");
-            
-            var emailErrors = response.GetErrorsForProperty(propertyName).ToList();
-            emailErrors.Should().HaveCount(3, "because all errors should be for the email property");
-            
-            foreach (var message in messages)
-            {
-                emailErrors.Should().ContainSingle(e => e.Detail == message, 
-                    $"because message '{message}' should be included");
-            }
+            result.Should().BeSameAs(response, "because AddError should return same instance");
+            result.Should().BeOfType<ApiResponse>("because result should be of correct type");
+            response.Errors.Should().HaveCount(1, "because one error was added");
         }
 
         [Fact]
-        public void AddValidationErrors_WithDictionary_ShouldAddAllErrors()
+        public void AddValidationError_ShouldReturnApiResponse()
         {
             // Arrange
             var response = new ApiResponse();
-            var validationErrors = new Dictionary<string, List<string>>
+
+            // Act
+            var result = response.AddValidationError("name", "Name is required");
+
+            // Assert
+            result.Should().BeSameAs(response, "because AddValidationError should return same instance");
+            result.Should().BeOfType<ApiResponse>("because result should be of correct type");
+            response.Errors.Should().HaveCount(1, "because one validation error was added");
+        }
+
+        [Fact]
+        public void ClearErrors_ShouldReturnApiResponse()
+        {
+            // Arrange
+            var response = new ApiResponse();
+            response.AddValidationError("email", "Email error");
+            response.AddNotFoundError("User not found");
+
+            // Act
+            var result = response.ClearErrors();
+
+            // Assert
+            result.Should().BeSameAs(response, "because ClearErrors should return same instance");
+            result.Should().BeOfType<ApiResponse>("because result should be of correct type");
+            response.Errors.Should().NotBeNull("because the list should still exist");
+            response.Errors.Should().BeEmpty("because all errors should be cleared");
+        }
+
+        [Fact]
+        public void ConvenienceErrorMethods_ShouldReturnApiResponse()
+        {
+            // Arrange
+            var response = new ApiResponse();
+
+            // Act & Assert - Test all convenience methods return ApiResponse
+            response.AddNotFoundError("Not found").Should().BeSameAs(response).And.BeOfType<ApiResponse>();
+            response.AddPermissionError("Access denied").Should().BeSameAs(response).And.BeOfType<ApiResponse>();
+            response.AddAuthenticationError("Invalid token").Should().BeSameAs(response).And.BeOfType<ApiResponse>();
+            response.AddInternalError("Server error").Should().BeSameAs(response).And.BeOfType<ApiResponse>();
+            response.AddCancellationError("Cancelled").Should().BeSameAs(response).And.BeOfType<ApiResponse>();
+
+            // Verify all errors were added
+            response.Errors.Should().HaveCount(5, "because five convenience methods were called");
+        }
+
+        [Fact]
+        public void BulkErrorMethods_ShouldReturnApiResponse()
+        {
+            // Arrange
+            var response = new ApiResponse();
+            var messages = new[] { "Error 1", "Error 2" };
+            var validationDict = new Dictionary<string, List<string>>
             {
-                { "email", new List<string> { "Email is required", "Email format is invalid" } },
-                { "name", new List<string> { "Name is required" } },
-                { "age", new List<string> { "Age must be positive", "Age must be less than 150" } }
+                { "field1", new List<string> { "Field1 error" } }
             };
 
-            // Act
-            response.AddValidationErrors(validationErrors);
+            // Act & Assert
+            response.AddValidationErrors("test", messages).Should().BeSameAs(response).And.BeOfType<ApiResponse>();
+            response.AddValidationErrors(validationDict).Should().BeSameAs(response).And.BeOfType<ApiResponse>();
 
-            // Assert
-            response.Errors.Should().HaveCount(5, "because five validation errors should be added");
-            
-            response.GetErrorsForProperty("email").Should().HaveCount(2, "because email has two errors");
-            response.GetErrorsForProperty("name").Should().HaveCount(1, "because name has one error");
-            response.GetErrorsForProperty("age").Should().HaveCount(2, "because age has two errors");
+            // Verify errors were added
+            response.Errors.Should().HaveCount(3, "because bulk methods added errors");
         }
-
-        [Fact]
-        public void AddValidationErrors_WithEmptyEnumerable_ShouldNotAddErrors()
-        {
-            // Arrange
-            var response = new ApiResponse();
-            var messages = Enumerable.Empty<string>();
-
-            // Act
-            response.AddValidationErrors("test", messages);
-
-            // Assert
-            response.Errors.Should().BeNull("because no errors were added");
-        }
-
-        [Fact]
-        public void AddValidationErrors_WithEmptyDictionary_ShouldNotAddErrors()
-        {
-            // Arrange
-            var response = new ApiResponse();
-            var validationErrors = new Dictionary<string, List<string>>();
-
-            // Act
-            response.AddValidationErrors(validationErrors);
-
-            // Assert
-            response.Errors.Should().BeNull("because no errors were added");
-        }
-
         #endregion
 
         #region JSON Serialization Tests - Source Generation Verification

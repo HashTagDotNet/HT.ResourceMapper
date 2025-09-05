@@ -280,5 +280,76 @@ namespace HT.Api.Client.Contracts.Extensions
                 e.SeverityClass == "warning" || 
                 e.SeverityClass == "info");
         }
+
+        #region ApiResponse<TData> Extensions
+
+        /// <summary>
+        /// Indicates if the response has data
+        /// </summary>
+        /// <param name="response">The ApiResponse&lt;TData&gt; to check</param>
+        /// <returns>True if data is present, false otherwise</returns>
+        public static bool HasData<TData>(this ApiResponse<TData> response) where TData : class, new()
+            => response.Data != null;
+
+        /// <summary>
+        /// Gets the data or returns a new instance if data is null (useful for Blazor binding)
+        /// </summary>
+        /// <param name="response">The ApiResponse&lt;TData&gt; to check</param>
+        /// <returns>The data or a new default instance</returns>
+        public static TData DataOrDefault<TData>(this ApiResponse<TData> response) where TData : class, new()
+            => response.Data ?? new TData();
+
+        /// <summary>
+        /// Validates JSON:API compliance - ensures data and errors don't coexist
+        /// </summary>
+        /// <param name="response">The ApiResponse&lt;TData&gt; to check</param>
+        /// <returns>True if compliant, false otherwise</returns>
+        public static bool IsJsonApiCompliant<TData>(this ApiResponse<TData> response) where TData : class, new()
+            => !(response.HasData() && (response.Errors?.Any() == true));
+
+        /// <summary>
+        /// Gets validation issues with JSON:API compliance
+        /// </summary>
+        /// <param name="response">The ApiResponse&lt;TData&gt; to check</param>
+        /// <returns>Enumerable of compliance issue descriptions</returns>
+        public static IEnumerable<string> GetComplianceIssues<TData>(this ApiResponse<TData> response) where TData : class, new()
+        {
+            var issues = new List<string>();
+            
+            if (response.HasData() && response.Errors?.Any() == true)
+            {
+                issues.Add("JSON:API violation: Data and Errors cannot coexist in the same response");
+            }
+            
+            return issues;
+        }
+
+        /// <summary>
+        /// Gets CSS class based on response state (for Blazor UI)
+        /// </summary>
+        /// <param name="response">The ApiResponse&lt;TData&gt; to check</param>
+        /// <returns>CSS class string for UI styling</returns>
+        public static string GetResponseStateClass<TData>(this ApiResponse<TData> response) where TData : class, new()
+        {
+            if (response.HasData()) return "response-success";
+            if (response.Errors?.Any(e => e.IsServerError) == true) return "response-server-error";
+            if (response.Errors?.Any(e => e.IsClientError) == true) return "response-client-error";
+            if (response.Errors?.Any(e => e.IsCancelled) == true) return "response-cancelled";
+            return "response-unknown";
+        }
+
+        /// <summary>
+        /// Gets icon class for response state (Font Awesome compatible)
+        /// </summary>
+        /// <param name="response">The ApiResponse&lt;TData&gt; to check</param>
+        /// <returns>Icon class string for UI display</returns>
+        public static string GetResponseStateIcon<TData>(this ApiResponse<TData> response) where TData : class, new()
+        {
+            if (response.HasData()) return "fa-check-circle";
+            if (response.Errors?.Any() == true) return "fa-exclamation-circle";
+            return "fa-question-circle";
+        }
+
+        #endregion
     }
 }
