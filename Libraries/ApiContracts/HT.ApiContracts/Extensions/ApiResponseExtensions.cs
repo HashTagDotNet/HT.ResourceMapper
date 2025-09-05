@@ -155,28 +155,6 @@ namespace HT.Api.Client.Contracts.Extensions
             => response.Errors?.Where(e => e.ResultCategory == category) ?? Enumerable.Empty<ErrorMessage>();
 
         /// <summary>
-        /// Gets CSS classes for all errors combined (for Blazor UI).
-        /// </summary>
-        /// <param name="response">The ApiResponse to check</param>
-        /// <param name="separator">Separator between CSS classes</param>
-        /// <returns>Combined CSS classes string</returns>
-        public static string GetCombinedSeverityClasses(this ApiResponse response, string separator = " ")
-        {
-            if (response.Errors == null || !response.Errors.Any()) return "alert-success";
-            
-            var severityClasses = response.Errors.Select(e => e.AlertClass).Distinct();
-            return string.Join(separator, severityClasses);
-        }
-
-        /// <summary>
-        /// Gets the most severe CSS class for display.
-        /// </summary>
-        /// <param name="response">The ApiResponse to check</param>
-        /// <returns>The CSS class for the most severe error</returns>
-        public static string GetPrimarySeverityClass(this ApiResponse response) 
-            => response.GetMostSevereError()?.AlertClass ?? "alert-success";
-
-        /// <summary>
         /// Gets user-friendly error messages for display.
         /// </summary>
         /// <param name="response">The ApiResponse to check</param>
@@ -322,32 +300,6 @@ namespace HT.Api.Client.Contracts.Extensions
             }
             
             return issues;
-        }
-
-        /// <summary>
-        /// Gets CSS class based on response state (for Blazor UI)
-        /// </summary>
-        /// <param name="response">The ApiResponse&lt;TData&gt; to check</param>
-        /// <returns>CSS class string for UI styling</returns>
-        public static string GetResponseStateClass<TData>(this ApiResponse<TData> response) where TData : class, new()
-        {
-            if (response.HasData()) return "response-success";
-            if (response.Errors?.Any(e => e.IsServerError) == true) return "response-server-error";
-            if (response.Errors?.Any(e => e.IsClientError) == true) return "response-client-error";
-            if (response.Errors?.Any(e => e.IsCancelled) == true) return "response-cancelled";
-            return "response-unknown";
-        }
-
-        /// <summary>
-        /// Gets icon class for response state (Font Awesome compatible)
-        /// </summary>
-        /// <param name="response">The ApiResponse&lt;TData&gt; to check</param>
-        /// <returns>Icon class string for UI display</returns>
-        public static string GetResponseStateIcon<TData>(this ApiResponse<TData> response) where TData : class, new()
-        {
-            if (response.HasData()) return "fa-check-circle";
-            if (response.Errors?.Any() == true) return "fa-exclamation-circle";
-            return "fa-question-circle";
         }
 
         #endregion

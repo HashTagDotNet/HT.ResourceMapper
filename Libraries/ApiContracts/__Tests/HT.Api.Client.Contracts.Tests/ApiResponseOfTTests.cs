@@ -433,52 +433,6 @@ namespace HT.Api.Client.Contracts.Tests
             issues.First().Should().Contain("JSON:API violation", "because it should describe the violation");
         }
 
-        [Fact]
-        public void GetResponseStateClass_ExtensionMethod_ShouldReturnCorrectClasses()
-        {
-            // Arrange
-            var response = new ApiResponse<TestUser>();
-            var user = new TestUser { Id = 1, Name = "John Doe" };
-
-            // Act & Assert - Success state
-            response.SetData(user);
-            response.GetResponseStateClass().Should().Be("response-success", "because response has data");
-
-            // Error states
-            response.ClearData();
-            response.AddError(ErrorCodes.InternalError, "Server error");
-            response.GetResponseStateClass().Should().Be("response-server-error", "because response has server error");
-
-            response.ClearErrors();
-            response.AddValidationError("email", "Invalid email");
-            response.GetResponseStateClass().Should().Be("response-client-error", "because response has client error");
-
-            response.ClearErrors();
-            response.AddCancellationError("Operation cancelled");
-            response.GetResponseStateClass().Should().Be("response-cancelled", "because response has cancellation");
-        }
-
-        [Fact]
-        public void GetResponseStateIcon_ExtensionMethod_ShouldReturnCorrectIcons()
-        {
-            // Arrange
-            var response = new ApiResponse<TestUser>();
-            var user = new TestUser { Id = 1, Name = "John Doe" };
-
-            // Act & Assert - Success state
-            response.SetData(user);
-            response.GetResponseStateIcon().Should().Be("fa-check-circle", "because response has data");
-
-            // Error state
-            response.ClearData();
-            response.AddError(ErrorCodes.NotFound, "Not found");
-            response.GetResponseStateIcon().Should().Be("fa-exclamation-circle", "because response has errors");
-
-            // Unknown state
-            response.ClearErrors();
-            response.GetResponseStateIcon().Should().Be("fa-question-circle", "because response state is unknown");
-        }
-
         #endregion
 
         #region JSON Serialization Tests
