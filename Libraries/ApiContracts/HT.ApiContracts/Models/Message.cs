@@ -14,11 +14,11 @@ namespace HT.Api.Client.Contracts.Models
         public string? MessageType { get; set; }
 
         /// <summary>
-        /// Tells caller how important this message might be. (e.g. toast messages) <inheritdoc cref="MessageLevel"/>
+        /// Tells caller how important this message might be. (e.g. toast messages) <inheritdoc cref="MessageSeverity"/>
         /// </summary>
         [JsonConverter(typeof(JsonStringEnumConverter))]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public MessageLevel? SeverityCode { get; set; }
+        public MessageSeverity? SeverityCode { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? SeverityId => SeverityCode != null ? (int)SeverityCode : null;

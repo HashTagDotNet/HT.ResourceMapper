@@ -3,6 +3,7 @@ using HT.Api.Service.Contracts;
 using HT.Microsoft.ILogger.Extensions;
 using Microsoft.Extensions.Logging;
 using HT.Api.Client.Contracts.Models;
+using HT.Api.Client.Contracts.Extensions;
 
 namespace ResourceMapper.Common.Server.Base
 {
@@ -151,8 +152,8 @@ namespace ResourceMapper.Common.Server.Base
                 response.ApiResponse.AddValidationError(error.PropertyName, error.ErrorMessage);
             }
 
-            // Set HTTP status code based on the primary error code
-            var primaryHttpStatus = response.ApiResponse.PrimaryHttpStatusCode;
+            // Set HTTP status code based on the primary error code using extension method
+            var primaryHttpStatus = response.ApiResponse.GetPrimaryHttpStatusCode();
             response.SetStatusCode(primaryHttpStatus);
 
             if (validationResult.Errors.Count == 1)

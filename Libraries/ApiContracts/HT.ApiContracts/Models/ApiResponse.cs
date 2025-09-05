@@ -3,6 +3,15 @@ using HT.Api.Client.Contracts.Interfaces;
 
 namespace HT.Api.Client.Contracts.Models
 {
+    /// <summary>
+    /// Base API response following JSON:API specification with ErrorCode-first approach.
+    /// ErrorCodes are the primary status indicators - HTTP status codes are derived automatically.
+    /// Use AddError() methods with ErrorCodes rather than setting HTTP status directly.
+    /// This design is based on the JSON:API specification (https://jsonapi.org/) with some customizations.
+    /// 
+    /// NOTE: Computed properties have been moved to ApiResponseExtensions for source generation compatibility.
+    /// Use extension methods like response.IsSuccess() instead of response.IsSuccess property.
+    /// </summary>
     public partial class ApiResponse : IApiResponse 
     {
         /// <summary>
@@ -11,7 +20,6 @@ namespace HT.Api.Client.Contracts.Models
         [JsonPropertyOrder(int.MinValue)]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<ErrorMessage>? Errors { get; set; }
-        public bool ShouldSerializeErrors() => Errors is { Count: > 0 };
 
         /// <summary>
         /// List of links (e.g. to object, log entries, etc.) https://jsonapi.org/format/#document-top-level
@@ -19,7 +27,6 @@ namespace HT.Api.Client.Contracts.Models
         [JsonPropertyOrder(int.MaxValue-1)]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<Link>? Links { get; set; }
-        public bool ShouldSerializeLinks() => Links is { Count: > 0 };
 
         /// <summary>
         /// Included in each response. https://jsonapi.org/format/#document-meta
@@ -28,57 +35,7 @@ namespace HT.Api.Client.Contracts.Models
         [JsonPropertyOrder(int.MaxValue)]
         public MetaData MetaData { get; set; } = new MetaData();
 
-        /// <summary>
-        /// Indicates if the response represents success (no errors or all errors are success codes)
-        /// </summary>
-        [JsonIgnore]
-        public bool IsSuccess => Errors?.All(e => e.IsSuccess) ?? true;
-
-        /// <summary>
-        /// Indicates if the response has any failure errors
-        /// </summary>
-        [JsonIgnore]
-        public bool HasFailures => Errors?.Any(e => e.IsFailure) ?? false;
-
-        /// <summary>
-        /// Indicates if the response has any server errors
-        /// </summary>
-        [JsonIgnore]
-        public bool HasServerErrors => Errors?.Any(e => e.IsServerError) ?? false;
-
-        /// <summary>
-        /// Indicates if the response has any client errors
-        /// </summary>
-        [JsonIgnore]
-        public bool HasClientErrors => Errors?.Any(e => e.IsClientError) ?? false;
-
-        /// <summary>
-        /// Gets the highest priority error (lowest number = highest priority)
-        /// </summary>
-        [JsonIgnore]
-        public ErrorMessage? HighestPriorityError => Errors?.OrderBy(e => e.Priority).FirstOrDefault();
-
-        /// <summary>
-        /// Gets the primary HTTP status code based on the highest priority error
-        /// </summary>
-        [JsonIgnore]
-        public System.Net.HttpStatusCode PrimaryHttpStatusCode => 
-            HighestPriorityError?.HttpStatusCode ?? System.Net.HttpStatusCode.OK;
-
-        /// <summary>
-        /// Gets the overall result category for the response
-        /// </summary>
-        [JsonIgnore]
-        public ResultCategory ResultCategory
-        {
-            get
-            {
-                if (IsSuccess) return ResultCategory.Success;
-                if (HasServerErrors) return ResultCategory.ServerError;
-                if (HasClientErrors) return ResultCategory.ClientError;
-                return ResultCategory.Failure;
-            }
-        }
+        #region Error Management Methods
 
         /// <summary>
         /// Adds a validation error using ErrorCode approach (developer sets ErrorCode, HTTP status derived)
@@ -117,45 +74,49 @@ namespace HT.Api.Client.Contracts.Models
             Errors.Add(error);
         }
 
+        #endregion
+
+        #region Convenience Error Methods
+
         /// <summary>
         /// Convenience method to add common errors
         /// </summary>
         public void AddNotFoundError(string? detail = null, string? property = null)
-        {
-            AddError(ErrorCodes.NotFound, detail, property);
-        }
+            => AddError(ErrorCodes.NotFound, detail, property);
 
         /// <summary>
         /// Convenience method to add validation errors
         /// </summary>
         public void AddValidationError(string property, string detail)
-        {
-            AddError(ErrorCodes.InvalidArgument, detail, property);
-        }
+            => AddError(ErrorCodes.InvalidArgument, detail, property);
 
         /// <summary>
         /// Convenience method to add permission errors
         /// </summary>
         public void AddPermissionError(string? detail = null, string? property = null)
-        {
-            AddError(ErrorCodes.PermissionDenied, detail, property);
-        }
+            => AddError(ErrorCodes.PermissionDenied, detail, property);
 
         /// <summary>
         /// Convenience method to add authentication errors
         /// </summary>
         public void AddAuthenticationError(string? detail = null)
-        {
-            AddError(ErrorCodes.Unauthenticated, detail);
-        }
+            => AddError(ErrorCodes.Unauthenticated, detail);
 
         /// <summary>
         /// Convenience method to add internal server errors
         /// </summary>
         public void AddInternalError(string? detail = null)
-        {
-            AddError(ErrorCodes.InternalError, detail);
-        }
+            => AddError(ErrorCodes.InternalError, detail);
+
+        /// <summary>
+        /// Convenience method to add cancellation errors
+        /// </summary>
+        public void AddCancellationError(string? detail = null)
+            => AddError(ErrorCodes.Cancelled, detail);
+
+        #endregion
+
+        #region Error Query Methods
 
         /// <summary>
         /// Gets all errors for a specific property
@@ -182,6 +143,10 @@ namespace HT.Api.Client.Contracts.Models
             return Errors?.Any(e => e.StatusCode == errorCode) ?? false;
         }
 
+        #endregion
+
+        #region Error Management
+
         /// <summary>
         /// Clears all errors
         /// </summary>
@@ -198,6 +163,73 @@ namespace HT.Api.Client.Contracts.Models
             if (Errors == null || !Errors.Any()) return string.Empty;
             return string.Join(separator, Errors.Select(e => e.Detail ?? e.GetDescription()));
         }
+
+        #endregion
+
+        #region Fluent API
+
+        /// <summary>
+        /// Fluent API to add an error and return the response
+        /// </summary>
+        public ApiResponse WithError(ErrorCodes errorCode, string? detail = null, string? property = null)
+        {
+            AddError(errorCode, detail, property);
+            return this;
+        }
+
+        /// <summary>
+        /// Fluent API to add validation error and return the response
+        /// </summary>
+        public ApiResponse WithValidationError(string property, string detail)
+        {
+            AddValidationError(property, detail);
+            return this;
+        }
+
+        #endregion
+
+        #region Bulk Error Operations
+
+        /// <summary>
+        /// Adds multiple validation errors for a property
+        /// </summary>
+        public void AddValidationErrors(string propertyName, IEnumerable<string> messages)
+        {
+            foreach (var message in messages)
+            {
+                AddValidationError(propertyName, message);
+            }
+        }
+
+        /// <summary>
+        /// Adds validation errors from a dictionary
+        /// </summary>
+        public void AddValidationErrors(Dictionary<string, List<string>> validationErrors)
+        {
+            foreach (var kvp in validationErrors)
+            {
+                foreach (var error in kvp.Value)
+                {
+                    AddValidationError(kvp.Key, error);
+                }
+            }
+        }
+
+        #endregion
+
+        #region JSON Serialization Helpers
+
+        /// <summary>
+        /// Determines whether to serialize the Errors property
+        /// </summary>
+        public bool ShouldSerializeErrors() => Errors is { Count: > 0 };
+
+        /// <summary>
+        /// Determines whether to serialize the Links property
+        /// </summary>
+        public bool ShouldSerializeLinks() => Links is { Count: > 0 };
+
+        #endregion
     }
 }
 

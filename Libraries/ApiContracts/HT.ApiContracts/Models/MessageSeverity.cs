@@ -8,7 +8,7 @@ namespace HT.Api.Client.Contracts.Models
     /// <remarks>
     /// Based on industry syslog severities. Note values are reverse of syslog values to help in filtering scenarios. See <a href="https://en.wikipedia.org/wiki/Syslog">SysLog</a>
     /// </remarks>
-    public enum MessageLevel
+    public enum MessageSeverity
     {
         /// <summary>
         /// API doesn't want to assign a severity level
