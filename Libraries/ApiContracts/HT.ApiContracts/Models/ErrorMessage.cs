@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Dynamic;
+using System.Text.Json.Serialization;
 
 // ReSharper disable UnusedMember.Global
 
@@ -10,86 +11,52 @@ namespace HT.Api.Client.Contracts.Models
     public class ErrorMessage : MessageBase
     {
         /// <summary>
-        /// <inheritdoc cref="CallStatusCode"/>
+        /// <inheritdoc cref="Models.CallStatusCode"/>
         /// </summary>
-        public int StatusId => (int)StatusCode;
-
-        /// <summary>
-        /// <inheritdoc cref="CallStatusCode"/>
-        /// </summary>
-        public CallStatusCode StatusCode { get; set; } = CallStatusCode.Ok;
+        public int CallStatusId { get; set; }
+            
 
         /// <summary>
         /// Indicates if this error represents a success state
         /// </summary>
-        [JsonIgnore]
-        public bool IsSuccess => StatusCode.IsSuccess();
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool IsSuccess => CallStatus.IsSuccess();
 
         /// <summary>
         /// Indicates if this error represents a failure state
         /// </summary>
-        [JsonIgnore]
-        public bool IsFailure => StatusCode.IsFailure();
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool IsFailure => CallStatus.IsFailure();
 
         /// <summary>
         /// Indicates if this error represents a cancelled operation
         /// </summary>
-        [JsonIgnore]
-        public bool IsCancelled => StatusCode.IsCancelled();
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool IsCancelled => CallStatus.IsCancelled();
 
         /// <summary>
         /// Indicates if this is a client error (4xx equivalent)
         /// </summary>
-        [JsonIgnore]
-        public bool IsClientError => StatusCode.IsClientError();
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool IsClientError => CallStatus.IsClientError();
 
         /// <summary>
         /// Indicates if this is a server error (5xx equivalent)
         /// </summary>
-        [JsonIgnore]
-        public bool IsServerError => StatusCode.IsServerError();
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool IsServerError => CallStatus.IsServerError();
 
         /// <summary>
         /// Indicates if the operation can be retried
         /// </summary>
-        [JsonIgnore]
-        public bool IsRetryable => StatusCode.IsRetryable();
-
-        /// <summary>
-        /// Gets the CSS class for UI severity display
-        /// </summary>
-        [JsonIgnore]
-        public string SeverityClass => StatusCode.GetSeverityClass();
-
-        /// <summary>
-        /// Gets the CSS alert class for UI display (Bootstrap compatible)
-        /// </summary>
-        [JsonIgnore]
-        public string AlertClass => StatusCode.GetAlertClass();
-
-        /// <summary>
-        /// Gets the icon class for UI display (Font Awesome compatible)
-        /// </summary>
-        [JsonIgnore]
-        public string IconClass => StatusCode.GetIconClass();
-
-        /// <summary>
-        /// Gets the priority level for error handling (1 = highest, 5 = lowest)
-        /// </summary>
-        [JsonIgnore]
-        public int Priority => StatusCode.GetPriority();
-
-        /// <summary>
-        /// Gets the result category for business logic decisions
-        /// </summary>
-        [JsonIgnore]
-        public ResultCategory ResultCategory => StatusCode.GetResultCategory();
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool IsRetryable => CallStatus.IsRetryable();
 
         /// <summary>
         /// Gets the corresponding HTTP status code (derived from ErrorCode)
         /// </summary>
-        [JsonIgnore]
-        public System.Net.HttpStatusCode HttpStatusCode => StatusCode.ToHttpStatusCode();
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public System.Net.HttpStatusCode? HttpStatusCode { get; set; }
 
         /// <summary>
         /// Practical actions that the developer of application consuming the API could take in order to resolve the error condition.  May be localized to callers language, resource code, or other content. 
@@ -108,7 +75,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public string GetDescription()
         {
-            return StatusCode.GetDescription();
+            return CallStatus.GetDescription();
         }
 
         /// <summary>
@@ -116,7 +83,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public string GetUserActionSuggestion()
         {
-            return SuggestedUserActions ?? StatusCode.GetUserActionSuggestion();
+            return SuggestedUserActions ?? CallStatus.GetUserActionSuggestion();
         }
 
         /// <summary>
@@ -124,7 +91,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public string GetDeveloperActionSuggestion()
         {
-            return SuggestedApplicationActions ?? StatusCode.GetDeveloperActionSuggestion();
+            return SuggestedApplicationActions ?? CallStatus.GetDeveloperActionSuggestion();
         }
 
         /// <summary>
@@ -134,7 +101,7 @@ namespace HT.Api.Client.Contracts.Models
         {
             return new ErrorMessage
             {
-                StatusCode = errorCode,
+                CallStatus = errorCode,
                 Detail = detail ?? errorCode.GetDescription(),
                 Property = property
             };

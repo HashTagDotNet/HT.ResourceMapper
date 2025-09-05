@@ -294,32 +294,7 @@ namespace HT.Api.Client.Contracts.Models
             return $"alert-{GetSeverityClass(errorCode)}";
         }
 
-        /// <summary>
-        /// Gets the appropriate icon name for the error code (Font Awesome compatible)
-        /// </summary>
-        public static string GetIconClass(this CallStatusCode errorCode)
-        {
-            return errorCode switch
-            {
-                CallStatusCode.Ok => "fa-check-circle",
-                CallStatusCode.Cancelled => "fa-times-circle",
-                CallStatusCode.InvalidArgument => "fa-exclamation-triangle",
-                CallStatusCode.NotFound => "fa-search",
-                CallStatusCode.AlreadyExists => "fa-copy",
-                CallStatusCode.PermissionDenied => "fa-lock",
-                CallStatusCode.Unauthenticated => "fa-user-slash",
-                CallStatusCode.ResourceExhausted => "fa-battery-empty",
-                CallStatusCode.FailedPrecondition => "fa-exclamation-triangle",
-                CallStatusCode.Aborted => "fa-stop-circle",
-                CallStatusCode.OutOfRange => "fa-ruler",
-                CallStatusCode.NotImplemented => "fa-wrench",
-                CallStatusCode.InternalError => "fa-bug",
-                CallStatusCode.Unavailable => "fa-server",
-                CallStatusCode.OperationTimeOut => "fa-clock",
-                CallStatusCode.Error => "fa-exclamation-circle",
-                _ => "fa-question-circle"
-            };
-        }
+  
 
         /// <summary>
         /// Gets the priority level for error handling (1 = highest, 5 = lowest)

@@ -9,6 +9,7 @@
   </Folder>
   <Folder Name="/Libraries/ApiContracts/_Tests/">
     <Project Path="Libraries/ApiContracts/__Tests/HT.Api.Client.Contracts.Tests/HT.Api.Client.Contracts.Tests.csproj" Id="72111eaa-2191-410a-baad-3ccf59827784" />
+    <Project Path="Libraries/ApiContracts/__Tests/HT.Api.Service.Contracts.Tests/HT.Api.Service.Contracts.Tests.csproj" Id="638347df-92c5-4f15-90b5-149fd126467e" />
   </Folder>
   <Folder Name="/Libraries/Collections/">
     <Project Path="Libraries/Collections/HT.Collections/HT.Collections.csproj" />

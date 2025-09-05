@@ -87,7 +87,7 @@ namespace HT.Api.Client.Contracts.Extensions
         /// <param name="response">The ApiResponse to check</param>
         /// <returns>The most severe error, or null if no errors exist</returns>
         public static ErrorMessage? GetMostSevereError(this ApiResponse response) 
-            => response.Errors?.OrderBy(e => e.Priority).ThenBy(e => e.StatusCode).FirstOrDefault();
+            => response.Errors?.OrderBy(e => e.Priority).ThenBy(e => e.CallStatus).FirstOrDefault();
 
         /// <summary>
         /// Gets the primary HTTP status code based on the authoritative CallStatus field.
@@ -143,7 +143,7 @@ namespace HT.Api.Client.Contracts.Extensions
         /// <param name="response">The ApiResponse to check</param>
         /// <returns>An array of error groups by error code</returns>
         public static IGrouping<CallStatusCode, ErrorMessage>[] GetErrorGroupsByCode(this ApiResponse response)
-            => response.Errors?.GroupBy(e => e.StatusCode).ToArray() ?? Array.Empty<IGrouping<CallStatusCode, ErrorMessage>>();
+            => response.Errors?.GroupBy(e => e.CallStatus).ToArray() ?? Array.Empty<IGrouping<CallStatusCode, ErrorMessage>>();
 
         /// <summary>
         /// Gets errors that can be retried.
@@ -190,7 +190,7 @@ namespace HT.Api.Client.Contracts.Extensions
             if (response.Errors == null || !response.Errors.Any()) return string.Empty;
             
             return string.Join(separator, response.Errors.Select(e => 
-                $"[{e.StatusCode}] {e.Detail ?? e.GetDescription()}"
+                $"[{e.CallStatus}] {e.Detail ?? e.GetDescription()}"
             ));
         }
 
@@ -260,7 +260,7 @@ namespace HT.Api.Client.Contracts.Extensions
         /// <param name="response">The ApiResponse to check</param>
         /// <returns>The error code of the highest priority error, or Ok if no errors</returns>
         public static CallStatusCode GetHighestPriorityErrorCode(this ApiResponse response)
-            => response.GetHighestPriorityError()?.StatusCode ?? CallStatusCode.Ok;
+            => response.GetHighestPriorityError()?.CallStatus ?? CallStatusCode.Ok;
 
         /// <summary>
         /// Checks if the response contains only warnings (info/warning severity errors).
@@ -272,8 +272,8 @@ namespace HT.Api.Client.Contracts.Extensions
             if (response.Errors == null || !response.Errors.Any()) return false;
             
             return response.Errors.All(e => 
-                e.StatusCode == CallStatusCode.AlreadyExists || 
-                e.StatusCode == CallStatusCode.NotImplemented ||
+                e.CallStatus == CallStatusCode.AlreadyExists || 
+                e.CallStatus == CallStatusCode.NotImplemented ||
                 e.SeverityClass == "warning" || 
                 e.SeverityClass == "info");
         }
@@ -350,7 +350,7 @@ namespace HT.Api.Client.Contracts.Extensions
             else
             {
                 var highestPriorityError = response.Errors.OrderBy(e => e.Priority).FirstOrDefault();
-                response.MetaData.CallStatus = highestPriorityError?.StatusCode ?? CallStatusCode.Ok;
+                response.MetaData.CallStatus = highestPriorityError?.CallStatus ?? CallStatusCode.Ok;
             }
             return response;
         }
@@ -393,7 +393,7 @@ namespace HT.Api.Client.Contracts.Extensions
             else if (response.Errors?.Any() == true)
             {
                 var highestPriorityError = response.Errors.OrderBy(e => e.Priority).FirstOrDefault();
-                response.MetaData.CallStatus = highestPriorityError?.StatusCode ?? CallStatusCode.Ok;
+                response.MetaData.CallStatus = highestPriorityError?.CallStatus ?? CallStatusCode.Ok;
             }
             else
             {

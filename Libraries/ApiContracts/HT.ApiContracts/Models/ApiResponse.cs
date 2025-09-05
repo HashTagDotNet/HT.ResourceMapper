@@ -47,7 +47,7 @@ namespace HT.Api.Client.Contracts.Models
             {
                 Property = propertyName,
                 Detail = message,
-                StatusCode = statusCode
+                CallStatus = statusCode
             };
             Errors.Add(errorMessage);
             UpdateCallStatus();
@@ -166,7 +166,7 @@ namespace HT.Api.Client.Contracts.Models
             {
                 // Set to the highest priority (most severe) error
                 var highestPriorityError = Errors.OrderBy(e => e.Priority).FirstOrDefault();
-                MetaData.CallStatus = highestPriorityError?.StatusCode ?? CallStatusCode.Ok;
+                MetaData.CallStatus = highestPriorityError?.CallStatus ?? CallStatusCode.Ok;
             }
         }
 
@@ -242,7 +242,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public IEnumerable<ErrorMessage> GetErrorsByCode(CallStatusCode statusCode)
         {
-            return Errors?.Where(e => e.StatusCode == statusCode) ?? Enumerable.Empty<ErrorMessage>();
+            return Errors?.Where(e => e.CallStatus == statusCode) ?? Enumerable.Empty<ErrorMessage>();
         }
 
         /// <summary>
@@ -250,7 +250,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public bool HasErrorCode(CallStatusCode statusCode)
         {
-            return Errors?.Any(e => e.StatusCode == statusCode) ?? false;
+            return Errors?.Any(e => e.CallStatus == statusCode) ?? false;
         }
 
         /// <summary>

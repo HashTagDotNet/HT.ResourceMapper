@@ -1,4 +1,4 @@
-﻿namespace ResourceMapper.Common.Server.Tests
+﻿namespace HT.Api.Service.Contracts.Tests
 {
     public class UnitTest1
     {

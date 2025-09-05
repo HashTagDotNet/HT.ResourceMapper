@@ -39,6 +39,26 @@ namespace HT.Api.Client.Contracts.Models
         /// The server MUST always ensure this value is set before the response is returned to the caller.
         /// The server can set this value based on the presence of CallStatusCodes in the Errors collection.
         /// </summary>
-        public CallStatusCode? CallStatus { get; set; } = CallStatusCode.Ok;
+        public CallStatusCode? CallStatus { get; set; }
+
+        public MetaData AddTag(string key, string? value)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new ArgumentNullException("Tag key cannot be null or whitespace", nameof(key));
+            }
+
+            Tags ??= new SortedDictionary<string, string>();
+            Tags[key] = value;
+            return this;
+        }
+        public MetaData AddMessage(Action<Message> configure)
+        {
+            Messages ??= new List<Message>();
+            var message = new Message();
+            configure(message);
+            Messages.Add(message);
+            return this;
+        }
     }
 }

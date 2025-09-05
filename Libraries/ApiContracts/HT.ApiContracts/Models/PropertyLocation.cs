@@ -6,9 +6,10 @@ namespace HT.Api.Client.Contracts.Models
     /// Component in HTTP request that is being referenced
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public enum RequestLocation
+    public enum PropertyLocation
     {
         Other = 0,
+
         /// <summary>
         /// Any part of request or not location specific (e.g. permission)
         /// </summary>

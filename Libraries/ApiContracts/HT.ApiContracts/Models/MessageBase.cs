@@ -4,6 +4,9 @@
 
 namespace HT.Api.Client.Contracts.Models
 {
+    /// <summary>
+    /// Based on: https://jsonapi.org/format/#errors
+    /// </summary>
     public class MessageBase
     {
         /// <summary>
@@ -11,6 +14,8 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? MessageUid { get; set; }
+
+        public CallStatusCode CallStatus { get; set; }
 
         /// <summary>
         /// An application-specific message identifier expressed as a string value. This is not a correlation id, but a code that can be used to uniquely identify message. 
@@ -48,7 +53,7 @@ namespace HT.Api.Client.Contracts.Models
         /// May be null when message is not related to a specific content of the request (e.g. authorization message, unhandled exception)
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public RequestLocation? RequestLocation { get; set; }
+        public PropertyLocation? RequestLocation { get; set; }
 
         /// <summary>
         /// Name of body property/field/attribute, header key, path segment, or query parameter that this message is referencing
@@ -62,5 +67,8 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<Link>? Links { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public MessageSeverity? Severity { get; set; }
     }
 }
