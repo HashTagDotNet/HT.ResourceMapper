@@ -6,9 +6,9 @@ using HT.Api.Client.Contracts.Interfaces;
 namespace HT.Api.Client.Contracts.Models
 {
     /// <summary>
-    /// Generic API response following JSON:API specification with ErrorCode-first approach.
+    /// Generic API response following JSON:API specification with CallStatusCode-first approach.
     /// This class represents a response that can contain either data of type TData OR errors, but never both.
-    /// ErrorCodes are the primary status indicators - HTTP status codes are derived automatically.
+    /// CallStatusCodes are the primary status indicators - HTTP status codes are derived automatically.
     /// 
     /// Usage Examples:
     /// <code>
@@ -16,7 +16,7 @@ namespace HT.Api.Client.Contracts.Models
     /// var response = ApiResponse&lt;UserDto&gt;.Success(userData);
     /// 
     /// // Error response
-    /// var errorResponse = ApiResponse&lt;UserDto&gt;.Error(ErrorCodes.NotFound, "User not found");
+    /// var errorResponse = ApiResponse&lt;UserDto&gt;.Error(CallStatusCode.NotFound, "User not found");
     /// 
     /// // Fluent API
     /// var validationResponse = new ApiResponse&lt;UserDto&gt;()
@@ -63,7 +63,7 @@ namespace HT.Api.Client.Contracts.Models
         }
 
         /// <summary>
-        /// Clears the data payload
+        /// Clears the data payload without affecting call status
         /// </summary>
         public ApiResponse<TData> ClearData()
         {
@@ -76,11 +76,11 @@ namespace HT.Api.Client.Contracts.Models
         #region Error Management with JSON:API Compliance
 
         /// <summary>
-        /// Adds an error using ErrorCode approach and clears data to maintain JSON:API compliance
+        /// Adds an error using CallStatusCode approach and clears data to maintain JSON:API compliance
         /// </summary>
-        public new ApiResponse<TData> AddError(ErrorCodes errorCode, string? detail = null, string? property = null)
+        public new ApiResponse<TData> AddError(CallStatusCode statusCode, string? detail = null, string? property = null)
         {
-            base.AddError(errorCode, detail, property);
+            base.AddError(statusCode, detail, property);
             // JSON:API compliance - clear data when errors are added
             ClearData();
             return this;
@@ -89,10 +89,10 @@ namespace HT.Api.Client.Contracts.Models
         /// <summary>
         /// Adds an error with custom user and developer action suggestions and clears data
         /// </summary>
-        public new ApiResponse<TData> AddError(ErrorCodes errorCode, string? detail, string? property, 
+        public new ApiResponse<TData> AddError(CallStatusCode statusCode, string? detail, string? property, 
             string? userActions, string? developerActions)
         {
-            base.AddError(errorCode, detail, property, userActions, developerActions);
+            base.AddError(statusCode, detail, property, userActions, developerActions);
             // JSON:API compliance - clear data when errors are added
             ClearData();
             return this;
@@ -109,6 +109,56 @@ namespace HT.Api.Client.Contracts.Models
             return this;
         }
 
+        /// <summary>
+        /// Convenience method to add common errors (generic version)
+        /// </summary>
+        public new ApiResponse<TData> AddNotFoundError(string? detail = null, string? property = null)
+        {
+            base.AddNotFoundError(detail, property);
+            ClearData();
+            return this;
+        }
+
+        /// <summary>
+        /// Convenience method to add permission errors (generic version)
+        /// </summary>
+        public new ApiResponse<TData> AddPermissionError(string? detail = null, string? property = null)
+        {
+            base.AddPermissionError(detail, property);
+            ClearData();
+            return this;
+        }
+
+        /// <summary>
+        /// Convenience method to add authentication errors (generic version)
+        /// </summary>
+        public new ApiResponse<TData> AddAuthenticationError(string? detail = null)
+        {
+            base.AddAuthenticationError(detail);
+            ClearData();
+            return this;
+        }
+
+        /// <summary>
+        /// Convenience method to add internal server errors (generic version)
+        /// </summary>
+        public new ApiResponse<TData> AddInternalError(string? detail = null)
+        {
+            base.AddInternalError(detail);
+            ClearData();
+            return this;
+        }
+
+        /// <summary>
+        /// Convenience method to add cancellation errors (generic version)
+        /// </summary>
+        public new ApiResponse<TData> AddCancellationError(string? detail = null)
+        {
+            base.AddCancellationError(detail);
+            ClearData();
+            return this;
+        }
+
         #endregion
 
         #region Fluent API (Generic Versions)
@@ -116,9 +166,9 @@ namespace HT.Api.Client.Contracts.Models
         /// <summary>
         /// Fluent API to add an error and return the response (generic version)
         /// </summary>
-        public new ApiResponse<TData> WithError(ErrorCodes errorCode, string? detail = null, string? property = null)
+        public new ApiResponse<TData> WithError(CallStatusCode statusCode, string? detail = null, string? property = null)
         {
-            AddError(errorCode, detail, property);
+            AddError(statusCode, detail, property);
             return this;
         }
 
@@ -151,16 +201,17 @@ namespace HT.Api.Client.Contracts.Models
         {
             var response = new ApiResponse<TData>();
             response.SetData(data);
+            response.MetaData.CallStatus = CallStatusCode.Ok;
             return response;
         }
 
         /// <summary>
         /// Creates an error response (no data)
         /// </summary>
-        public static ApiResponse<TData> Error(ErrorCodes errorCode, string? detail = null, string? property = null)
+        public static ApiResponse<TData> Error(CallStatusCode statusCode, string? detail = null, string? property = null)
         {
             var response = new ApiResponse<TData>();
-            response.AddError(errorCode, detail, property);
+            response.AddError(statusCode, detail, property);
             return response;
         }
 

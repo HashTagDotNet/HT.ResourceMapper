@@ -93,7 +93,7 @@ namespace HT.Api.Client.Contracts.Tests
             var response = new ApiResponse();
             var propertyName = "Email";
             var message = "Invalid email format";
-            var errorCode = ErrorCodes.InvalidArgument;
+            var errorCode = CallStatusCode.InvalidArgument;
 
             // Act
             response.AddValidation(propertyName, message, errorCode);
@@ -113,7 +113,7 @@ namespace HT.Api.Client.Contracts.Tests
         {
             // Arrange
             var response = new ApiResponse();
-            var errorCode = ErrorCodes.NotFound;
+            var errorCode = CallStatusCode.NotFound;
             var detail = "User not found";
             var property = "UserId";
 
@@ -135,7 +135,7 @@ namespace HT.Api.Client.Contracts.Tests
         {
             // Arrange
             var response = new ApiResponse();
-            var errorCode = ErrorCodes.Unauthenticated;
+            var errorCode = CallStatusCode.Unauthenticated;
             var detail = "Invalid credentials";
             var property = "credentials";
             var userActions = "Please check your username and password";
@@ -164,7 +164,7 @@ namespace HT.Api.Client.Contracts.Tests
             response.Errors.Should().BeNull("because errors list should start as null");
 
             // Act
-            response.AddError(ErrorCodes.InternalError);
+            response.AddError(CallStatusCode.InternalError);
 
             // Assert
             response.Errors.Should().NotBeNull("because errors list should be initialized");
@@ -189,7 +189,7 @@ namespace HT.Api.Client.Contracts.Tests
             // Assert
             response.Errors.Should().HaveCount(1, "because one error was added");
             var error = response.Errors.First();
-            error.StatusCode.Should().Be(ErrorCodes.NotFound, "because NotFound error code should be used");
+            error.StatusCode.Should().Be(CallStatusCode.NotFound, "because NotFound error code should be used");
             error.Detail.Should().Be(detail, "because detail should match");
             error.Property.Should().Be(property, "because property should match");
         }
@@ -208,7 +208,7 @@ namespace HT.Api.Client.Contracts.Tests
             // Assert
             response.Errors.Should().HaveCount(1, "because one error was added");
             var error = response.Errors.First();
-            error.StatusCode.Should().Be(ErrorCodes.InvalidArgument, "because InvalidArgument error code should be used");
+            error.StatusCode.Should().Be(CallStatusCode.InvalidArgument, "because InvalidArgument error code should be used");
             error.Detail.Should().Be(detail, "because detail should match");
             error.Property.Should().Be(property, "because property should match");
         }
@@ -226,7 +226,7 @@ namespace HT.Api.Client.Contracts.Tests
             // Assert
             response.Errors.Should().HaveCount(1, "because one error was added");
             var error = response.Errors.First();
-            error.StatusCode.Should().Be(ErrorCodes.PermissionDenied, "because PermissionDenied error code should be used");
+            error.StatusCode.Should().Be(CallStatusCode.PermissionDenied, "because PermissionDenied error code should be used");
             error.Detail.Should().Be(detail, "because detail should match");
         }
 
@@ -243,7 +243,7 @@ namespace HT.Api.Client.Contracts.Tests
             // Assert
             response.Errors.Should().HaveCount(1, "because one error was added");
             var error = response.Errors.First();
-            error.StatusCode.Should().Be(ErrorCodes.Unauthenticated, "because Unauthenticated error code should be used");
+            error.StatusCode.Should().Be(CallStatusCode.Unauthenticated, "because Unauthenticated error code should be used");
             error.Detail.Should().Be(detail, "because detail should match");
         }
 
@@ -260,7 +260,7 @@ namespace HT.Api.Client.Contracts.Tests
             // Assert
             response.Errors.Should().HaveCount(1, "because one error was added");
             var error = response.Errors.First();
-            error.StatusCode.Should().Be(ErrorCodes.InternalError, "because InternalError error code should be used");
+            error.StatusCode.Should().Be(CallStatusCode.InternalError, "because InternalError error code should be used");
             error.Detail.Should().Be(detail, "because detail should match");
         }
 
@@ -277,7 +277,7 @@ namespace HT.Api.Client.Contracts.Tests
             // Assert
             response.Errors.Should().HaveCount(1, "because one error was added");
             var error = response.Errors.First();
-            error.StatusCode.Should().Be(ErrorCodes.Cancelled, "because Cancelled error code should be used");
+            error.StatusCode.Should().Be(CallStatusCode.Cancelled, "because Cancelled error code should be used");
             error.Detail.Should().Be(detail, "because detail should match");
         }
 
@@ -329,9 +329,9 @@ namespace HT.Api.Client.Contracts.Tests
             response.AddValidationError("name", "Name error");
 
             // Act
-            var validationErrors = response.GetErrorsByCode(ErrorCodes.InvalidArgument).ToList();
-            var notFoundErrors = response.GetErrorsByCode(ErrorCodes.NotFound).ToList();
-            var nonExistentErrors = response.GetErrorsByCode(ErrorCodes.InternalError).ToList();
+            var validationErrors = response.GetErrorsByCode(CallStatusCode.InvalidArgument).ToList();
+            var notFoundErrors = response.GetErrorsByCode(CallStatusCode.NotFound).ToList();
+            var nonExistentErrors = response.GetErrorsByCode(CallStatusCode.InternalError).ToList();
 
             // Assert
             validationErrors.Should().HaveCount(2, "because there are two validation errors");
@@ -348,9 +348,9 @@ namespace HT.Api.Client.Contracts.Tests
             response.AddNotFoundError("User not found");
 
             // Act & Assert
-            response.HasErrorCode(ErrorCodes.InvalidArgument).Should().BeTrue("because there is a validation error");
-            response.HasErrorCode(ErrorCodes.NotFound).Should().BeTrue("because there is a not found error");
-            response.HasErrorCode(ErrorCodes.InternalError).Should().BeFalse("because there are no internal errors");
+            response.HasErrorCode(CallStatusCode.InvalidArgument).Should().BeTrue("because there is a validation error");
+            response.HasErrorCode(CallStatusCode.NotFound).Should().BeTrue("because there is a not found error");
+            response.HasErrorCode(CallStatusCode.InternalError).Should().BeFalse("because there are no internal errors");
         }
 
         [Fact]
@@ -451,7 +451,7 @@ namespace HT.Api.Client.Contracts.Tests
         {
             // Arrange
             var response = new ApiResponse();
-            response.AddError(ErrorCodes.NotFound); // No detail provided
+            response.AddError(CallStatusCode.NotFound); // No detail provided
 
             // Act
             var summary = response.GetErrorSummary();
@@ -472,7 +472,7 @@ namespace HT.Api.Client.Contracts.Tests
             var response = new ApiResponse();
 
             // Act
-            var result = response.WithError(ErrorCodes.NotFound, "User not found", "userId");
+            var result = response.WithError(CallStatusCode.NotFound, "User not found", "userId");
 
             // Assert
             result.Should().BeSameAs(response, "because fluent API should return same instance");
@@ -480,7 +480,7 @@ namespace HT.Api.Client.Contracts.Tests
             response.Errors.Should().HaveCount(1, "because one error was added");
             
             var error = response.Errors.First();
-            error.StatusCode.Should().Be(ErrorCodes.NotFound, "because error code should match");
+            error.StatusCode.Should().Be(CallStatusCode.NotFound, "because error code should match");
             error.Detail.Should().Be("User not found", "because detail should match");
             error.Property.Should().Be("userId", "because property should match");
         }
@@ -500,7 +500,7 @@ namespace HT.Api.Client.Contracts.Tests
             response.Errors.Should().HaveCount(1, "because one error was added");
             
             var error = response.Errors.First();
-            error.StatusCode.Should().Be(ErrorCodes.InvalidArgument, "because validation error should use InvalidArgument");
+            error.StatusCode.Should().Be(CallStatusCode.InvalidArgument, "because validation error should use InvalidArgument");
             error.Detail.Should().Be("Email is required", "because detail should match");
             error.Property.Should().Be("email", "because property should match");
         }
@@ -514,7 +514,7 @@ namespace HT.Api.Client.Contracts.Tests
             // Act
             var result = response
                 .WithValidationError("email", "Email is required")
-                .WithError(ErrorCodes.NotFound, "User not found");
+                .WithError(CallStatusCode.NotFound, "User not found");
 
             // Assert
             result.Should().BeSameAs(response, "because fluent API should return same instance");
@@ -529,7 +529,7 @@ namespace HT.Api.Client.Contracts.Tests
             var response = new ApiResponse();
 
             // Act
-            var result = response.AddError(ErrorCodes.InternalError, "Internal server error");
+            var result = response.AddError(CallStatusCode.InternalError, "Internal server error");
 
             // Assert
             result.Should().BeSameAs(response, "because AddError should return same instance");
@@ -809,7 +809,7 @@ namespace HT.Api.Client.Contracts.Tests
             var response = new ApiResponse();
 
             // Act & Assert - Should not throw for null parameters
-            var action1 = () => response.AddError(ErrorCodes.InternalError, null, null);
+            var action1 = () => response.AddError(CallStatusCode.InternalError, null, null);
             var action2 = () => response.AddValidationError("test", null);
             var action3 = () => response.GetErrorsForProperty(null);
 
@@ -826,7 +826,7 @@ namespace HT.Api.Client.Contracts.Tests
 
             // Act
             response.AddValidationError("", "");
-            response.AddError(ErrorCodes.NotFound, "", "");
+            response.AddError(CallStatusCode.NotFound, "", "");
 
             // Assert
             response.Errors.Should().HaveCount(2, "because errors with empty strings should be added");
@@ -889,7 +889,7 @@ namespace HT.Api.Client.Contracts.Tests
             
             // Verify round-trip for client consumption
             var clientResponse = JsonSerializer.Deserialize<ApiResponse>(json, ApiContractsJsonContext.Default.ApiResponse);
-            clientResponse.HasErrorCode(ErrorCodes.NotFound).Should().BeTrue("because NotFound error should be preserved");
+            clientResponse.HasErrorCode(CallStatusCode.NotFound).Should().BeTrue("because NotFound error should be preserved");
         }
 
         #endregion

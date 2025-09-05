@@ -42,12 +42,12 @@ namespace ResourceMapper.Common.Server.Base
                 }
 
                 var data = await executeOperation(request, cancellationToken);
-                return response.SetDataWithErrorCode(data, ErrorCodes.Ok);
+                return response.SetDataWithErrorCode(data, CallStatusCode.Ok);
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, $"Unexpected error in {operationName}. {ex}");
-                return response.SetErrorCodeResponse(ErrorCodes.InternalError, $"Unexpected error in {operationName}");
+                return response.SetErrorCodeResponse(CallStatusCode.InternalError, $"Unexpected error in {operationName}");
             }
         }
 
@@ -72,12 +72,12 @@ namespace ResourceMapper.Common.Server.Base
                 }
 
                 var data = executeOperation(request);
-                return response.SetDataWithErrorCode(data, ErrorCodes.Ok);
+                return response.SetDataWithErrorCode(data, CallStatusCode.Ok);
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, $"Unexpected error in {operationName}. {ex}");
-                return response.SetErrorCodeResponse(ErrorCodes.InternalError, $"Unexpected error in {operationName}");
+                return response.SetErrorCodeResponse(CallStatusCode.InternalError, $"Unexpected error in {operationName}");
             }
         }
 
@@ -103,12 +103,12 @@ namespace ResourceMapper.Common.Server.Base
                 }
 
                 var data = await executeOperation(request, cancellationToken);
-                return response.SetDataWithErrorCode(data, ErrorCodes.Ok, "Resource created successfully");
+                return response.SetDataWithErrorCode(data, CallStatusCode.Ok, "Resource created successfully");
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, $"Unexpected error in {operationName}. {ex}");
-                return response.SetErrorCodeResponse(ErrorCodes.InternalError, $"Unexpected error in {operationName}");
+                return response.SetErrorCodeResponse(CallStatusCode.InternalError, $"Unexpected error in {operationName}");
             }
         }
 
@@ -133,12 +133,12 @@ namespace ResourceMapper.Common.Server.Base
                 }
 
                 await executeOperation(request, cancellationToken);
-                return response.SetErrorCodeResponse(ErrorCodes.Ok, "Operation completed successfully");
+                return response.SetErrorCodeResponse(CallStatusCode.Ok, "Operation completed successfully");
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, $"Unexpected error in {operationName}. {ex}");
-                return response.SetErrorCodeResponse(ErrorCodes.InternalError, $"Unexpected error in {operationName}");
+                return response.SetErrorCodeResponse(CallStatusCode.InternalError, $"Unexpected error in {operationName}");
             }
         }
 
@@ -176,7 +176,7 @@ namespace ResourceMapper.Common.Server.Base
         /// Sets data and ErrorCode, derives HTTP status code automatically
         /// </summary>
         public static ApiServiceResponse<T> SetDataWithErrorCode<T>(this ApiServiceResponse<T> response, 
-            T data, ErrorCodes errorCode, string? message = null) where T : class, new()
+            T data, CallStatusCode errorCode, string? message = null) where T : class, new()
         {
             response.Data = data;
             response.ApiResponse.AddError(errorCode, message);
@@ -188,7 +188,7 @@ namespace ResourceMapper.Common.Server.Base
         /// Sets ErrorCode and derives HTTP status code automatically
         /// </summary>
         public static ApiServiceResponse SetErrorCodeResponse(this ApiServiceResponse response, 
-            ErrorCodes errorCode, string? message = null)
+            CallStatusCode errorCode, string? message = null)
         {
             response.ApiResponse.AddError(errorCode, message);
             response.SetStatusCode(errorCode.ToHttpStatusCode(), message);
@@ -199,7 +199,7 @@ namespace ResourceMapper.Common.Server.Base
         /// Sets ErrorCode and derives HTTP status code automatically (generic version)
         /// </summary>
         public static ApiServiceResponse<T> SetErrorCodeResponse<T>(this ApiServiceResponse<T> response, 
-            ErrorCodes errorCode, string? message = null) where T : class, new()
+            CallStatusCode errorCode, string? message = null) where T : class, new()
         {
             response.ApiResponse.AddError(errorCode, message);
             response.SetStatusCode(errorCode.ToHttpStatusCode(), message);
@@ -210,7 +210,7 @@ namespace ResourceMapper.Common.Server.Base
         /// Adds an error with ErrorCode and updates HTTP status if this error has higher priority
         /// </summary>
         public static ApiServiceResponse AddErrorCode(this ApiServiceResponse response, 
-            ErrorCodes errorCode, string? detail = null, string? property = null)
+            CallStatusCode errorCode, string? detail = null, string? property = null)
         {
             response.ApiResponse.AddError(errorCode, detail, property);
             
@@ -228,7 +228,7 @@ namespace ResourceMapper.Common.Server.Base
         /// Adds an error with ErrorCode (generic version)
         /// </summary>
         public static ApiServiceResponse<T> AddErrorCode<T>(this ApiServiceResponse<T> response, 
-            ErrorCodes errorCode, string? detail = null, string? property = null) where T : class, new()
+            CallStatusCode errorCode, string? detail = null, string? property = null) where T : class, new()
         {
             ((ApiServiceResponse)response).AddErrorCode(errorCode, detail, property);
             return response;

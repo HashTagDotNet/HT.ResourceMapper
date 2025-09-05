@@ -4,9 +4,9 @@ using HT.Api.Client.Contracts.Interfaces;
 namespace HT.Api.Client.Contracts.Models
 {
     /// <summary>
-    /// Base API response following JSON:API specification with ErrorCode-first approach.
-    /// ErrorCodes are the primary status indicators - HTTP status codes are derived automatically.
-    /// Use AddError() methods with ErrorCodes rather than setting HTTP status directly.
+    /// Base API response following JSON:API specification with CallStatusCode-first approach.
+    /// CallStatusCodes are the primary status indicators - HTTP status codes are derived automatically.
+    /// Use AddError() methods with CallStatusCodes rather than setting HTTP status directly.
     /// This design is based on the JSON:API specification (https://jsonapi.org/) with some customizations.
     /// 
     /// NOTE: Computed properties have been moved to ApiResponseExtensions for source generation compatibility.
@@ -38,42 +38,45 @@ namespace HT.Api.Client.Contracts.Models
         #region Error Management Methods
 
         /// <summary>
-        /// Adds a validation error using ErrorCode approach (developer sets ErrorCode, HTTP status derived)
+        /// Adds a validation error using CallStatusCode approach (developer sets CallStatusCode, HTTP status derived)
         /// </summary>
-        public ApiResponse AddValidation(string propertyName, string message, ErrorCodes errorCode = ErrorCodes.InvalidArgument)
+        public ApiResponse AddValidation(string propertyName, string message, CallStatusCode statusCode = CallStatusCode.InvalidArgument)
         {
             Errors ??= new List<ErrorMessage>();
             var errorMessage = new ErrorMessage
             {
                 Property = propertyName,
                 Detail = message,
-                StatusCode = errorCode
+                StatusCode = statusCode
             };
             Errors.Add(errorMessage);
+            UpdateCallStatus();
             return this;
         }
 
         /// <summary>
-        /// Adds an error using ErrorCode approach
+        /// Adds an error using CallStatusCode approach
         /// </summary>
-        public ApiResponse AddError(ErrorCodes errorCode, string? detail = null, string? property = null)
+        public ApiResponse AddError(CallStatusCode statusCode, string? detail = null, string? property = null)
         {
             Errors ??= new List<ErrorMessage>();
-            Errors.Add(ErrorMessage.Create(errorCode, detail, property));
+            Errors.Add(ErrorMessage.Create(statusCode, detail, property));
+            UpdateCallStatus();
             return this;
         }
 
         /// <summary>
         /// Adds an error with custom user and developer action suggestions
         /// </summary>
-        public ApiResponse AddError(ErrorCodes errorCode, string? detail, string? property, 
+        public ApiResponse AddError(CallStatusCode statusCode, string? detail, string? property, 
             string? userActions, string? developerActions)
         {
             Errors ??= new List<ErrorMessage>();
-            var error = ErrorMessage.Create(errorCode, detail, property);
+            var error = ErrorMessage.Create(statusCode, detail, property);
             error.SuggestedUserActions = userActions;
             error.SuggestedApplicationActions = developerActions;
             Errors.Add(error);
+            UpdateCallStatus();
             return this;
         }
 
@@ -86,7 +89,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public ApiResponse AddNotFoundError(string? detail = null, string? property = null)
         {
-            AddError(ErrorCodes.NotFound, detail, property);
+            AddError(CallStatusCode.NotFound, detail, property);
             return this;
         }
 
@@ -95,7 +98,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public ApiResponse AddValidationError(string property, string detail)
         {
-            AddError(ErrorCodes.InvalidArgument, detail, property);
+            AddError(CallStatusCode.InvalidArgument, detail, property);
             return this;
         }
 
@@ -104,7 +107,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public ApiResponse AddPermissionError(string? detail = null, string? property = null)
         {
-            AddError(ErrorCodes.PermissionDenied, detail, property);
+            AddError(CallStatusCode.PermissionDenied, detail, property);
             return this;
         }
 
@@ -113,7 +116,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public ApiResponse AddAuthenticationError(string? detail = null)
         {
-            AddError(ErrorCodes.Unauthenticated, detail);
+            AddError(CallStatusCode.Unauthenticated, detail);
             return this;
         }
 
@@ -122,7 +125,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public ApiResponse AddInternalError(string? detail = null)
         {
-            AddError(ErrorCodes.InternalError, detail);
+            AddError(CallStatusCode.InternalError, detail);
             return this;
         }
 
@@ -131,7 +134,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public ApiResponse AddCancellationError(string? detail = null)
         {
-            AddError(ErrorCodes.Cancelled, detail);
+            AddError(CallStatusCode.Cancelled, detail);
             return this;
         }
 
@@ -140,11 +143,39 @@ namespace HT.Api.Client.Contracts.Models
         #region Error Management
 
         /// <summary>
-        /// Clears all errors
+        /// Clears all errors and resets call status to success
         /// </summary>
         public ApiResponse ClearErrors()
         {
             Errors?.Clear();
+            UpdateCallStatus();
+            return this;
+        }
+
+        /// <summary>
+        /// Updates the CallStatus in MetaData based on current errors state.
+        /// This ensures MetaData.CallStatus is the authoritative source of truth.
+        /// </summary>
+        protected void UpdateCallStatus()
+        {
+            if (Errors == null || !Errors.Any())
+            {
+                MetaData.CallStatus = CallStatusCode.Ok;
+            }
+            else
+            {
+                // Set to the highest priority (most severe) error
+                var highestPriorityError = Errors.OrderBy(e => e.Priority).FirstOrDefault();
+                MetaData.CallStatus = highestPriorityError?.StatusCode ?? CallStatusCode.Ok;
+            }
+        }
+
+        /// <summary>
+        /// Explicitly sets the call status. Use with caution - prefer using AddError methods.
+        /// </summary>
+        public ApiResponse SetCallStatus(CallStatusCode statusCode)
+        {
+            MetaData.CallStatus = statusCode;
             return this;
         }
 
@@ -207,19 +238,19 @@ namespace HT.Api.Client.Contracts.Models
         }
 
         /// <summary>
-        /// Gets all errors of a specific ErrorCode type
+        /// Gets all errors of a specific CallStatusCode type
         /// </summary>
-        public IEnumerable<ErrorMessage> GetErrorsByCode(ErrorCodes errorCode)
+        public IEnumerable<ErrorMessage> GetErrorsByCode(CallStatusCode statusCode)
         {
-            return Errors?.Where(e => e.StatusCode == errorCode) ?? Enumerable.Empty<ErrorMessage>();
+            return Errors?.Where(e => e.StatusCode == statusCode) ?? Enumerable.Empty<ErrorMessage>();
         }
 
         /// <summary>
         /// Checks if there are any errors of a specific type
         /// </summary>
-        public bool HasErrorCode(ErrorCodes errorCode)
+        public bool HasErrorCode(CallStatusCode statusCode)
         {
-            return Errors?.Any(e => e.StatusCode == errorCode) ?? false;
+            return Errors?.Any(e => e.StatusCode == statusCode) ?? false;
         }
 
         /// <summary>
@@ -238,9 +269,9 @@ namespace HT.Api.Client.Contracts.Models
         /// <summary>
         /// Fluent API to add an error and return the response
         /// </summary>
-        public ApiResponse WithError(ErrorCodes errorCode, string? detail = null, string? property = null)
+        public ApiResponse WithError(CallStatusCode statusCode, string? detail = null, string? property = null)
         {
-            AddError(errorCode, detail, property);
+            AddError(statusCode, detail, property);
             return this;
         }
 

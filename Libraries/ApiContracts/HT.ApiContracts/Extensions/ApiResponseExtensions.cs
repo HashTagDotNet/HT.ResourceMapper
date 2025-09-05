@@ -6,30 +6,47 @@ namespace HT.Api.Client.Contracts.Extensions
     /// <summary>
     /// Extension methods for ApiResponse to provide computed properties while maintaining source generation compatibility.
     /// These methods replace the computed properties that were moved from ApiResponse to support System.Text.Json source generation.
+    /// The CallStatus field in MetaData is the authoritative source for determining response status.
     /// </summary>
     public static class ApiResponseExtensions
     {
         /// <summary>
-        /// Indicates if the response represents success (no errors or all errors are success codes).
-        /// This method is dynamically calculated on each access and is not cached.
+        /// Gets the current status of the API call from the authoritative CallStatus field.
+        /// This is the field of record for determining call success/failure.
+        /// </summary>
+        /// <param name="response">The ApiResponse to check</param>
+        /// <returns>The current call status from MetaData.CallStatus, or calculated from errors if not set</returns>
+        public static CallStatusCode CurrentStatus(this ApiResponse response)
+        {
+            // CallStatus in MetaData is the authoritative source
+            if (response.MetaData.CallStatus.HasValue)
+            {
+                return response.MetaData.CallStatus.Value;
+            }
+
+            // Fallback: calculate from errors if CallStatus is not set
+            return response.GetHighestPriorityErrorCode();
+        }
+
+        /// <summary>
+        /// Indicates if the response represents success based on the authoritative CallStatus field.
         /// </summary>
         /// <param name="response">The ApiResponse to check</param>
         /// <returns>True if successful, false otherwise</returns>
         public static bool IsSuccess(this ApiResponse response) 
-            => response.Errors?.All(e => e.IsSuccess) ?? true;
+            => response.CurrentStatus().IsSuccess();
 
         /// <summary>
-        /// Indicates if the response has any failure errors.
-        /// This method is dynamically calculated on each access and is not cached.
+        /// Indicates if the response has any failure errors based on the authoritative CallStatus field.
         /// </summary>
         /// <param name="response">The ApiResponse to check</param>
         /// <returns>True if there are failure errors, false otherwise</returns>
         public static bool HasFailures(this ApiResponse response) 
-            => response.Errors?.Any(e => e.IsFailure) ?? false;
+            => response.CurrentStatus().IsFailure();
 
         /// <summary>
-        /// Indicates if the response has any server errors.
-        /// This method is dynamically calculated on each access and is not cached.
+        /// Indicates if the response has any server errors based on checking the errors collection.
+        /// This method examines all errors to determine if any server errors exist.
         /// </summary>
         /// <param name="response">The ApiResponse to check</param>
         /// <returns>True if there are server errors, false otherwise</returns>
@@ -37,8 +54,8 @@ namespace HT.Api.Client.Contracts.Extensions
             => response.Errors?.Any(e => e.IsServerError) ?? false;
 
         /// <summary>
-        /// Indicates if the response has any client errors.
-        /// This method is dynamically calculated on each access and is not cached.
+        /// Indicates if the response has any client errors based on checking the errors collection.
+        /// This method examines all errors to determine if any client errors exist.
         /// </summary>
         /// <param name="response">The ApiResponse to check</param>
         /// <returns>True if there are client errors, false otherwise</returns>
@@ -46,8 +63,8 @@ namespace HT.Api.Client.Contracts.Extensions
             => response.Errors?.Any(e => e.IsClientError) ?? false;
 
         /// <summary>
-        /// Indicates if the response has any cancelled operations.
-        /// This method is dynamically calculated on each access and is not cached.
+        /// Indicates if the response has any cancelled operations based on checking the errors collection.
+        /// This method examines all errors to determine if any cancellations exist.
         /// </summary>
         /// <param name="response">The ApiResponse to check</param>
         /// <returns>True if there are cancelled operations, false otherwise</returns>
@@ -73,17 +90,17 @@ namespace HT.Api.Client.Contracts.Extensions
             => response.Errors?.OrderBy(e => e.Priority).ThenBy(e => e.StatusCode).FirstOrDefault();
 
         /// <summary>
-        /// Gets the primary HTTP status code based on the highest priority error.
-        /// This method is dynamically calculated on each access and is not cached.
+        /// Gets the primary HTTP status code based on the authoritative CallStatus field.
         /// </summary>
         /// <param name="response">The ApiResponse to check</param>
-        /// <returns>The HTTP status code derived from the highest priority error</returns>
+        /// <returns>The HTTP status code derived from the CallStatus field</returns>
         public static HttpStatusCode GetPrimaryHttpStatusCode(this ApiResponse response) 
-            => response.GetHighestPriorityError()?.HttpStatusCode ?? HttpStatusCode.OK;
+            => response.CurrentStatus().ToHttpStatusCode();
 
         /// <summary>
-        /// Gets the overall result category for the response.
-        /// This method is dynamically calculated on each access and is not cached.
+        /// Gets the overall result category for the response based on priority rules.
+        /// Priority: Success > Cancelled > ServerError > ClientError > Failure
+        /// This method examines the errors collection to determine the appropriate category.
         /// </summary>
         /// <param name="response">The ApiResponse to check</param>
         /// <returns>The result category based on the types of errors present</returns>
@@ -125,8 +142,8 @@ namespace HT.Api.Client.Contracts.Extensions
         /// </summary>
         /// <param name="response">The ApiResponse to check</param>
         /// <returns>An array of error groups by error code</returns>
-        public static IGrouping<ErrorCodes, ErrorMessage>[] GetErrorGroupsByCode(this ApiResponse response)
-            => response.Errors?.GroupBy(e => e.StatusCode).ToArray() ?? Array.Empty<IGrouping<ErrorCodes, ErrorMessage>>();
+        public static IGrouping<CallStatusCode, ErrorMessage>[] GetErrorGroupsByCode(this ApiResponse response)
+            => response.Errors?.GroupBy(e => e.StatusCode).ToArray() ?? Array.Empty<IGrouping<CallStatusCode, ErrorMessage>>();
 
         /// <summary>
         /// Gets errors that can be retried.
@@ -237,11 +254,13 @@ namespace HT.Api.Client.Contracts.Extensions
 
         /// <summary>
         /// Gets the highest priority error code in the response.
+        /// This method calculates from the Errors collection and should not be used for primary status determination.
+        /// Use CurrentStatus() for the authoritative status.
         /// </summary>
         /// <param name="response">The ApiResponse to check</param>
         /// <returns>The error code of the highest priority error, or Ok if no errors</returns>
-        public static ErrorCodes GetHighestPriorityErrorCode(this ApiResponse response)
-            => response.GetHighestPriorityError()?.StatusCode ?? ErrorCodes.Ok;
+        public static CallStatusCode GetHighestPriorityErrorCode(this ApiResponse response)
+            => response.GetHighestPriorityError()?.StatusCode ?? CallStatusCode.Ok;
 
         /// <summary>
         /// Checks if the response contains only warnings (info/warning severity errors).
@@ -253,8 +272,8 @@ namespace HT.Api.Client.Contracts.Extensions
             if (response.Errors == null || !response.Errors.Any()) return false;
             
             return response.Errors.All(e => 
-                e.StatusCode == ErrorCodes.AlreadyExists || 
-                e.StatusCode == ErrorCodes.NotImplemented ||
+                e.StatusCode == CallStatusCode.AlreadyExists || 
+                e.StatusCode == CallStatusCode.NotImplemented ||
                 e.SeverityClass == "warning" || 
                 e.SeverityClass == "info");
         }
@@ -303,5 +322,84 @@ namespace HT.Api.Client.Contracts.Extensions
         }
 
         #endregion
+
+        /// <summary>
+        /// Explicitly sets the CallStatus field. Use with caution - prefer using error management methods.
+        /// </summary>
+        /// <param name="response">The ApiResponse to update</param>
+        /// <param name="statusCode">The status code to set</param>
+        /// <returns>The response for method chaining</returns>
+        public static ApiResponse SetCallStatus(this ApiResponse response, CallStatusCode statusCode)
+        {
+            response.MetaData.CallStatus = statusCode;
+            return response;
+        }
+
+        /// <summary>
+        /// Forces an update of the CallStatus field based on current errors.
+        /// This is automatically called by error management methods but can be used manually if needed.
+        /// </summary>
+        /// <param name="response">The ApiResponse to update</param>
+        /// <returns>The response for method chaining</returns>
+        public static ApiResponse RefreshCallStatus(this ApiResponse response)
+        {
+            if (response.Errors == null || !response.Errors.Any())
+            {
+                response.MetaData.CallStatus = CallStatusCode.Ok;
+            }
+            else
+            {
+                var highestPriorityError = response.Errors.OrderBy(e => e.Priority).FirstOrDefault();
+                response.MetaData.CallStatus = highestPriorityError?.StatusCode ?? CallStatusCode.Ok;
+            }
+            return response;
+        }
+
+        /// <summary>
+        /// Validates that the CallStatus field is consistent with the errors collection.
+        /// </summary>
+        /// <param name="response">The ApiResponse to validate</param>
+        /// <returns>True if CallStatus is consistent with errors, false otherwise</returns>
+        public static bool IsCallStatusConsistent(this ApiResponse response)
+        {
+            var currentStatus = response.MetaData.CallStatus ?? CallStatusCode.Ok;
+            var calculatedStatus = response.GetHighestPriorityErrorCode();
+            return currentStatus == calculatedStatus;
+        }
+
+        /// <summary>
+        /// Explicitly sets the CallStatus field for generic responses. Use with caution - prefer using error management methods.
+        /// </summary>
+        /// <param name="response">The ApiResponse&lt;TData&gt; to update</param>
+        /// <param name="statusCode">The status code to set</param>
+        /// <returns>The response for method chaining</returns>
+        public static ApiResponse<TData> SetCallStatus<TData>(this ApiResponse<TData> response, CallStatusCode statusCode) where TData : class, new()
+        {
+            response.MetaData.CallStatus = statusCode;
+            return response;
+        }
+
+        /// <summary>
+        /// Forces an update of the CallStatus field based on current state (data vs errors).
+        /// </summary>
+        /// <param name="response">The ApiResponse&lt;TData&gt; to update</param>
+        /// <returns>The response for method chaining</returns>
+        public static ApiResponse<TData> RefreshCallStatus<TData>(this ApiResponse<TData> response) where TData : class, new()
+        {
+            if (response.HasData() && (response.Errors == null || !response.Errors.Any()))
+            {
+                response.MetaData.CallStatus = CallStatusCode.Ok;
+            }
+            else if (response.Errors?.Any() == true)
+            {
+                var highestPriorityError = response.Errors.OrderBy(e => e.Priority).FirstOrDefault();
+                response.MetaData.CallStatus = highestPriorityError?.StatusCode ?? CallStatusCode.Ok;
+            }
+            else
+            {
+                response.MetaData.CallStatus = CallStatusCode.Ok;
+            }
+            return response;
+        }
     }
 }

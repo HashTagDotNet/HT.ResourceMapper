@@ -129,7 +129,7 @@ namespace HT.Api.Client.Contracts.Tests
             response.Data = user;
 
             // Act
-            response.AddError(ErrorCodes.NotFound, "User not found");
+            response.AddError(CallStatusCode.NotFound, "User not found");
 
             // Assert
             response.Data.Should().BeNull("because data should be cleared when errors are added");
@@ -163,7 +163,7 @@ namespace HT.Api.Client.Contracts.Tests
             var response = new ApiResponse<TestUser>();
 
             // Act
-            var result = response.WithError(ErrorCodes.NotFound, "User not found");
+            var result = response.WithError(CallStatusCode.NotFound, "User not found");
 
             // Assert
             result.Should().BeSameAs(response, "because fluent API should return same instance");
@@ -211,7 +211,7 @@ namespace HT.Api.Client.Contracts.Tests
             // Act
             var response = new ApiResponse<TestUser>()
                 .WithData(user)
-                .WithError(ErrorCodes.InternalError, "Something went wrong"); // This should clear data
+                .WithError(CallStatusCode.InternalError, "Something went wrong"); // This should clear data
 
             // Assert
             response.Data.Should().BeNull("because adding error should clear data");
@@ -260,7 +260,7 @@ namespace HT.Api.Client.Contracts.Tests
             response.Data = user;
 
             // Act
-            var result = response.AddError(ErrorCodes.NotFound, "User not found");
+            var result = response.AddError(CallStatusCode.NotFound, "User not found");
 
             // Assert
             result.Should().BeSameAs(response, "because AddError should return same instance");
@@ -310,7 +310,7 @@ namespace HT.Api.Client.Contracts.Tests
         public void Error_ShouldCreateErrorResponseWithNoData()
         {
             // Act
-            var response = ApiResponse<TestUser>.Error(ErrorCodes.NotFound, "User not found");
+            var response = ApiResponse<TestUser>.Error(CallStatusCode.NotFound, "User not found");
 
             // Assert
             response.Data.Should().BeNull("because error response should have no data");
@@ -327,7 +327,7 @@ namespace HT.Api.Client.Contracts.Tests
             // Assert
             response.Data.Should().BeNull("because validation error response should have no data");
             response.Errors.Should().HaveCount(1, "because one validation error should be added");
-            response.Errors.First().StatusCode.Should().Be(ErrorCodes.InvalidArgument, "because validation errors use InvalidArgument code");
+            response.Errors.First().StatusCode.Should().Be(CallStatusCode.InvalidArgument, "because validation errors use InvalidArgument code");
         }
 
         [Fact]
@@ -339,7 +339,7 @@ namespace HT.Api.Client.Contracts.Tests
             // Assert
             response.Data.Should().BeNull("because not found response should have no data");
             response.Errors.Should().HaveCount(1, "because one error should be added");
-            response.Errors.First().StatusCode.Should().Be(ErrorCodes.NotFound, "because it should be a NotFound error");
+            response.Errors.First().StatusCode.Should().Be(CallStatusCode.NotFound, "because it should be a NotFound error");
         }
 
         [Fact]
@@ -351,7 +351,7 @@ namespace HT.Api.Client.Contracts.Tests
             // Assert
             response.Data.Should().BeNull("because internal error response should have no data");
             response.Errors.Should().HaveCount(1, "because one error should be added");
-            response.Errors.First().StatusCode.Should().Be(ErrorCodes.InternalError, "because it should be an InternalError");
+            response.Errors.First().StatusCode.Should().Be(CallStatusCode.InternalError, "because it should be an InternalError");
         }
 
         #endregion
@@ -410,7 +410,7 @@ namespace HT.Api.Client.Contracts.Tests
 
             // Add error manually (bypassing the automatic clearing)
             response.Data = user;
-            response.Errors = new List<ErrorMessage> { ErrorMessage.Create(ErrorCodes.InternalError) };
+            response.Errors = new List<ErrorMessage> { ErrorMessage.Create(CallStatusCode.InternalError) };
             response.IsJsonApiCompliant().Should().BeFalse("because data and errors cannot coexist");
         }
 
@@ -423,7 +423,7 @@ namespace HT.Api.Client.Contracts.Tests
 
             // Set up non-compliant state
             response.Data = user;
-            response.Errors = new List<ErrorMessage> { ErrorMessage.Create(ErrorCodes.InternalError) };
+            response.Errors = new List<ErrorMessage> { ErrorMessage.Create(CallStatusCode.InternalError) };
 
             // Act
             var issues = response.GetComplianceIssues().ToList();
@@ -553,6 +553,95 @@ namespace HT.Api.Client.Contracts.Tests
 
             successResponse.Should().BeOfType<ApiResponse<TestProduct>>("because success response should be correct type");
             errorResponse.Should().BeOfType<ApiResponse<TestProduct>>("because error response should be correct type");
+        }
+
+        #endregion
+
+        #region CallStatus Functionality Tests
+
+        [Fact]
+        public void CallStatus_WithData_ShouldBeOk()
+        {
+            // Arrange
+            var response = new ApiResponse<TestUser>();
+            var user = new TestUser { Id = 1, Name = "John Doe" };
+
+            // Act
+            response.SetData(user);
+
+            // Assert
+            response.MetaData.CallStatus.Should().Be(CallStatusCode.Ok, "because setting data should result in Ok status");
+            response.CurrentStatus().Should().Be(CallStatusCode.Ok, "because CurrentStatus should reflect Ok status");
+            response.IsSuccess().Should().BeTrue("because data indicates success");
+        }
+
+        [Fact]
+        public void CallStatus_WithErrors_ShouldReflectHighestPriorityError()
+        {
+            // Arrange
+            var response = new ApiResponse<TestUser>();
+            var user = new TestUser { Id = 1, Name = "John Doe" };
+            response.SetData(user);
+
+            // Act - Adding error should clear data and update CallStatus
+            response.AddInternalError("Something went wrong");
+
+            // Assert
+            response.MetaData.CallStatus.Should().Be(CallStatusCode.InternalError, "because adding error should update CallStatus");
+            response.Data.Should().BeNull("because adding error should clear data for JSON:API compliance");
+            response.CurrentStatus().Should().Be(CallStatusCode.InternalError, "because CurrentStatus should reflect the error");
+            response.HasServerErrors().Should().BeTrue("because InternalError is a server error");
+        }
+
+        [Fact]
+        public void SetCallStatus_GenericVersion_ShouldWork()
+        {
+            // Arrange
+            var response = new ApiResponse<TestUser>();
+            var user = new TestUser { Id = 1, Name = "John Doe" };
+            response.SetData(user);
+
+            // Act
+            response.SetCallStatus(CallStatusCode.Cancelled);
+
+            // Assert
+            response.MetaData.CallStatus.Should().Be(CallStatusCode.Cancelled, "because SetCallStatus should override");
+            response.CurrentStatus().Should().Be(CallStatusCode.Cancelled, "because CurrentStatus should return the set status");
+            response.HasCancellations().Should().BeFalse("because there are no actual cancellation errors in the errors collection");
+            response.IsSuccess().Should().BeFalse("because CallStatus is set to Cancelled which is not a success state");
+        }
+
+        [Fact]
+        public void RefreshCallStatus_GenericWithData_ShouldSetToOk()
+        {
+            // Arrange
+            var response = new ApiResponse<TestUser>();
+            var user = new TestUser { Id = 1, Name = "John Doe" };
+            response.SetData(user);
+            response.SetCallStatus(CallStatusCode.InternalError); // Override to incorrect status
+
+            // Act
+            response.RefreshCallStatus();
+
+            // Assert
+            response.MetaData.CallStatus.Should().Be(CallStatusCode.Ok, "because RefreshCallStatus with data should set to Ok");
+            response.CurrentStatus().Should().Be(CallStatusCode.Ok, "because refreshed status should be Ok");
+        }
+
+        [Fact]
+        public void RefreshCallStatus_GenericWithErrors_ShouldCalculateFromErrors()
+        {
+            // Arrange
+            var response = new ApiResponse<TestUser>();
+            response.AddValidationError("test", "Test error");
+            response.SetCallStatus(CallStatusCode.Cancelled); // Override to incorrect status
+
+            // Act
+            response.RefreshCallStatus();
+
+            // Assert
+            response.MetaData.CallStatus.Should().Be(CallStatusCode.InvalidArgument, "because RefreshCallStatus should calculate from errors");
+            response.CurrentStatus().Should().Be(CallStatusCode.InvalidArgument, "because refreshed status should match errors");
         }
 
         #endregion

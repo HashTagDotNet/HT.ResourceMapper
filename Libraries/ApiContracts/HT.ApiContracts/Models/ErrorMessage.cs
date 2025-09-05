@@ -10,14 +10,14 @@ namespace HT.Api.Client.Contracts.Models
     public class ErrorMessage : MessageBase
     {
         /// <summary>
-        /// <inheritdoc cref="ErrorCodes"/>
+        /// <inheritdoc cref="CallStatusCode"/>
         /// </summary>
         public int StatusId => (int)StatusCode;
 
         /// <summary>
-        /// <inheritdoc cref="ErrorCodes"/>
+        /// <inheritdoc cref="CallStatusCode"/>
         /// </summary>
-        public ErrorCodes StatusCode { get; set; } = ErrorCodes.Ok;
+        public CallStatusCode StatusCode { get; set; } = CallStatusCode.Ok;
 
         /// <summary>
         /// Indicates if this error represents a success state
@@ -130,7 +130,7 @@ namespace HT.Api.Client.Contracts.Models
         /// <summary>
         /// Creates an ErrorMessage with a specific error code
         /// </summary>
-        public static ErrorMessage Create(ErrorCodes errorCode, string? detail = null, string? property = null)
+        public static ErrorMessage Create(CallStatusCode errorCode, string? detail = null, string? property = null)
         {
             return new ErrorMessage
             {
@@ -145,7 +145,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public static ErrorMessage CreateSuccess(string? detail = null)
         {
-            return Create(ErrorCodes.Ok, detail);
+            return Create(CallStatusCode.Ok, detail);
         }
 
         /// <summary>
@@ -153,7 +153,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public static ErrorMessage CreateInvalidArgument(string property, string detail)
         {
-            return Create(ErrorCodes.InvalidArgument, detail, property);
+            return Create(CallStatusCode.InvalidArgument, detail, property);
         }
 
         /// <summary>
@@ -161,7 +161,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public static ErrorMessage CreateNotFound(string? detail = null, string? property = null)
         {
-            return Create(ErrorCodes.NotFound, detail, property);
+            return Create(CallStatusCode.NotFound, detail, property);
         }
 
         /// <summary>
@@ -169,7 +169,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public static ErrorMessage CreateInternalError(string? detail = null)
         {
-            return Create(ErrorCodes.InternalError, detail);
+            return Create(CallStatusCode.InternalError, detail);
         }
 
         /// <summary>
@@ -177,7 +177,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public static ErrorMessage CreateUnauthenticated(string? detail = null)
         {
-            return Create(ErrorCodes.Unauthenticated, detail);
+            return Create(CallStatusCode.Unauthenticated, detail);
         }
 
         /// <summary>
@@ -185,7 +185,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public static ErrorMessage CreatePermissionDenied(string? detail = null, string? property = null)
         {
-            return Create(ErrorCodes.PermissionDenied, detail, property);
+            return Create(CallStatusCode.PermissionDenied, detail, property);
         }
 
         /// <summary>
@@ -193,7 +193,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public static ErrorMessage CreateAlreadyExists(string? detail = null, string? property = null)
         {
-            return Create(ErrorCodes.AlreadyExists, detail, property);
+            return Create(CallStatusCode.AlreadyExists, detail, property);
         }
 
         /// <summary>
@@ -201,7 +201,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public static ErrorMessage CreateTimeout(string? detail = null)
         {
-            return Create(ErrorCodes.OperationTimeOut, detail);
+            return Create(CallStatusCode.OperationTimeOut, detail);
         }
 
         /// <summary>
@@ -209,7 +209,7 @@ namespace HT.Api.Client.Contracts.Models
         /// </summary>
         public static ErrorMessage CreateUnavailable(string? detail = null)
         {
-            return Create(ErrorCodes.Unavailable, detail);
+            return Create(CallStatusCode.Unavailable, detail);
         }
     }
 }

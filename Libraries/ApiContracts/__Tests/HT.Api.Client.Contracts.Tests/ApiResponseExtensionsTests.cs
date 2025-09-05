@@ -44,7 +44,7 @@ namespace HT.Api.Client.Contracts.Tests
         {
             // Arrange
             var response = new ApiResponse();
-            response.Errors = new List<ErrorMessage> { ErrorMessage.Create(ErrorCodes.Ok) };
+            response.Errors = new List<ErrorMessage> { ErrorMessage.Create(CallStatusCode.Ok) };
 
             // Act
             var result = response.IsSuccess();
@@ -191,7 +191,7 @@ namespace HT.Api.Client.Contracts.Tests
 
             // Assert
             result.Should().NotBeNull("because response has errors");
-            result!.StatusCode.Should().Be(ErrorCodes.InternalError, "because internal errors have higher priority");
+            result!.StatusCode.Should().Be(CallStatusCode.InternalError, "because internal errors have higher priority");
         }
 
         [Fact]
@@ -220,7 +220,7 @@ namespace HT.Api.Client.Contracts.Tests
 
             // Assert
             result.Should().NotBeNull("because response has errors");
-            result!.StatusCode.Should().Be(ErrorCodes.InternalError, "because internal errors are more severe");
+            result!.StatusCode.Should().Be(CallStatusCode.InternalError, "because internal errors are more severe");
         }
 
         [Fact]
@@ -350,9 +350,9 @@ namespace HT.Api.Client.Contracts.Tests
 
             // Assert
             result.Should().HaveCount(2, "because there are two different error codes");
-            result.Should().ContainSingle(g => g.Key == ErrorCodes.InvalidArgument && g.Count() == 2, 
+            result.Should().ContainSingle(g => g.Key == CallStatusCode.InvalidArgument && g.Count() == 2, 
                 "because there are two validation errors");
-            result.Should().ContainSingle(g => g.Key == ErrorCodes.NotFound && g.Count() == 1, 
+            result.Should().ContainSingle(g => g.Key == CallStatusCode.NotFound && g.Count() == 1, 
                 "because there is one not found error");
         }
 
@@ -362,14 +362,14 @@ namespace HT.Api.Client.Contracts.Tests
             // Arrange
             var response = new ApiResponse();
             response.AddValidationError("test", "Non-retryable error");
-            response.AddError(ErrorCodes.OperationTimeOut, "Retryable error");
+            response.AddError(CallStatusCode.OperationTimeOut, "Retryable error");
 
             // Act
             var result = response.GetRetryableErrors().ToList();
 
             // Assert
             result.Should().HaveCount(1, "because only one error is retryable");
-            result.First().StatusCode.Should().Be(ErrorCodes.OperationTimeOut, "because timeout errors are retryable");
+            result.First().StatusCode.Should().Be(CallStatusCode.OperationTimeOut, "because timeout errors are retryable");
         }
 
         [Fact]
@@ -520,7 +520,7 @@ namespace HT.Api.Client.Contracts.Tests
             var response = new ApiResponse();
             response.Errors = new List<ErrorMessage>
             {
-                new ErrorMessage { StatusCode = ErrorCodes.Ok } // Success error but treated as having errors
+                new ErrorMessage { StatusCode = CallStatusCode.Ok } // Success error but treated as having errors
             };
 
             // Act
@@ -536,7 +536,7 @@ namespace HT.Api.Client.Contracts.Tests
         {
             // Arrange
             var response = new ApiResponse();
-            response.AddError(ErrorCodes.OperationTimeOut, "Timeout error");
+            response.AddError(CallStatusCode.OperationTimeOut, "Timeout error");
 
             // Act
             var result = response.IsRetryRecommended();
@@ -571,7 +571,7 @@ namespace HT.Api.Client.Contracts.Tests
             var result = response.GetHighestPriorityErrorCode();
 
             // Assert
-            result.Should().Be(ErrorCodes.InternalError, "because internal error has highest priority");
+            result.Should().Be(CallStatusCode.InternalError, "because internal error has highest priority");
         }
 
         [Fact]
@@ -584,7 +584,7 @@ namespace HT.Api.Client.Contracts.Tests
             var result = response.GetHighestPriorityErrorCode();
 
             // Assert
-            result.Should().Be(ErrorCodes.Ok, "because no errors means OK status");
+            result.Should().Be(CallStatusCode.Ok, "because no errors means OK status");
         }
 
         [Fact]
@@ -592,7 +592,7 @@ namespace HT.Api.Client.Contracts.Tests
         {
             // Arrange
             var response = new ApiResponse();
-            response.AddError(ErrorCodes.AlreadyExists, "Already exists warning");
+            response.AddError(CallStatusCode.AlreadyExists, "Already exists warning");
 
             // Act
             var result = response.HasOnlyWarnings();
@@ -723,7 +723,7 @@ namespace HT.Api.Client.Contracts.Tests
             // Arrange
             var response = new ApiResponse<TestUser>();
             response.Data = new TestUser { Id = 1, Name = "Test" };
-            response.Errors = new List<ErrorMessage> { ErrorMessage.Create(ErrorCodes.InternalError) };
+            response.Errors = new List<ErrorMessage> { ErrorMessage.Create(CallStatusCode.InternalError) };
 
             // Act
             var result = response.IsJsonApiCompliant();
@@ -765,7 +765,7 @@ namespace HT.Api.Client.Contracts.Tests
             // Arrange
             var response = new ApiResponse<TestUser>();
             response.Data = new TestUser { Id = 1, Name = "Test" };
-            response.Errors = new List<ErrorMessage> { ErrorMessage.Create(ErrorCodes.InternalError) };
+            response.Errors = new List<ErrorMessage> { ErrorMessage.Create(CallStatusCode.InternalError) };
 
             // Act
             var issues = response.GetComplianceIssues().ToList();
@@ -825,6 +825,218 @@ namespace HT.Api.Client.Contracts.Tests
             response.IsJsonApiCompliant().Should().BeTrue("because null data with no errors is compliant");
         }
 
+        #endregion
+
+        #region Call Status Tests
+
+        [Fact]
+        public void CallStatus_ShouldBeAuthoritative_ForSuccessState()
+        {
+            // Arrange
+            var response = new ApiResponse();
+
+            // Act - CallStatus should be Ok by default
+            var currentStatus = response.CurrentStatus();
+            var isSuccess = response.IsSuccess();
+
+            // Assert
+            response.MetaData.CallStatus.Should().Be(CallStatusCode.Ok, "because default state should be Ok");
+            currentStatus.Should().Be(CallStatusCode.Ok, "because CurrentStatus should return the CallStatus field");
+            isSuccess.Should().BeTrue("because Ok status indicates success");
+        }
+
+        [Fact]
+        public void CallStatus_ShouldUpdateAutomatically_WhenErrorsAdded()
+        {
+            // Arrange
+            var response = new ApiResponse();
+
+            // Act
+            response.AddValidationError("test", "Test error");
+
+            // Assert
+            response.MetaData.CallStatus.Should().Be(CallStatusCode.InvalidArgument, "because CallStatus should update when errors are added");
+            response.CurrentStatus().Should().Be(CallStatusCode.InvalidArgument, "because CurrentStatus should reflect the updated CallStatus");
+            response.IsSuccess().Should().BeFalse("because validation errors indicate failure");
+        }
+
+        [Fact]
+        public void CallStatus_ShouldUpdateToHighestPriority_WhenMultipleErrorsAdded()
+        {
+            // Arrange
+            var response = new ApiResponse();
+
+            // Act - Add lower priority error first, then higher priority
+            response.AddValidationError("test", "Validation error"); // Priority 3
+            response.AddInternalError("Internal error"); // Priority 1 (highest)
+
+            // Assert
+            response.MetaData.CallStatus.Should().Be(CallStatusCode.InternalError, "because CallStatus should reflect highest priority error");
+            response.CurrentStatus().Should().Be(CallStatusCode.InternalError, "because CurrentStatus should return highest priority");
+            response.HasServerErrors().Should().BeTrue("because InternalError is a server error");
+        }
+
+        [Fact]
+        public void CallStatus_ShouldResetToOk_WhenErrorsCleared()
+        {
+            // Arrange
+            var response = new ApiResponse();
+            response.AddValidationError("test", "Test error");
+
+            // Act
+            response.ClearErrors();
+
+            // Assert
+            response.MetaData.CallStatus.Should().Be(CallStatusCode.Ok, "because CallStatus should reset to Ok when errors are cleared");
+            response.CurrentStatus().Should().Be(CallStatusCode.Ok, "because CurrentStatus should reflect cleared state");
+            response.IsSuccess().Should().BeTrue("because cleared errors should indicate success");
+        }
+
+        [Fact]
+        public void SetCallStatus_ShouldOverrideCalculatedStatus()
+        {
+            // Arrange
+            var response = new ApiResponse();
+            response.AddValidationError("test", "Test error");
+
+            // Act
+            response.SetCallStatus(CallStatusCode.Cancelled);
+
+            // Assert
+            response.MetaData.CallStatus.Should().Be(CallStatusCode.Cancelled, "because explicit SetCallStatus should override");
+            response.CurrentStatus().Should().Be(CallStatusCode.Cancelled, "because CurrentStatus should return the explicitly set status");
+            response.HasCancellations().Should().BeFalse("because there are no actual cancellation errors in the errors collection");
+            response.IsSuccess().Should().BeFalse("because CallStatus is set to Cancelled which is not a success state");
+        }
+
+        [Fact]
+        public void RefreshCallStatus_ShouldRecalculateFromErrors()
+        {
+            // Arrange
+            var response = new ApiResponse();
+            response.AddValidationError("test", "Test error");
+            response.SetCallStatus(CallStatusCode.Cancelled); // Override the status
+
+            // Act
+            response.RefreshCallStatus();
+
+            // Assert
+            response.MetaData.CallStatus.Should().Be(CallStatusCode.InvalidArgument, "because RefreshCallStatus should recalculate from errors");
+            response.CurrentStatus().Should().Be(CallStatusCode.InvalidArgument, "because status should be refreshed from errors");
+        }
+
+        [Fact]
+        public void IsCallStatusConsistent_ShouldDetectInconsistencies()
+        {
+            // Arrange
+            var response = new ApiResponse();
+            response.AddValidationError("test", "Test error");
+
+            // Act & Assert - Should be consistent initially
+            response.IsCallStatusConsistent().Should().BeTrue("because CallStatus should be consistent after adding error");
+
+            // Act - Make it inconsistent
+            response.SetCallStatus(CallStatusCode.Cancelled);
+
+            // Assert
+            response.IsCallStatusConsistent().Should().BeFalse("because CallStatus was manually overridden and is inconsistent with errors");
+        }
+
+        [Fact]
+        public void CurrentStatus_ShouldFallbackToCalculated_WhenCallStatusNotSet()
+        {
+            // Arrange
+            var response = new ApiResponse();
+            response.AddValidationError("test", "Test error");
+            response.MetaData.CallStatus = null; // Simulate unset CallStatus
+
+            // Act
+            var currentStatus = response.CurrentStatus();
+
+            // Assert
+            currentStatus.Should().Be(CallStatusCode.InvalidArgument, "because CurrentStatus should fallback to calculated status when CallStatus is null");
+        }
+
+        [Fact]
+        public void CallStatus_PracticalScenario_ShouldMaintainConsistency()
+        {
+            // Demonstrate a practical scenario where CallStatus is the authoritative field
+            var response = new ApiResponse();
+
+            // Initial state - success
+            response.CurrentStatus().Should().Be(CallStatusCode.Ok, "because initial state is Ok");
+            response.IsSuccess().Should().BeTrue("because Ok indicates success");
+
+            // Add validation errors - CallStatus should auto-update
+            response.AddValidationError("email", "Email is required");
+            response.AddValidationError("name", "Name is required");
+            
+            response.CurrentStatus().Should().Be(CallStatusCode.InvalidArgument, "because validation errors update CallStatus");
+            response.HasClientErrors().Should().BeTrue("because there are validation errors");
+            response.GetErrorCount().Should().Be(2, "because two validation errors were added");
+
+            // Add a server error - CallStatus should update to highest priority
+            response.AddInternalError("Database connection failed");
+            
+            response.CurrentStatus().Should().Be(CallStatusCode.InternalError, "because server errors have higher priority");
+            response.HasServerErrors().Should().BeTrue("because internal error was added");
+            response.HasClientErrors().Should().BeTrue("because validation errors still exist");
+            response.GetErrorCount().Should().Be(3, "because three total errors exist");
+
+            // Server admin manually overrides status for specific business reason
+            response.SetCallStatus(CallStatusCode.Unavailable);
+            
+            response.CurrentStatus().Should().Be(CallStatusCode.Unavailable, "because status was explicitly overridden");
+            response.IsCallStatusConsistent().Should().BeFalse("because CallStatus was manually overridden");
+
+            // System administrator refreshes status based on current errors
+            response.RefreshCallStatus();
+            
+            response.CurrentStatus().Should().Be(CallStatusCode.InternalError, "because refresh recalculates from errors");
+            response.IsCallStatusConsistent().Should().BeTrue("because status is now consistent with errors");
+
+            // Clear all errors - CallStatus should reset
+            response.ClearErrors();
+            
+            response.CurrentStatus().Should().Be(CallStatusCode.Ok, "because clearing errors resets to Ok");
+            response.IsSuccess().Should().BeTrue("because Ok indicates success");
+            response.GetErrorCount().Should().Be(0, "because all errors were cleared");
+        }
+
+        [Fact]
+        public void CallStatus_JsonApiCompliance_ShouldWorkCorrectly()
+        {
+            // Demonstrate CallStatus with JSON:API compliance in a practical scenario
+            var userResponse = new ApiResponse<TestUser>();
+            var user = new TestUser { Id = 1, Name = "John Doe", Email = "john@example.com" };
+
+            // Successful data response
+            userResponse.SetData(user);
+            userResponse.CurrentStatus().Should().Be(CallStatusCode.Ok, "because data indicates success");
+            userResponse.IsJsonApiCompliant().Should().BeTrue("because data with no errors is compliant");
+
+            // Business rule validation fails - errors added, data cleared
+            userResponse.AddValidationError("email", "Email domain not allowed");
+            
+            userResponse.CurrentStatus().Should().Be(CallStatusCode.InvalidArgument, "because validation error updates status");
+            userResponse.HasData().Should().BeFalse("because errors clear data for JSON:API compliance");
+            userResponse.IsJsonApiCompliant().Should().BeTrue("because errors without data is compliant");
+
+            // System recovers and processes the request successfully
+            userResponse.ClearErrors();
+            userResponse.SetData(user);
+            
+            userResponse.CurrentStatus().Should().Be(CallStatusCode.Ok, "because successful processing resets to Ok");
+            userResponse.HasData().Should().BeTrue("because data was successfully set");
+            userResponse.IsJsonApiCompliant().Should().BeTrue("because data with no errors is compliant");
+
+            // External service timeout occurs
+            userResponse.AddError(CallStatusCode.OperationTimeOut, "External service timed out");
+            
+            userResponse.CurrentStatus().Should().Be(CallStatusCode.OperationTimeOut, "because timeout error updates status");
+            userResponse.HasData().Should().BeFalse("because errors clear data");
+            userResponse.IsRetryRecommended().Should().BeTrue("because timeout errors are retryable");
+        }
         #endregion
     }
 }

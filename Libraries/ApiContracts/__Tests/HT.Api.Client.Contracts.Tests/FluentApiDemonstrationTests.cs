@@ -25,12 +25,12 @@ namespace HT.Api.Client.Contracts.Tests
                 .AddPermissionError("Access denied")
                 .ClearErrors()  // Start fresh
                 .AddNotFoundError("Resource not found")
-                .WithError(ErrorCodes.InternalError, "Database error");
+                .WithError(CallStatusCode.InternalError, "Database error");
 
             // Verify the final state
             response.Errors.Should().HaveCount(2, "because two errors were added after clearing");
-            response.HasErrorCode(ErrorCodes.NotFound).Should().BeTrue();
-            response.HasErrorCode(ErrorCodes.InternalError).Should().BeTrue();
+            response.HasErrorCode(CallStatusCode.NotFound).Should().BeTrue();
+            response.HasErrorCode(CallStatusCode.InternalError).Should().BeTrue();
             response.IsSuccess().Should().BeFalse();
         }
 
@@ -66,7 +66,7 @@ namespace HT.Api.Client.Contracts.Tests
             var errorResponse = ApiResponse<UserDto>
                 .ValidationError("email", "Invalid email")
                 .AddValidationError("name", "Name too short")
-                .WithError(ErrorCodes.PermissionDenied, "Access denied");
+                .WithError(CallStatusCode.PermissionDenied, "Access denied");
 
             // Verify success response
             successResponse.HasData().Should().BeTrue();
@@ -129,12 +129,12 @@ namespace HT.Api.Client.Contracts.Tests
 
             // Set final data and add final error
             response.SetData(updatedUser)
-                   .WithError(ErrorCodes.Cancelled, "Operation was cancelled by user");
+                   .WithError(CallStatusCode.Cancelled, "Operation was cancelled by user");
 
             // Verify final state represents cancellation with no data
             response.HasData().Should().BeFalse("because final operation added an error");
             response.Errors.Should().HaveCount(1, "because only the final error remains");
-            response.HasErrorCode(ErrorCodes.Cancelled).Should().BeTrue();
+            response.HasErrorCode(CallStatusCode.Cancelled).Should().BeTrue();
             response.GetResultCategory().Should().Be(ResultCategory.Cancelled);
             response.IsRetryRecommended().Should().BeFalse("because cancellations typically aren't retryable");
         }
@@ -153,7 +153,7 @@ namespace HT.Api.Client.Contracts.Tests
                 .AddValidationError("test", "test")
                 .AddNotFoundError("not found")
                 .ClearErrors()
-                .WithError(ErrorCodes.InternalError, "error");
+                .WithError(CallStatusCode.InternalError, "error");
 
             // Verify types are preserved
             typedResponse.Should().BeOfType<ApiResponse<UserDto>>();
@@ -164,7 +164,68 @@ namespace HT.Api.Client.Contracts.Tests
             typedResponse.Data!.Id.Should().Be(2);
             
             baseResponse.Errors.Should().HaveCount(1);
-            baseResponse.HasErrorCode(ErrorCodes.InternalError).Should().BeTrue();
+            baseResponse.HasErrorCode(CallStatusCode.InternalError).Should().BeTrue();
+        }
+
+        [Fact]
+        public void CallStatus_AuthoritativeField_ShouldWorkCorrectly()
+        {
+            // Demonstrate CallStatus as the authoritative field of record
+            var response = new ApiResponse()
+                .AddValidationError("email", "Email is required")
+                .AddInternalError("Database error");
+
+            // Verify CallStatus reflects highest priority error
+            response.CurrentStatus().Should().Be(CallStatusCode.InternalError, 
+                "because CallStatus should reflect highest priority error");
+            response.MetaData.CallStatus.Should().Be(CallStatusCode.InternalError, 
+                "because CallStatus field is the authoritative source");
+
+            // Demonstrate explicit override
+            response.SetCallStatus(CallStatusCode.Cancelled);
+            response.CurrentStatus().Should().Be(CallStatusCode.Cancelled, 
+                "because CallStatus can be explicitly overridden");
+
+            // Demonstrate refresh from errors
+            response.RefreshCallStatus();
+            response.CurrentStatus().Should().Be(CallStatusCode.InternalError, 
+                "because RefreshCallStatus recalculates from errors");
+
+            // Demonstrate consistency checking
+            response.SetCallStatus(CallStatusCode.Ok);
+            response.IsCallStatusConsistent().Should().BeFalse(
+                "because CallStatus doesn't match the errors");
+        }
+
+        [Fact]
+        public void CallStatus_GenericResponse_ShouldMaintainJsonApiCompliance()
+        {
+            // Demonstrate CallStatus with generic response and JSON:API compliance
+            var user = new UserDto { Id = 1, Name = "John Doe", Email = "john@example.com" };
+            
+            var response = new ApiResponse<UserDto>()
+                .SetData(user);
+
+            // Verify success state
+            response.CurrentStatus().Should().Be(CallStatusCode.Ok, 
+                "because setting data should result in Ok status");
+            response.MetaData.CallStatus.Should().Be(CallStatusCode.Ok, 
+                "because CallStatus should be set to Ok");
+
+            // Add error - should clear data and update CallStatus
+            response.AddValidationError("email", "Invalid format");
+
+            response.CurrentStatus().Should().Be(CallStatusCode.InvalidArgument, 
+                "because adding error should update CallStatus");
+            response.HasData().Should().BeFalse(
+                "because adding error clears data for JSON:API compliance");
+            response.IsJsonApiCompliant().Should().BeTrue(
+                "because data and errors don't coexist");
+
+            // Clear errors - should reset to Ok
+            response.ClearErrors();
+            response.CurrentStatus().Should().Be(CallStatusCode.Ok, 
+                "because clearing errors should reset CallStatus to Ok");
         }
     }
 }
