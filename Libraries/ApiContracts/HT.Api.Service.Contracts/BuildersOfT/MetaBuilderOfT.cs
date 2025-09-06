@@ -19,8 +19,11 @@ namespace HT.Api.Service.Contracts.BuildersOfT
         }
         public MetaBuilder<TResponseData> AddTag(string key, string value)
         {
-            if (_parent.BackingServiceResponse.ApiResponse?.MetaData == null) return this;
-            _parent.BackingServiceResponse.ApiResponse.MetaData.AddTag(key, value);
+            ArgumentNullException.ThrowIfNullOrWhiteSpace(key);
+
+            _parent.BackingServiceResponse.ApiResponse.MetaData ??= new MetaData();
+            _parent.BackingServiceResponse.ApiResponse.MetaData.Tags ??= new SortedDictionary<string, string>();
+            _parent.BackingServiceResponse.ApiResponse.MetaData.Tags[key] = value;
             return this;
         }
 
@@ -35,22 +38,34 @@ namespace HT.Api.Service.Contracts.BuildersOfT
             if (_parent.BackingServiceResponse.ApiResponse?.MetaData == null) return this;
             var msg = new Message();
             message.Invoke(msg);
-            _parent.BackingServiceResponse.ApiResponse.MetaData.AddMessage(message);
+            _parent.BackingServiceResponse.ApiResponse.MetaData.Messages ??= new List<Message>();
+            _parent.BackingServiceResponse.ApiResponse.MetaData.Messages?.Add(msg);
             return this;
         }
-
+       
         public MetaBuilder<TResponseData> SetId(string responseId)
         {
             if (_parent.BackingServiceResponse.ApiResponse?.MetaData == null) return this;
-            _parent.BackingServiceResponse.ApiResponse.MetaData.ResponseId = responseId;
+
+            _parent.BackingServiceResponse.ApiResponse.MetaData.ResponseId = string.IsNullOrWhiteSpace(responseId)
+                ? Guid.NewGuid().ToString("N")[..8]
+                : responseId;
             return this;
         }
-        public MetaBuilder<TResponseData> SetTimestamp(string timestamp)
+        public MetaBuilder<TResponseData> SetTimestamp(DateTime timestamp)
         {
             if (_parent.BackingServiceResponse.ApiResponse?.MetaData == null) return this;
-            _parent.BackingServiceResponse.ApiResponse.MetaData.Timestamp = timestamp;
+            _parent.BackingServiceResponse.ApiResponse.MetaData.Timestamp = timestamp.ToString("yyyy-MM-ddTHH:mm:ss.ffZ");
             return this;
         }
+
+        public HttpApiResponseBuilder<TResponseData> Http => _parent.Http;
+        public ValidationBuilder<TResponseData> Validation => _parent.Validation;
+        public ErrorBuilder<TResponseData> Errors => _parent.Errors;
+        public LinksBuilder<TResponseData> Links => _parent.Links;
+        public DataBuilder<TResponseData> Data => _parent.Data;
+
+        public ApiServiceResponse<TResponseData> BuildResponse(Action<ApiServiceResponse<TResponseData>>? response=null) => _parent.BuildResponse(response);
     }
 
 }

@@ -2,6 +2,18 @@
 
 namespace HT.Api.Client.Contracts.Models
 {
+    public class MetaDataFlags
+    {
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public ResultCategory? ResultCategory { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? ResultCategoryId { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? IsRetryable { get; set; }
+    }
     ///<summary>
     /// System information about the API call and not specifically bound to the response payload (e.g. timings, correlation ids, timestamps, validation errors)
     /// </summary>
@@ -27,7 +39,8 @@ namespace HT.Api.Client.Contracts.Models
         /// <summary>
         /// List of message(s) the API wants to send back to the caller.
         /// For example, it may be informational, warning (quota about to expire).
-        /// This will often be the &#x27;error response&#x27; found in other API vendors.
+        /// Usually if there are Error messages there may not be specific messages.
+        /// See your API implementation documentation for specifics.
         /// NOTE: These messages do not contribute to the determination of the success or failure of the API call.
         /// Use the presence of ErrorCodes in the Errors collection to determine success or failure.
         /// </summary>
@@ -39,26 +52,19 @@ namespace HT.Api.Client.Contracts.Models
         /// The server MUST always ensure this value is set before the response is returned to the caller.
         /// The server can set this value based on the presence of CallStatusCodes in the Errors collection.
         /// </summary>
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public CallStatusCode? CallStatus { get; set; }
 
-        public MetaData AddTag(string key, string? value)
-        {
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                throw new ArgumentNullException("Tag key cannot be null or whitespace", nameof(key));
-            }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public int? CallStatusId { get; set; }
 
-            Tags ??= new SortedDictionary<string, string>();
-            Tags[key] = value;
-            return this;
-        }
-        public MetaData AddMessage(Action<Message> configure)
-        {
-            Messages ??= new List<Message>();
-            var message = new Message();
-            configure(message);
-            Messages.Add(message);
-            return this;
-        }
+        /// <summary>
+        /// Convenience helper flags.  Use CallStatus for source-of-truth on overall status of the API call.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public MetaDataFlags? Flags { get; set; }
+
+
     }
 }

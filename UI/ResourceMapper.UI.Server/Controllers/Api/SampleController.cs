@@ -22,13 +22,13 @@ public class SampleController : ControllerBase
     public async Task<ActionResult<ApiResponse<SampleGetDateTimeResponse>>> GetCurrentDate([FromQuery] SampleGetDateTimeRequest request, CancellationToken cancellationToken = default)
     {
         var svcResponse = await _dateTimeService.GetDaysAgoAsync(request, cancellationToken);
-        return StatusCode((int)(svcResponse.HttpStatusCode ?? HttpStatusCode.OK), svcResponse.ApiResponse);
+        return StatusCode((int)( HttpStatusCode.OK), svcResponse.ApiResponse);
     }
 
     [HttpPost]
     public async Task<ActionResult<ApiResponse<SampleGetDateTimeResponse>>> GetCurrentDatePost([FromBody] SampleGetDateTimeRequest request, CancellationToken cancellationToken = default)
     {
         var svcResponse = await _dateTimeService.GetDaysAgoAsync(request, cancellationToken);
-        return StatusCode((int)(svcResponse.HttpStatusCode ?? HttpStatusCode.OK), svcResponse.ApiResponse);
+        return StatusCode((int)(HttpStatusCode.OK), svcResponse.ApiResponse);
     }
 }

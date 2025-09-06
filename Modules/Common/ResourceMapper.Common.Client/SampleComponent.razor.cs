@@ -81,7 +81,7 @@ namespace ResourceMapper.Common.Client
                         if (errorResponse?.Errors?.Any() == true)
                         {
                             var firstError = errorResponse.Errors.First();
-                            errorMessage += $" - {firstError.Detail}";
+                            errorMessage += $" - {firstError.Details}";
                         }
                     }
                     catch

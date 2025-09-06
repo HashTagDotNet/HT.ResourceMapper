@@ -24,7 +24,7 @@ namespace HT.Api.Client.Contracts.Models
             Href = href;
             Rel = rel;
             Title = title;
-            Method = method;
+            Method = method??="GET";
         }
 
         /// <summary>
