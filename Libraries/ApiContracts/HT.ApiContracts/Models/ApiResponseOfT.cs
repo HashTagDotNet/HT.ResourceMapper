@@ -34,21 +34,32 @@ namespace HT.Api.Client.Contracts.Models
         /// <summary>
         /// The payload of the response. Data and Errors cannot be included in same document https://jsonapi.org/format/#document-top-level
         /// </summary>
+        [JsonPropertyName("data")]
+        [JsonPropertyOrder(int.MaxValue)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public TData? Data { get; set; }
 
         /// <summary>
         /// List of errors on this message.  Not included on successful response. https://jsonapi.org/format/#errors
         /// </summary>
+        [JsonPropertyName("errors")]
+        [JsonPropertyOrder(int.MaxValue-1)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<Message>? Errors { get; set; }
 
         /// <summary>
         /// List of links (e.g. to object, log entries, etc.) https://jsonapi.org/format/#document-top-level
         /// </summary>
+        [JsonPropertyName("links")]
+        [JsonPropertyOrder(int.MaxValue - 2)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<Link>? Links { get; set; }
 
         /// <summary>
         /// Included in each response. https://jsonapi.org/format/#document-meta
         /// </summary>
+        [JsonPropertyName("meta")]
+        [JsonPropertyOrder(int.MaxValue)]
         public MetaData MetaData { get; set; } = new();
 
         /// <summary>
@@ -128,9 +139,9 @@ namespace HT.Api.Client.Contracts.Models
 ///// </summary>
 //public new ApiResponse<TData> AddNotFoundError(string? detail = null, string? property = null)
 //{
-//    base.AddNotFoundError(detail, property);
-//    ClearData();
-//    return this;
+    //base.AddNotFoundError(detail, property);
+    //ClearData();
+    //return this;
 //}
 
 ///// <summary>
@@ -169,6 +180,36 @@ namespace HT.Api.Client.Contracts.Models
 //public new ApiResponse<TData> AddCancellationError(string? detail = null)
 //{
 //    base.AddCancellationError(detail);
+//    ClearData();
+//    return this;
+//}
+
+///// <summary>
+///// Convenience method to add already tested error (generic version)
+///// </summary>
+//public new ApiResponse<TData> AddAlreadyTestedError(string? detail = null)
+//{
+//    base.AddAlreadyTestedError(detail);
+//    ClearData();
+//    return this;
+//}
+
+///// <summary>
+///// Convenience method to add rate limit errors (generic version)
+///// </summary>
+//public new ApiResponse<TData> AddRateLimitError(string? detail = null)
+//{
+//    base.AddRateLimitError(detail);
+//    ClearData();
+//    return this;
+//}
+
+///// <summary>
+///// Convenience method to add unavailable errors (generic version)
+///// </summary>
+//public new ApiResponse<TData> AddUnavailableError(string? detail = null)
+//{
+//    base.AddUnavailableError(detail);
 //    ClearData();
 //    return this;
 //}
