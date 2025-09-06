@@ -7,12 +7,8 @@ namespace HT.Api.Service.Contracts
     /// </summary>
     public class ApiServiceResponse
     {
-        /// <summary>
-        /// Raw http response to return to the caller from the API controller. If null, the controller will create a default api response with the headers
-        /// </summary>
-        public virtual ApiResponse ApiResponse { get; set; } = new();
-
-        public HttpResponse HttpDetails { get; set; }
+        public  ApiResponse ApiResponse { get; set; } = new();
+        public  HttpApiResponse HttpResponse { get; set; }
     }
 }
 

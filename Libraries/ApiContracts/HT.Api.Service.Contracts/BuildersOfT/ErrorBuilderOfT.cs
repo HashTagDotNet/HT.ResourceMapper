@@ -1,7 +1,7 @@
 ﻿using System.Reflection.Metadata.Ecma335;
 using HT.Api.Client.Contracts.Models;
 
-namespace HT.Api.Service.Contracts
+namespace HT.Api.Service.Contracts.BuildersOfT
 {
     public class ErrorBuilder<TResponseData> where TResponseData : class, new()
     {
@@ -16,7 +16,7 @@ namespace HT.Api.Service.Contracts
         {
             return _parentBuilder.Response;
         }
-        public ErrorMessageBuilder<TResponseData> AddError(string title, string detail)
+        public ErrorMessageBuilderOfT<TResponseData> AddError(string title, string detail)
         {
             var errorMessage = new ErrorMessage
             {
@@ -24,7 +24,7 @@ namespace HT.Api.Service.Contracts
                 Detail = detail
             };
             _parentBuilder.BackingServiceResponse.AddErrorMessage(errorMessage);
-            return new ErrorMessageBuilder<TResponseData>(_parentBuilder, errorMessage);
+            return new ErrorMessageBuilderOfT<TResponseData>(_parentBuilder, errorMessage);
         }
 
     }

@@ -5,40 +5,40 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace HT.Api.Service.Contracts
+namespace HT.Api.Service.Contracts.BuildersOfT
 {
-    public class ErrorMessageBuilder<TResponseData> where TResponseData : class, new()
+    public class ErrorMessageBuilderOfT<TResponseData> where TResponseData : class, new()
     {
         private readonly ServiceResponseBuilder<TResponseData> _parent;
         private readonly ErrorMessage _errorMessage;
 
-        public ErrorMessageBuilder(ServiceResponseBuilder<TResponseData> parent, ErrorMessage errorMessage)
+        public ErrorMessageBuilderOfT(ServiceResponseBuilder<TResponseData> parent, ErrorMessage errorMessage)
         {
             _parent = parent;
             _errorMessage = errorMessage;
         }
 
 
-        public ErrorMessageBuilder WithStatus(CallStatusCode statusCode)
+        public ErrorMessageBuilderOfT WithStatus(CallStatusCode statusCode)
         {
             _errorMessage.CallStatus = statusCode;
             return this;
         }
 
-        public ErrorMessageBuilder WithSeverity(MessageSeverity severity)
+        public ErrorMessageBuilderOfT WithSeverity(MessageSeverity severity)
         {
             // Note: ErrorMessage might inherit severity from MessageBase
             // This would need to be implemented based on the actual inheritance structure
             return this;
         }
 
-        public ErrorMessageBuilder AddCorrelationId(string correlationId)
+        public ErrorMessageBuilderOfT AddCorrelationId(string correlationId)
         {
             _errorMessage.MessageUid = correlationId;
             return this;
         }
 
-        public ErrorMessageBuilder AddLink(string href, string? rel = null, string? title = null, string? method = null)
+        public ErrorMessageBuilderOfT AddLink(string href, string? rel = null, string? title = null, string? method = null)
         {
             _errorMessage.Links ??= new List<Link>();
             _errorMessage.Links.Add(new Link(href, rel, title, method));

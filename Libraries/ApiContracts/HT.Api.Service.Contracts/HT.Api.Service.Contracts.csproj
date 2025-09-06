@@ -10,4 +10,8 @@
     <ProjectReference Include="..\HT.ApiContracts\HT.Api.Client.Contracts.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Builders\" />
+  </ItemGroup>
+
 </Project>

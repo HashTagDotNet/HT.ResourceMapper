@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace HT.Api.Service.Contracts
+﻿namespace HT.Api.Service.Contracts.BuildersOfT
 {
     public class DataBuilder<T> where T : class, new()
     {
@@ -27,7 +21,7 @@ namespace HT.Api.Service.Contracts
             return this;
         }
 
-        public HttpResponseBuilder<T> Http =>_responseBuilder.Http;
+        public HttpApiResponseBuilderOfT<T> Http =>_responseBuilder.Http;
         public ValidationBuilder<T> Validation => _responseBuilder.Validation;
         public MetaDataBuilderOfT<T> Meta => _responseBuilder.Meta;
 

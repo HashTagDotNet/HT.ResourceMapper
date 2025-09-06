@@ -1,6 +1,6 @@
 ﻿using HT.Api.Client.Contracts.Models;
 
-namespace HT.Api.Service.Contracts
+namespace HT.Api.Service.Contracts.BuildersOfT
 {
     public class MetaBuilder<TResponseData> where TResponseData : class, new()
     {

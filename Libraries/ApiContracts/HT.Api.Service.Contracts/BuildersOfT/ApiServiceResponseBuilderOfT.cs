@@ -1,6 +1,6 @@
 ﻿using HT.Api.Client.Contracts.Models;
 
-namespace HT.Api.Service.Contracts
+namespace HT.Api.Service.Contracts.BuildersOfT
 {
     public class ServiceResponseBuilder<TResponseData> where TResponseData : class, new()
     {
@@ -8,13 +8,13 @@ namespace HT.Api.Service.Contracts
 
         public ServiceResponseBuilder()
         {
-            Http = new HttpResponseBuilder<TResponseData>(this);
+            Http = new HttpApiResponseBuilderOfT<TResponseData>(this);
             Data = new DataBuilder<TResponseData>(this);
             Meta = new MetaBuilder<TResponseData>(this);
 
             Validation = new ValidationBuilder(this);
             Errors = new ErrorBuilder<TResponseData>(this);
-            Links = new LinksBuilder<TResponseData>(this);
+            Links = new LinksBuilderOfT<TResponseData>(this);
 
         }
 
@@ -34,11 +34,11 @@ namespace HT.Api.Service.Contracts
         }
 
         // Nested builder access
-        public HttpResponseBuilder<TResponseData> Http { get; }
+        public HttpApiResponseBuilderOfT<TResponseData> Http { get; }
 
         public ValidationBuilder Validation { get; }
         public ErrorBuilder<TResponseData> Errors { get; }
-        public LinksBuilder<TResponseData> Links { get; }
+        public LinksBuilderOfT<TResponseData> Links { get; }
         public MetaBuilder<TResponseData> Meta { get; }
         public DataBuilder<TResponseData> Data { get; }
 
