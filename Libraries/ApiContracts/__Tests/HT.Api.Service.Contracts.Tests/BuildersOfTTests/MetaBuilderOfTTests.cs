@@ -1,6 +1,5 @@
 // ReSharper disable InconsistentNaming
 using HT.Api.Client.Contracts.Models;
-using HT.Api.Service.Contracts;
 using HT.Api.Service.Contracts.BuildersOfT;
 
 namespace HT.Api.Service.Contracts.Tests.BuildersOfTTests

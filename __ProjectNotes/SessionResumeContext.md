@@ -24,11 +24,11 @@
 ### Active Files When Session Suspended:
 - `Database\HTServices\ResourceMapper\Tables\ResourceDependency.sql` (current focus)
 - All SQL tables and stored procedures for ResourceMapper
-- Planning documents in `__WorkingPrompts\` folder
+- Planning documents in `__ProjectNotes\` folder
 
 ### Git Repository State:
 - **Branch**: develop
-- **Remote**: origin (https://github.com/HashTagDotNet/HT.Services)
+- **Remote**: origin (https://github.com/HashTagDotNet/HT.ResourceMapper)
 - **Latest Commit**: Planning documents committed with comprehensive context
 
 ### Next Session Priorities:
@@ -63,8 +63,8 @@
 
 1. **Open Key Files**:
    ```
-   __WorkingPrompts\UserStories.md          # Main story repository
-   __WorkingPrompts\Concept1.md             # Architectural decisions
+   __ProjectNotes\UserStories.md          # Main story repository
+   __ProjectNotes\Concept1.md             # Architectural decisions
    Libraries\ApiContracts\                  # Existing API patterns to extend
    Database\HTServices\ResourceMapper\      # Database schema
    ```
