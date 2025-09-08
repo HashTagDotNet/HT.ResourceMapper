@@ -1,6 +1,6 @@
 ﻿@namespace ResourceMapper.UI.Client
 
-<Router AppAssembly="@typeof(App).Assembly">
+<Router AppAssembly="@typeof(App).Assembly" AdditionalAssemblies="@lazyLoadedAssemblies">
     <Found Context="routeData">
         <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
@@ -12,3 +12,10 @@
         </LayoutView>
     </NotFound>
 </Router>
+
+@code {
+    private System.Reflection.Assembly[] lazyLoadedAssemblies = 
+    {
+        typeof(ResourceMapper.Common.Client._Imports).Assembly
+    };
+}
