@@ -3,8 +3,8 @@ using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ResourceMapper.Common.Server.Config;
-using ResourceMapper.Common.Server.Sample;
-using ResourceMapper.Common.Server.Sample.Interfaces;
+using ResourceMapper.Common.Server.Resources;
+using ResourceMapper.Common.Server.Resources.Interfaces;
 
 namespace ResourceMapper.Common.Server.Utils
 {
@@ -14,16 +14,14 @@ namespace ResourceMapper.Common.Server.Utils
         {
           
             services.TryAddSingleton(typeof(GlobalConfig));
-
-            services.AddTransient<ISampleService, SampleService>();
-            services.AddTransient<ISampleRepository, SampleSqlRepository>();
-
-            
             services.TryAddSingleton<IDbConnector>(services =>
             {
                 var cfg = services.GetRequiredService<GlobalConfig>();
                 return new DbConnector(cfg.ConnectionStrings.DatabaseReadWrite,cfg.ConnectionStrings.DatabaseReadWrite);
             });
+
+            services.TryAddScoped<IResourceRepository,ResourceSqlRepository>();
+            services.TryAddScoped<IResourceService,ResourceService>();
         }
     }
 }

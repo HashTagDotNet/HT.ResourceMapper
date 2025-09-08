@@ -13,6 +13,19 @@ namespace HT.Api.Service.Contracts.BuildersOfT
             _responseBuilder = parent;
         }
 
+        public ErrorBuilder<T> AddError(string? title = null, string? detail = null, string? code = null)
+        {
+            ApiResponse.Errors ??= [];
+
+            ApiResponse.Errors.Add(new Message()
+            {
+                Title = title,
+                Details = detail,
+                MessageCode = code,
+                CallStatus = CallStatusCode.Error,
+            });
+            return this;
+        }
 
         public ErrorBuilder<T> AddError(CallStatusCode callStatus, string? title=null, string? detail=null, string? code = null)
         {

@@ -9,6 +9,10 @@
     <AssemblyName>HT.Services</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
+    <Build Remove="ResourceMapper\Scripts\Demo_Insert_ResourceItemsForGrid.sql" />
+  </ItemGroup>
+  <ItemGroup>
     <None Include="localhost.publish.xml" />
+    <None Include="ResourceMapper\Scripts\Demo_Insert_ResourceItemsForGrid.sql" />
   </ItemGroup>
 </Project>

@@ -17,6 +17,20 @@ namespace HT.Api.Service.Contracts.BuildersOfT
         {
             _responseBuilder = serviceResponseBuilder;
         }
+        public ValidationBuilder<T> AddValidation(string? propertyName, string? title = null, string? detail = null, string? code = null)
+        {
+            ApiResponse.Errors ??= new List<Message>();
+            ApiResponse.Errors.Add(new Message()
+            {
+                Title = title,
+                Details = detail,
+                MessageCode = code,
+                PropertyLocation = PropertyLocation.Other,
+                PropertyName = propertyName,
+                CallStatus = CallStatusCode.InvalidArgument
+            });
+            return this;
+        }
 
         public ValidationBuilder<T> AddValidation(PropertyLocation propertyLocation, string? propertyName, string? title = null, string? detail = null, string? code = null)
         {

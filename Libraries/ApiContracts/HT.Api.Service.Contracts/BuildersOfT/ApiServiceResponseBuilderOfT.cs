@@ -34,6 +34,17 @@ namespace HT.Api.Service.Contracts.BuildersOfT
         public MetaBuilder<TResponseData> Meta { get; }
         public DataBuilder<TResponseData> Data { get; }
 
+        public bool IsOk
+        {
+            get
+            {
+                if (BackingServiceResponse?.ApiResponse?.Errors is { Count: > 0 }) return false;
+                if (BackingServiceResponse?.ApiResponse?.MetaData?.CallStatus != null && BackingServiceResponse.ApiResponse.MetaData.CallStatus.IsError()) return false;
+                if (BackingServiceResponse?.HttpResponse?.HttpStatusCode != null && (int)BackingServiceResponse.HttpResponse.HttpStatusCode >= 400) return false;
+                return true;
+            }
+        }
+
         // Direct property access for convenience
 
         public ApiServiceResponse<TResponseData> BuildResponse(Action<ApiServiceResponse<TResponseData>>? postBuildFix = null)

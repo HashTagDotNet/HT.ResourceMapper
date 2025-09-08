@@ -13,23 +13,11 @@
         <FluentStack Orientation="Orientation.Vertical" VerticalGap="16" Style="padding: 24px;">
             <FluentLabel Typo="Typography.Subject">Server Date & Time</FluentLabel>
             
-            <SampleComponent @ref="sampleComponent" />
-            
-            <FluentButton Appearance="Appearance.Accent" @onclick="RefreshDateTime">
-                🔄 Refresh
-            </FluentButton>
+          
         </FluentStack>
     </FluentCard>
 </FluentStack>
 
 @code {
-    private SampleComponent? sampleComponent;
-
-    private async Task RefreshDateTime()
-    {
-        if (sampleComponent != null)
-        {
-            await sampleComponent.RefreshAsync();
-        }
-    }
+   
 }
