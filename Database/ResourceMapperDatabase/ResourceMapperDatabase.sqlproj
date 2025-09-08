@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build">
+  <Sdk Name="Microsoft.Build.Sql" Version="0.2.3-preview" />
+  <PropertyGroup>
+    <Name>ResourceMapperDatabase</Name>
+    <DSP>Microsoft.Data.Tools.Schema.Sql.Sql160DatabaseSchemaProvider</DSP>
+    <ModelCollation>1033, CI</ModelCollation>
+    <RootNamespace>ResourceMapperDatabase</RootNamespace>
+    <AssemblyName>ResourceMapperDatabase</AssemblyName>
+  </PropertyGroup>
+  
+  <!-- Include all SQL files as Build items -->
+  <ItemGroup>
+    <Build Include="HTResourceMapper\Tables\*.sql" />
+    <Build Include="HTResourceMapper\StoredProcedures\*.sql" />
+    <Build Include="HTResourceMapper\Security\*.sql" />
+  </ItemGroup>
+  
+  <!-- Publish profiles -->
+  <ItemGroup>
+    <None Include="ResourceMapperDatabase.localhost.publish.xml" />
+    <None Include="ResourceMapperDatabase.publish.xml" />
+  </ItemGroup>
+</Project>

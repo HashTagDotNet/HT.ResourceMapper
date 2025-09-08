@@ -20,7 +20,45 @@ namespace HT.Api.Client.Contracts
                 CallStatusCode.Cancelled => System.Net.HttpStatusCode.RequestTimeout,
                 CallStatusCode.InvalidArgument => System.Net.HttpStatusCode.BadRequest,
                 CallStatusCode.OperationTimeOut => System.Net.HttpStatusCode.RequestTimeout,
+                
+                // IMPORTANT: Resource not found maps to 422 Unprocessable Entity
+                // This differentiates from ASP.NET Core's automatic 404 for unknown endpoints
+                CallStatusCode.NotFound => System.Net.HttpStatusCode.UnprocessableEntity, 
+                
+                CallStatusCode.AlreadyExists => System.Net.HttpStatusCode.Conflict,
+                CallStatusCode.PermissionDenied => System.Net.HttpStatusCode.Forbidden,
+                CallStatusCode.ResourceExhausted => System.Net.HttpStatusCode.TooManyRequests,
+                CallStatusCode.FailedPrecondition => System.Net.HttpStatusCode.PreconditionFailed,
+                CallStatusCode.Aborted => System.Net.HttpStatusCode.Conflict,
+                CallStatusCode.OutOfRange => System.Net.HttpStatusCode.BadRequest,
+                CallStatusCode.NotImplemented => System.Net.HttpStatusCode.NotImplemented,
+                CallStatusCode.InternalError => System.Net.HttpStatusCode.InternalServerError,
+                CallStatusCode.Unavailable => System.Net.HttpStatusCode.ServiceUnavailable,
+                CallStatusCode.Unauthenticated => System.Net.HttpStatusCode.Unauthorized,
+                CallStatusCode.Error => System.Net.HttpStatusCode.InternalServerError,
+
+                _ => System.Net.HttpStatusCode.InternalServerError
+            };
+        }
+
+        /// <summary>
+        /// Converts ErrorCode to HTTP status code with option to use traditional 404 for resource not found
+        /// Use this method when you need backward compatibility or client expectations for 404
+        /// </summary>
+        public static System.Net.HttpStatusCode ToHttpStatusCodeTraditional(this CallStatusCode? errorCode)
+        {
+            if (errorCode == null) return System.Net.HttpStatusCode.OK;
+
+            return errorCode switch
+            {
+                CallStatusCode.Ok => System.Net.HttpStatusCode.OK,
+                CallStatusCode.Cancelled => System.Net.HttpStatusCode.RequestTimeout,
+                CallStatusCode.InvalidArgument => System.Net.HttpStatusCode.BadRequest,
+                CallStatusCode.OperationTimeOut => System.Net.HttpStatusCode.RequestTimeout,
+                
+                // Traditional approach: both endpoint and resource not found use 404
                 CallStatusCode.NotFound => System.Net.HttpStatusCode.NotFound,
+                
                 CallStatusCode.AlreadyExists => System.Net.HttpStatusCode.Conflict,
                 CallStatusCode.PermissionDenied => System.Net.HttpStatusCode.Forbidden,
                 CallStatusCode.ResourceExhausted => System.Net.HttpStatusCode.TooManyRequests,
@@ -196,9 +234,6 @@ namespace HT.Api.Client.Contracts
             };
         }
 
-     
-
-
         /// <summary>
         /// Gets the priority level for error handling (1 = highest, 5 = lowest)
         /// </summary>
@@ -226,8 +261,6 @@ namespace HT.Api.Client.Contracts
             };
         }
 
-
-
         /// <summary>
         /// Determines the overall result category for business logic decisions
         /// </summary>
@@ -243,7 +276,6 @@ namespace HT.Api.Client.Contracts
             };
         }
        
-
         /// <summary>
         /// Gets user-friendly action suggestions based on the error code
         /// </summary>
@@ -335,7 +367,5 @@ namespace HT.Api.Client.Contracts
             CallStatusCode.Error => "An error occurred",
             _ => "Please try again or contact support if the problem persists"
         };
-
-        
     }
 }

@@ -70,234 +70,147 @@ namespace HT.Api.Client.Contracts.Models
         public bool ShouldSerializeLinks() => Links is { Count: > 0 };
         public bool ShouldSerializeErrors() => Errors is { Count: > 0 };
 
+        #region Static Factory Methods for Common Scenarios
+
+        /// <summary>
+        /// Creates a successful response with data
+        /// </summary>
+        /// <param name="data">The data to include in the response</param>
+        /// <returns>A successful API response</returns>
+        public static ApiResponse<TData> Success(TData data)
+        {
+            return new ApiResponse<TData>
+            {
+                Data = data,
+                MetaData = new MetaData
+                {
+                    CallStatus = CallStatusCode.Ok,
+                    CallStatusId = (int)CallStatusCode.Ok
+                }
+            };
+        }
+
+        /// <summary>
+        /// Creates a resource not found response (HTTP 422 - Unprocessable Entity)
+        /// Use this when a specific resource ID/identifier is not found in the database
+        /// </summary>
+        /// <param name="resourceType">The type of resource that was not found (e.g., "Resource", "User")</param>
+        /// <param name="resourceId">The identifier that was searched for</param>
+        /// <param name="additionalDetails">Additional context about the search</param>
+        /// <returns>A resource not found API response</returns>
+        public static ApiResponse<TData> ResourceNotFound(string resourceType, string resourceId, string? additionalDetails = null)
+        {
+            var detail = $"{resourceType} with identifier '{resourceId}' was not found.";
+            if (!string.IsNullOrEmpty(additionalDetails))
+            {
+                detail += $" {additionalDetails}";
+            }
+
+            return new ApiResponse<TData>
+            {
+                MetaData = new MetaData
+                {
+                    CallStatus = CallStatusCode.NotFound,
+                    CallStatusId = (int)CallStatusCode.NotFound
+                },
+                Errors = new List<Message>
+                {
+                    new Message
+                    {
+                        CallStatus = CallStatusCode.NotFound,
+                        CallStatusId = (int)CallStatusCode.NotFound,
+                        Title = $"{resourceType} Not Found",
+                        Details = detail,
+                        MessageCode = "RESOURCE_NOT_FOUND",
+                        SeverityCode = MessageSeverity.Error,
+                        SeverityId = (int)MessageSeverity.Error,
+                        PropertyLocation = PropertyLocation.Path,
+                        PropertyName = resourceId,
+                        Tags = new Dictionary<string, string?>
+                        {
+                            ["ResourceType"] = resourceType,
+                            ["ResourceId"] = resourceId,
+                            ["ErrorType"] = "ResourceNotFound"
+                        }
+                    }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Creates a validation error response (HTTP 400 - Bad Request)
+        /// </summary>
+        /// <param name="fieldName">The field that failed validation</param>
+        /// <param name="errorMessage">The validation error message</param>
+        /// <returns>A validation error API response</returns>
+        public static ApiResponse<TData> ValidationError(string fieldName, string errorMessage)
+        {
+            return new ApiResponse<TData>
+            {
+                MetaData = new MetaData
+                {
+                    CallStatus = CallStatusCode.InvalidArgument,
+                    CallStatusId = (int)CallStatusCode.InvalidArgument
+                },
+                Errors = new List<Message>
+                {
+                    new Message
+                    {
+                        CallStatus = CallStatusCode.InvalidArgument,
+                        CallStatusId = (int)CallStatusCode.InvalidArgument,
+                        Title = "Validation Error",
+                        Details = errorMessage,
+                        MessageCode = "VALIDATION_ERROR",
+                        SeverityCode = MessageSeverity.Error,
+                        SeverityId = (int)MessageSeverity.Error,
+                        PropertyLocation = PropertyLocation.Body,
+                        PropertyName = fieldName,
+                        Tags = new Dictionary<string, string?>
+                        {
+                            ["ErrorType"] = "ValidationError",
+                            ["Field"] = fieldName
+                        }
+                    }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Creates an internal server error response (HTTP 500)
+        /// </summary>
+        /// <param name="details">Error details (avoid exposing sensitive information)</param>
+        /// <param name="correlationId">Optional correlation ID for tracking</param>
+        /// <returns>An internal server error API response</returns>
+        public static ApiResponse<TData> InternalError(string? details = null, string? correlationId = null)
+        {
+            return new ApiResponse<TData>
+            {
+                MetaData = new MetaData
+                {
+                    CallStatus = CallStatusCode.InternalError,
+                    CallStatusId = (int)CallStatusCode.InternalError
+                },
+                Errors = new List<Message>
+                {
+                    new Message
+                    {
+                        CallStatus = CallStatusCode.InternalError,
+                        CallStatusId = (int)CallStatusCode.InternalError,
+                        Title = "Internal Server Error",
+                        Details = details ?? "An unexpected error occurred while processing your request.",
+                        MessageCode = "INTERNAL_ERROR",
+                        SeverityCode = MessageSeverity.Error,
+                        SeverityId = (int)MessageSeverity.Error,
+                        Tags = new Dictionary<string, string?>
+                        {
+                            ["ErrorType"] = "InternalError",
+                            ["CorrelationId"] = correlationId
+                        }
+                    }
+                }
+            };
+        }
+
+        #endregion
     }
 }
-
-
-//#region Data Management
-
-///// <summary>
-///// Sets data and ensures response is in valid JSON:API state (clears errors if data is set)
-///// </summary>
-//public ApiResponse<TData> SetData(TData data)
-//{
-//    Data = data ?? throw new ArgumentNullException(nameof(data));
-//    // JSON:API compliance - clear errors when data is present
-//    ClearErrors();
-//    return this;
-//}
-
-///// <summary>
-///// Clears the data payload without affecting call status
-///// </summary>
-//public ApiResponse<TData> ClearData()
-//{
-//    Data = null;
-//    return this;
-//}
-
-//#endregion
-
-//#region Error Management with JSON:API Compliance
-
-///// <summary>
-///// Adds an error using CallStatusCode approach and clears data to maintain JSON:API compliance
-///// </summary>
-//public new ApiResponse<TData> AddError(CallStatusCode statusCode, string? detail = null, string? property = null)
-//{
-//    base.AddError(statusCode, detail, property);
-//    // JSON:API compliance - clear data when errors are added
-//    ClearData();
-//    return this;
-//}
-
-///// <summary>
-///// Adds an error with custom user and developer action suggestions and clears data
-///// </summary>
-//public new ApiResponse<TData> AddError(CallStatusCode statusCode, string? detail, string? property, 
-//    string? userActions, string? developerActions)
-//{
-//    base.AddError(statusCode, detail, property, userActions, developerActions);
-//    // JSON:API compliance - clear data when errors are added
-//    ClearData();
-//    return this;
-//}
-
-///// <summary>
-///// Adds validation error and clears data to maintain JSON:API compliance
-///// </summary>
-//public new ApiResponse<TData> AddValidationError(string property, string detail)
-//{
-//    base.AddValidationError(property, detail);
-//    // JSON:API compliance - clear data when errors are added
-//    ClearData();
-//    return this;
-//}
-
-///// <summary>
-///// Convenience method to add common errors (generic version)
-///// </summary>
-//public new ApiResponse<TData> AddNotFoundError(string? detail = null, string? property = null)
-//{
-    //base.AddNotFoundError(detail, property);
-    //ClearData();
-    //return this;
-//}
-
-///// <summary>
-///// Convenience method to add permission errors (generic version)
-///// </summary>
-//public new ApiResponse<TData> AddPermissionError(string? detail = null, string? property = null)
-//{
-//    base.AddPermissionError(detail, property);
-//    ClearData();
-//    return this;
-//}
-
-///// <summary>
-///// Convenience method to add authentication errors (generic version)
-///// </summary>
-//public new ApiResponse<TData> AddAuthenticationError(string? detail = null)
-//{
-//    base.AddAuthenticationError(detail);
-//    ClearData();
-//    return this;
-//}
-
-///// <summary>
-///// Convenience method to add internal server errors (generic version)
-///// </summary>
-//public new ApiResponse<TData> AddInternalError(string? detail = null)
-//{
-//    base.AddInternalError(detail);
-//    ClearData();
-//    return this;
-//}
-
-///// <summary>
-///// Convenience method to add cancellation errors (generic version)
-///// </summary>
-//public new ApiResponse<TData> AddCancellationError(string? detail = null)
-//{
-//    base.AddCancellationError(detail);
-//    ClearData();
-//    return this;
-//}
-
-///// <summary>
-///// Convenience method to add already tested error (generic version)
-///// </summary>
-//public new ApiResponse<TData> AddAlreadyTestedError(string? detail = null)
-//{
-//    base.AddAlreadyTestedError(detail);
-//    ClearData();
-//    return this;
-//}
-
-///// <summary>
-///// Convenience method to add rate limit errors (generic version)
-///// </summary>
-//public new ApiResponse<TData> AddRateLimitError(string? detail = null)
-//{
-//    base.AddRateLimitError(detail);
-//    ClearData();
-//    return this;
-//}
-
-///// <summary>
-///// Convenience method to add unavailable errors (generic version)
-///// </summary>
-//public new ApiResponse<TData> AddUnavailableError(string? detail = null)
-//{
-//    base.AddUnavailableError(detail);
-//    ClearData();
-//    return this;
-//}
-
-//#endregion
-
-//#region Fluent API (Generic Versions)
-
-///// <summary>
-///// Fluent API to add an error and return the response (generic version)
-///// </summary>
-//public new ApiResponse<TData> WithError(CallStatusCode statusCode, string? detail = null, string? property = null)
-//{
-//    AddError(statusCode, detail, property);
-//    return this;
-//}
-
-///// <summary>
-///// Fluent API to add validation error and return the response (generic version)
-///// </summary>
-//public new ApiResponse<TData> WithValidationError(string property, string detail)
-//{
-//    AddValidationError(property, detail);
-//    return this;
-//}
-
-///// <summary>
-///// Fluent API to set data and return the response
-///// </summary>
-//public ApiResponse<TData> WithData(TData data)
-//{
-//    SetData(data);
-//    return this;
-//}
-
-//#endregion
-
-//#region Static Factory Methods
-
-///// <summary>
-///// Creates a successful response with data
-///// </summary>
-//public static ApiResponse<TData> Success(TData data)
-//{
-//    var response = new ApiResponse<TData>();
-//    response.SetData(data);
-//    response.MetaData.CallStatus = CallStatusCode.Ok;
-//    return response;
-//}
-
-///// <summary>
-///// Creates an error response (no data)
-///// </summary>
-//public static ApiResponse<TData> Error(CallStatusCode statusCode, string? detail = null, string? property = null)
-//{
-//    var response = new ApiResponse<TData>();
-//    response.AddError(statusCode, detail, property);
-//    return response;
-//}
-
-///// <summary>
-///// Creates a validation error response
-///// </summary>
-//public static ApiResponse<TData> ValidationError(string property, string detail)
-//{
-//    var response = new ApiResponse<TData>();
-//    response.AddValidationError(property, detail);
-//    return response;
-//}
-
-///// <summary>
-///// Creates a not found error response
-///// </summary>
-//public static ApiResponse<TData> NotFound(string? detail = null, string? property = null)
-//{
-//    var response = new ApiResponse<TData>();
-//    response.AddNotFoundError(detail, property);
-//    return response;
-//}
-
-///// <summary>
-///// Creates an internal error response
-///// </summary>
-//public static ApiResponse<TData> InternalError(string? detail = null)
-//{
-//    var response = new ApiResponse<TData>();
-//    response.AddInternalError(detail);
-//    return response;
-//}
-
-//#endregion

@@ -1,0 +1,38 @@
+﻿---- NOTE:  Remember to enable COMMIT below
+--USE [HT.Services]
+--GO
+--DROP PROC IF EXISTS #SeedTagType
+--GO
+--CREATE PROC #SeedTagType(
+--    @TagTypeId INT
+--    ,@TagCode VARCHAR(50)
+--)
+--AS
+--BEGIN
+--    UPDATE TOP(1)
+--        [HTResourceMapper].TagContentTypes
+--    SET
+--        TagCode = @TagCode
+--    WHERE
+--        TagTypeId = @TagTypeId
+--    IF @@ROWCOUNT = 0
+--    BEGIN
+--        INSERT INTO [HTResourceMapper].TagContentTypes (
+--            TagTypeId,
+--            TagCode
+--        ) VALUES (
+--            @TagTypeId
+--            ,@TagCode
+--        )
+--    END
+--END
+--GO
+
+--EXEC #SeedTagType @TagTypeId=0, @TagCode='Text'
+--EXEC #SeedTagType @TagTypeId=1, @TagCode='Link'
+
+--SELECT * FROM [HTResourceMapper].TagContentTypes
+--ROLLBACK
+----COMMIT
+--GO
+--DROP PROC IF EXISTS #SeedTagType
