@@ -8,14 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="9.0.8" />
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\Libraries\ApiContracts\HT.Api.Service.Contracts\HT.Api.Service.Contracts.csproj" />
-    <ProjectReference Include="..\..\Libraries\ApiContracts\HT.ApiContracts\HT.Api.Client.Contracts.csproj" />
     <ProjectReference Include="..\..\Modules\Common\ResourceMapper.Common.Server\ResourceMapper.Common.Server.csproj" />
     <ProjectReference Include="..\ResourceMapper.UI.Client\ResourceMapper.UI.Client.csproj" />
   </ItemGroup>
