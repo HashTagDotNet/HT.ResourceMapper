@@ -1,4 +1,4 @@
-﻿@page "/"
+﻿@* @page "/"
 @using ResourceMapper.Common.Client
 
 <PageTitle>Home</PageTitle>
@@ -12,28 +12,18 @@
             <MudCardHeader>
                 <CardHeaderContent>
                     <MudText Typo="Typo.h6">
-                        <MudIcon Icon="Icons.Material.Filled.Info" Class="mr-3" /> Quick Start
+                        <MudIcon Icon="Icons.Material.Filled.Info" Class="mr-3" />Search for Resources
                     </MudText>
                 </CardHeaderContent>
             </MudCardHeader>
             <MudCardContent>
-                <MudText Typo="Typo.body2">
-                    Welcome to the ResourceMapper application. This is your central hub for managing and organizing resources with hashtag-based categorization.
-                </MudText>
-                <MudList T="string">
-                    <MudListItem Icon="Icons.Material.Filled.Search" Text="Search and filter resources" />
-                    <MudListItem Icon="Icons.Material.Filled.Add" Text="Add new resources" />
-                    <MudListItem Icon="Icons.Material.Filled.Tag" Text="Organize with tags" />
-                    <MudListItem Icon="Icons.Material.Filled.ImportExport" Text="Import/Export data" />
-                </MudList>
+                
             </MudCardContent>
             <MudCardActions>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.GetStarted">
-                    Get Started
+                <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="Icons.Material.Filled.GetStarted">
+                    Search
                 </MudButton>
-                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="Icons.Material.Filled.Help">
-                    Learn More
-                </MudButton>
+                
             </MudCardActions>
         </MudCard>
     </MudItem>
@@ -68,3 +58,4 @@
 @code {
    
 }
+ *@

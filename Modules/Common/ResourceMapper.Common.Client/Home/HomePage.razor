@@ -1,0 +1,152 @@
+﻿@page "/"
+@using ResourceMapper.Common.Shared.HomePage
+@using ResourceMapper.Common.Shared.HomePage.Contracts
+
+<PageTitle>Resource Mapper - Home</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Resource Mapper</MudText>
+    
+    <MudGrid>
+        <!-- Search Card -->
+        <MudItem xs="12" lg="4">
+            <MudCard Elevation="2" Style="height: fit-content;">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="Icons.Material.Filled.Search" Class="mr-3" />
+                            Search for Resources
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudTextField @bind-Value="SearchTerm" 
+                                  Label="Search resources..." 
+                                  Variant="Variant.Outlined"
+                                  @onkeypress="HandleKeyPress" />
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary" 
+                               StartIcon="Icons.Material.Filled.Search"
+                               Class="ml-auto"
+                               OnClick="PerformSearch">
+                        Search
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+        
+        <!-- Data Grid Card -->
+        <MudItem xs="12" lg="8">
+            <MudCard Elevation="2" Style="height: 70vh; display: flex; flex-direction: column;">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="Icons.Material.Filled.TableChart" Class="mr-3" />
+                            Resources
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent Style="flex: 1; overflow: hidden;">
+                    <MudDataGrid @ref="dataGrid"
+                                 T="ResourceGridItemModel" 
+                                 VirtualizeServerData="LoadServerData"
+                                 Virtualize="true"
+                                 Height="500px"
+                                 Elevation="0"
+                                 Bordered="true"
+                                 Dense="true"
+                                 Hover="false"
+                                 Striped="false"
+                                 SortMode="SortMode.None"
+                                 Filterable="false"
+                                 ShowMenuIcon="false"
+                                 FixedHeader="true"
+                                 ItemSize="50"
+                                 
+                                 RowsPerPage="5"
+                                 CurrentPage="0">
+                        
+                        <Columns>
+                            <TemplateColumn Title="Resource Name" Sortable="false">
+                                <CellTemplate>
+                                    <MudText Typo="Typo.body2" Class="font-weight-medium">
+                                        @context.Item.ResourceName
+                                    </MudText>
+                                </CellTemplate>
+                            </TemplateColumn>
+                            
+                            <TemplateColumn Title="Resource Type" Sortable="false">
+                                <CellTemplate>
+                                    <MudChip T="string" 
+                                             Size="Size.Small" 
+                                             Color="Color.Primary" 
+                                             Variant="Variant.Text">
+                                        @(context.Item.ResourceType ?? "Unknown")
+                                    </MudChip>
+                                </CellTemplate>
+                            </TemplateColumn>
+                            
+                            <TemplateColumn Title="Description" Sortable="false">
+                                <CellTemplate>
+                                    <MudText Typo="Typo.body2" 
+                                             Style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        @context.Item.Description
+                                    </MudText>
+                                </CellTemplate>
+                            </TemplateColumn>
+                            
+                            <TemplateColumn Title="Tags" Sortable="false">
+                                <CellTemplate>
+                                    <div style="white-space: pre-line; font-size: 0.875rem; line-height: 1.2;">
+                                        @if (context.Item.Tags?.Any() == true)
+                                        {
+                                            var displayTags = context.Item.Tags.Take(3).ToList();
+                                            @foreach (var tag in displayTags)
+                                            {
+                                                <div>
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Text">
+                                                        @($"{tag.TagKey}: {tag.TagValue}")
+                                                    </MudChip>
+                                                </div>
+                                            }
+                                            @if (context.Item.Tags.Count > 3)
+                                            {
+                                                <div style="font-style: italic; color: var(--mud-palette-text-secondary);">
+                                                    (@(context.Item.Tags.Count - 3) more...)
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <MudText Typo="Typo.caption" Style="font-style: italic;">No tags</MudText>
+                                        }
+                                    </div>
+                                </CellTemplate>
+                            </TemplateColumn>
+                            
+                            <TemplateColumn Title="Last Updated" Sortable="false">
+                                <CellTemplate>
+                                    <MudText Typo="Typo.body2">
+                                        @context.Item.RelativeLastUpdatedOn
+                                    </MudText>
+                                </CellTemplate>
+                            </TemplateColumn>
+                        </Columns>
+                        
+                        <NoRecordsContent>
+                            <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">
+                                No resources found
+                            </MudText>
+                        </NoRecordsContent>
+                        
+                        <LoadingContent>
+                            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                        </LoadingContent>
+                    </MudDataGrid>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
