@@ -164,7 +164,7 @@ namespace ResourceMapper.Common.Client.Home
             }
 
             // Normal grid state-based request
-            return new ResourceGridRequest
+            var retVal = new ResourceGridRequest
             {
                 Skip = state.StartIndex,
                 Take = state.Count, // Use the actual page size from the grid state
@@ -172,6 +172,42 @@ namespace ResourceMapper.Common.Client.Home
                 OrderBy = null,   // No sorting for now
                 OrderDirection = "Asc"
             };
+            if (state.SortDefinitions is { Count: > 0 })
+            {
+             
+                retVal.SortBy ??= [];
+                foreach (var sortDef in state.SortDefinitions)
+                {
+                    string? orderByFieldName = string.Empty;
+                    var sortDefinition = state.SortDefinitions.First();
+                    // Check if SortBy is a GUID (for TemplateColumns)
+                    if (Guid.TryParse(sortDefinition.SortBy, out _))
+                    {
+                        // Find the column by its GUID and use the Tag
+                        var column = dataGrid?.GetColumnByPropertyName(sortDefinition.SortBy);
+                        if (column is { Tag: not null })
+                        {
+                            orderByFieldName = column!.Tag!.ToString();
+                        }
+                    }
+                    else
+                    {
+                        // This is a PropertyColumn, use its name
+                        orderByFieldName = sortDefinition.SortBy;
+                    }
+                    if (string.IsNullOrWhiteSpace(retVal.OrderBy))
+                    {
+                        retVal.OrderBy = orderByFieldName;
+                        retVal.OrderDirection = sortDef.Descending ? "Desc" : "Asc";
+                    }
+                    retVal.SortBy.Add(new ResourceGridSortDefinition()
+                    {
+                        Column = orderByFieldName,
+                        Direction = sortDef.Descending ? "Desc" : "Asc"
+                    });
+                }
+            }
+            return retVal;
         }
 
         private ResourceGridRequest BuildRequestFromUrl(GridStateVirtualize<ResourceGridItemModel> state)

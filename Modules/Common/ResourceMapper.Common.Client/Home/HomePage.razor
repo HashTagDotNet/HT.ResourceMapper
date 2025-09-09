@@ -59,7 +59,7 @@
                                  Dense="true"
                                  Hover="false"
                                  Striped="false"
-                                 SortMode="SortMode.None"
+                                 SortMode="SortMode.Single"
                                  Filterable="false"
                                  ShowMenuIcon="false"
                                  FixedHeader="true"
@@ -69,7 +69,7 @@
                                  CurrentPage="0">
                         
                         <Columns>
-                            <TemplateColumn Title="Resource Name" Sortable="false">
+                            <TemplateColumn Title="Resource Name" Sortable="true" Tag="@nameof(ResourceGridItemModel.ResourceName)">
                                 <CellTemplate>
                                     <MudText Typo="Typo.body2" Class="font-weight-medium">
                                         @context.Item.ResourceName
