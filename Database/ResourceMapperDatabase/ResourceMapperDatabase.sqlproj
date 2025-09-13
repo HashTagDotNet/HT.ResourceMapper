@@ -15,10 +15,14 @@
     <Build Include="HTResourceMapper\StoredProcedures\*.sql" />
     <Build Include="HTResourceMapper\Security\*.sql" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="HTResourceMapper\Scripts\*.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="localhost.publish.xml" />
+  </ItemGroup>
   
   <!-- Publish profiles -->
-  <ItemGroup>
-    <None Include="ResourceMapperDatabase.localhost.publish.xml" />
-    <None Include="ResourceMapperDatabase.publish.xml" />
-  </ItemGroup>
 </Project>

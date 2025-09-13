@@ -14,383 +14,390 @@
 --=============================================
 --*/
 
---BEGIN TRANSACTION;
+CREATE OR ALTER PROCEDURE #Seed_ResourceType(
+	@ResourceTypeId INT,
+	@ResourceTypeUid VARCHAR(40),
+    @TypeName NVARCHAR(250),
+    @AllowCustomTags BIT = 0
+)
+AS
+BEGIN
+	UPDATE TOP(1)
+		[HTResourceMapper].ResourceType
+	SET
+		ResourceTypeUid = @ResourceTypeUid,
+		TypeName = @TypeName,
+		AllowCustomTags = @AllowCustomTags,
+		UpdatedOn = SYSUTCDATETIME()
+	WHERE
+		ResourceTypeId = @ResourceTypeId
 
---BEGIN TRY
+	
+	IF @@ROWCOUNT = 0
+	BEGIN
+        SET IDENTITY_INSERT [HTResourceMapper].ResourceType ON
+		INSERT INTO [HTResourceMapper].ResourceType (
+			ResourceTypeId,
+			ResourceTypeUid,
+			TypeName,
+			AllowCustomTags
+		) VALUES (
+			@ResourceTypeId,
+			@ResourceTypeUid,
+			@TypeName,
+			@AllowCustomTags
+		)
+        SET IDENTITY_INSERT [HTResourceMapper].ResourceType OFF
+	END
+	
+END
+GO
 
---    -- =============================================
---    -- 1. INSERT TAG CONTENT TYPES (IDEMPOTENT)
---    -- =============================================
-    
---    MERGE [HTResourceMapper].[TagContentType] AS target
---    USING (VALUES 
---        (1, 'Text'),
---        (2, 'Link')
---    ) AS source (TagContentTypeId, TagCode)
---    ON target.TagContentTypeId = source.TagContentTypeId
---    WHEN NOT MATCHED THEN
---        INSERT (TagContentTypeId, TagCode)
---        VALUES (source.TagContentTypeId, source.TagCode);
+CREATE OR ALTER PROC #Seed_TagType(
+    @TagContentTypeId INT
+    ,@TagCode VARCHAR(50)
+)
+AS
+BEGIN
+    UPDATE TOP(1)
+        [HTResourceMapper].TagContentType
+    SET
+        TagCode = @TagCode
+    WHERE
+        TagContentTypeId = @TagContentTypeId
+    IF @@ROWCOUNT = 0
+    BEGIN
+        INSERT INTO [HTResourceMapper].TagContentType (
+            TagContentTypeId,
+            TagCode
+        ) VALUES (
+            @TagContentTypeId
+            ,@TagCode
+        )
+    END
+END
+GO
 
---    -- =============================================
---    -- 2. INSERT TAG VALUE TYPES (IDEMPOTENT)
---    -- =============================================
-    
---    MERGE [HTResourceMapper].[TagValueType] AS target
---    USING (VALUES 
---        (1, 'Required', 1),
---        (2, 'Optional', 0)
---    ) AS source (TagValueTypeId, Code, IsRequired)
---    ON target.TagValueTypeId = source.TagValueTypeId
---    WHEN NOT MATCHED THEN
---        INSERT (TagValueTypeId, Code, IsRequired)
---        VALUES (source.TagValueTypeId, source.Code, source.IsRequired);
+CREATE OR ALTER PROCEDURE #Seed_Resource(
+	@ResourceId INT,
+	@ResourceUid VARCHAR(40),
+	@ResourceKey NVARCHAR(250),
+	@ResourceTypeUid VARCHAR(40),
+	@ResourceName NVARCHAR(250),
+	@Description NVARCHAR(2000)
+)
+AS
+BEGIN
 
---    -- =============================================
---    -- 3. INSERT RESOURCE TYPES (IDEMPOTENT)
---    -- =============================================
-    
---    MERGE [HTResourceMapper].[ResourceType] AS target
---    USING (VALUES 
---        ('RT-DATABASE-001', 'Database', 1, GETUTCDATE()),
---        ('RT-WEBSERVICE-001', 'WebService', 1, GETUTCDATE()),
---        ('RT-GATEWAY-001', 'Gateway', 1, GETUTCDATE()),
---        ('RT-STORAGE-001', 'Storage', 1, GETUTCDATE()),
---        ('RT-CACHE-001', 'Cache', 1, GETUTCDATE())
---    ) AS source (ResourceTypeUid, TypeName, AllowCustomTags, CreatedOn)
---    ON target.ResourceTypeUid = source.ResourceTypeUid
---    WHEN NOT MATCHED THEN
---        INSERT (ResourceTypeUid, TypeName, AllowCustomTags, CreatedOn)
---        VALUES (source.ResourceTypeUid, source.TypeName, source.AllowCustomTags, source.CreatedOn);
+	UPDATE
+		[HTResourceMapper].[Resource]
+	SET
+			ResourceUid = @ResourceUid,
+			ResourceKey = @ResourceKey,
+			ResourceTypeId = (SELECT ResourceTypeId FROM [HTResourceMapper].ResourceType WHERE ResourceTypeUid = @ResourceTypeUid),
+			ResourceName = @ResourceName,
+			Description = @Description,
+			UpdatedOn = SYSUTCDATETIME()
+	WHERE
+			ResourceId = @ResourceId
+	IF @@ROWCOUNT = 0
+	BEGIN
+		SET IDENTITY_INSERT [HTResourceMapper].[Resource] ON
+		INSERT INTO [HTResourceMapper].[Resource] (
+			ResourceId,
+			ResourceUid,
+			ResourceKey,
+			ResourceTypeId,
+			ResourceName,
+			Description
+		) VALUES (
+			@ResourceId,
+			@ResourceUid,
+			@ResourceKey,
+			(SELECT ResourceTypeId FROM [HTResourceMapper].ResourceType WHERE ResourceTypeUid = @ResourceTypeUid),
+			@ResourceName,
+			@Description
+		)
+		SET IDENTITY_INSERT [HTResourceMapper].[Resource] OFF
+	END
 
---    -- =============================================
---    -- 4. INSERT TAG DEFINITIONS (IDEMPOTENT)
---    -- =============================================
-    
---    MERGE [HTResourceMapper].[TagDefinition] AS target
---    USING (VALUES 
---        -- Environment tags
---        ('TD-ENV-001', 'environment', 1, 0, 0, 'dev,test,staging,prod', 1, GETUTCDATE()),
---        ('TD-REGION-001', 'region', 1, 0, 0, 'us-east,us-west,eu-west,asia-pacific', 1, GETUTCDATE()),
---        ('TD-OWNER-001', 'owner', 1, 1, 0, NULL, 0, GETUTCDATE()),
---        ('TD-COST-001', 'cost-center', 1, 1, 0, NULL, 0, GETUTCDATE()),
-        
---        -- Technical tags
---        ('TD-VERSION-001', 'version', 1, 1, 0, NULL, 0, GETUTCDATE()),
---        ('TD-RUNTIME-001', 'runtime', 1, 0, 0, 'dotnet,java,python,nodejs', 0, GETUTCDATE()),
---        ('TD-PROTOCOL-001', 'protocol', 1, 0, 0, 'https,http,tcp,grpc', 0, GETUTCDATE()),
-        
---        -- Link tags  
---        ('TD-PORTAL-001', 'portal', 2, 1, 0, NULL, 0, GETUTCDATE()),
---        ('TD-DOCS-001', 'documentation', 2, 1, 0, NULL, 0, GETUTCDATE()),
---        ('TD-MONITOR-001', 'monitoring', 2, 1, 0, NULL, 0, GETUTCDATE()),
-        
---        -- Business tags
---        ('TD-PROJECT-001', 'project', 1, 1, 0, NULL, 0, GETUTCDATE()),
---        ('TD-CRITICALITY-001', 'criticality', 1, 0, 0, 'low,medium,high,critical', 0, GETUTCDATE())
---    ) AS source (TagDefinitionUid, TagDefinitionKey, TagContentTypeId, AllowCustomValue, IsMultiValued, AllowedValues, IsSystemTag, CreatedOn)
---    ON target.TagDefinitionUid = source.TagDefinitionUid
---    WHEN NOT MATCHED THEN
---        INSERT (TagDefinitionUid, TagDefinitionKey, TagContentTypeId, AllowCustomValue, IsMultiValued, AllowedValues, IsSystemTag, CreatedOn)
---        VALUES (source.TagDefinitionUid, source.TagDefinitionKey, source.TagContentTypeId, source.AllowCustomValue, source.IsMultiValued, source.AllowedValues, source.IsSystemTag, source.CreatedOn);
+END
+GO
 
---    -- =============================================
---    -- 5. INSERT DEMO RESOURCES (IDEMPOTENT)
---    -- =============================================
-    
---    DECLARE @DatabaseTypeId INT = (SELECT ResourceTypeId FROM [HTResourceMapper].[ResourceType] WHERE TypeName = 'Database');
---    DECLARE @WebServiceTypeId INT = (SELECT ResourceTypeId FROM [HTResourceMapper].[ResourceType] WHERE TypeName = 'WebService');
---    DECLARE @GatewayTypeId INT = (SELECT ResourceTypeId FROM [HTResourceMapper].[ResourceType] WHERE TypeName = 'Gateway');
---    DECLARE @StorageTypeId INT = (SELECT ResourceTypeId FROM [HTResourceMapper].[ResourceType] WHERE TypeName = 'Storage');
---    DECLARE @CacheTypeId INT = (SELECT ResourceTypeId FROM [HTResourceMapper].[ResourceType] WHERE TypeName = 'Cache');
+BEGIN TRANSACTION
 
---    MERGE [HTResourceMapper].[Resource] AS target
---    USING (VALUES 
---        -- Production Databases
---        ('RES-DB-PROD-001', 'prod-customer-db', @DatabaseTypeId, 'Production Customer Database', 'Main production database containing customer data and transactions', DATEADD(day, -90, GETUTCDATE()), DATEADD(hour, -2, GETUTCDATE())),
---        ('RES-DB-PROD-002', 'prod-inventory-db', @DatabaseTypeId, 'Production Inventory Database', 'Production database managing product inventory and warehouse data', DATEADD(day, -75, GETUTCDATE()), DATEADD(hour, -6, GETUTCDATE())),
---        ('RES-DB-PROD-003', 'prod-analytics-db', @DatabaseTypeId, 'Production Analytics Database', 'Data warehouse for business intelligence and reporting', DATEADD(day, -60, GETUTCDATE()), DATEADD(day, -1, GETUTCDATE())),
-        
---        -- Staging/Test Databases  
---        ('RES-DB-STAGE-001', 'staging-customer-db', @DatabaseTypeId, 'Staging Customer Database', 'Staging environment database for customer data testing', DATEADD(day, -45, GETUTCDATE()), DATEADD(hour, -12, GETUTCDATE())),
---        ('RES-DB-TEST-001', 'test-integration-db', @DatabaseTypeId, 'Test Integration Database', 'Integration testing database for automated test suites', DATEADD(day, -30, GETUTCDATE()), DATEADD(hour, -4, GETUTCDATE())),
-        
---        -- Web Services
---        ('RES-WS-PROD-001', 'customer-api-prod', @WebServiceTypeId, 'Customer API Service', 'REST API for customer management operations', DATEADD(day, -80, GETUTCDATE()), DATEADD(hour, -1, GETUTCDATE())),
---        ('RES-WS-PROD-002', 'payment-service-prod', @WebServiceTypeId, 'Payment Processing Service', 'Microservice handling payment transactions and validation', DATEADD(day, -70, GETUTCDATE()), DATEADD(hour, -3, GETUTCDATE())),
---        ('RES-WS-PROD-003', 'notification-service', @WebServiceTypeId, 'Notification Service', 'Service managing email and SMS notifications', DATEADD(day, -55, GETUTCDATE()), DATEADD(hour, -8, GETUTCDATE())),
---        ('RES-WS-STAGE-001', 'customer-api-staging', @WebServiceTypeId, 'Customer API Staging', 'Staging environment for customer API testing', DATEADD(day, -40, GETUTCDATE()), DATEADD(hour, -5, GETUTCDATE())),
-        
---        -- Gateways
---        ('RES-GW-PROD-001', 'api-gateway-prod', @GatewayTypeId, 'Production API Gateway', 'Main API gateway routing external requests', DATEADD(day, -85, GETUTCDATE()), DATEADD(hour, -2, GETUTCDATE())),
---        ('RES-GW-PROD-002', 'internal-gateway-prod', @GatewayTypeId, 'Internal API Gateway', 'Gateway for internal service-to-service communication', DATEADD(day, -65, GETUTCDATE()), DATEADD(hour, -7, GETUTCDATE())),
-        
---        -- Storage
---        ('RES-ST-PROD-001', 'blob-storage-prod', @StorageTypeId, 'Production Blob Storage', 'Main blob storage for application files and media', DATEADD(day, -95, GETUTCDATE()), DATEADD(day, -2, GETUTCDATE())),
---        ('RES-ST-PROD-002', 'backup-storage-prod', @StorageTypeId, 'Production Backup Storage', 'Long-term backup storage for disaster recovery', DATEADD(day, -100, GETUTCDATE()), DATEADD(day, -7, GETUTCDATE())),
-        
---        -- Cache
---        ('RES-CACHE-PROD-001', 'redis-cache-prod', @CacheTypeId, 'Production Redis Cache', 'Main Redis cache cluster for session and data caching', DATEADD(day, -50, GETUTCDATE()), DATEADD(hour, -4, GETUTCDATE())),
---        ('RES-CACHE-STAGE-001', 'redis-cache-staging', @CacheTypeId, 'Staging Redis Cache', 'Staging environment Redis cache for testing', DATEADD(day, -35, GETUTCDATE()), DATEADD(hour, -10, GETUTCDATE()))
---    ) AS source (ResourceUid, ResourceKey, ResourceTypeId, ResourceName, Description, CreatedOn, UpdatedOn)
---    ON target.ResourceUid = source.ResourceUid
---    WHEN NOT MATCHED THEN
---        INSERT (ResourceUid, ResourceKey, ResourceTypeId, ResourceName, Description, CreatedOn, UpdatedOn)
---        VALUES (source.ResourceUid, source.ResourceKey, source.ResourceTypeId, source.ResourceName, source.Description, source.CreatedOn, source.UpdatedOn)
---    WHEN MATCHED THEN
---        UPDATE SET 
---            ResourceName = source.ResourceName,
---            Description = source.Description,
---            UpdatedOn = source.UpdatedOn;
+-- Create demo resource types
+DECLARE @ResourceType_Application VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+, @ResourceType_AppServices VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+, @ResourceType_AzureRedis VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+, @ResourceType_AppInsights VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+, @ResourceType_ResourceGroup VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+, @ResourceType_AppConfiguration VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+, @ResourceType_ServiceBus VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+, @ResourceType_ServiceFabric VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
 
---    -- =============================================
---    -- 6. INSERT RESOURCE TAGS (IDEMPOTENT)
---    -- =============================================
-    
---    -- Get Tag Definition IDs
---    DECLARE @EnvTagId INT = (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = 'environment');
---    DECLARE @RegionTagId INT = (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = 'region');
---    DECLARE @OwnerTagId INT = (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = 'owner');
---    DECLARE @CostTagId INT = (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = 'cost-center');
---    DECLARE @VersionTagId INT = (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = 'version');
---    DECLARE @RuntimeTagId INT = (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = 'runtime');
---    DECLARE @ProtocolTagId INT = (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = 'protocol');
---    DECLARE @PortalTagId INT = (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = 'portal');
---    DECLARE @DocsTagId INT = (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = 'documentation');
---    DECLARE @MonitorTagId INT = (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = 'monitoring');
---    DECLARE @ProjectTagId INT = (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = 'project');
---    DECLARE @CriticalityTagId INT = (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE TagDefinitionKey = 'criticality');
+EXEC #Seed_ResourceType @ResourceTypeId=-1, @ResourceTypeUid=@ResourceType_Application, @TypeName='Application', @AllowCustomTags=0
+EXEC #Seed_ResourceType @ResourceTypeId=-2, @ResourceTypeUid=@ResourceType_AppServices, @TypeName='Azure App Service', @AllowCustomTags=0
+EXEC #Seed_ResourceType @ResourceTypeId=-3, @ResourceTypeUid=@ResourceType_AzureRedis, @TypeName='Azure Redis', @AllowCustomTags=0
+EXEC #Seed_ResourceType @ResourceTypeId=-4, @ResourceTypeUid=@ResourceType_AppInsights, @TypeName='Azure App Insights', @AllowCustomTags=0
+EXEC #Seed_ResourceType @ResourceTypeId=-5, @ResourceTypeUid=@ResourceType_AppConfiguration, @TypeName='Azure App Config', @AllowCustomTags=0
+EXEC #Seed_ResourceType @ResourceTypeId=-6, @ResourceTypeUid=@ResourceType_ServiceBus, @TypeName='Azure ServiceBus', @AllowCustomTags=0
+EXEC #Seed_ResourceType @ResourceTypeId=-7, @ResourceTypeUid=@ResourceType_ServiceFabric, @TypeName='Azure ServcieFabric', @AllowCustomTags=0
+EXEC #Seed_ResourceType @ResourceTypeId=-8, @ResourceTypeUid=@ResourceType_ResourceGroup, @TypeName='Azure ResourceGroup', @AllowCustomTags=0
 
---    -- Get Resource IDs
---    DECLARE @ProdCustomerDbId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'prod-customer-db');
---    DECLARE @ProdInventoryDbId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'prod-inventory-db');
---    DECLARE @ProdAnalyticsDbId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'prod-analytics-db');
---    DECLARE @StagingCustomerDbId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'staging-customer-db');
---    DECLARE @TestIntegrationDbId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'test-integration-db');
---    DECLARE @CustomerApiProdId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'customer-api-prod');
---    DECLARE @PaymentServiceProdId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'payment-service-prod');
---    DECLARE @NotificationServiceId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'notification-service');
---    DECLARE @CustomerApiStagingId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'customer-api-staging');
---    DECLARE @ApiGatewayProdId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'api-gateway-prod');
---    DECLARE @InternalGatewayProdId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'internal-gateway-prod');
---    DECLARE @BlobStorageProdId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'blob-storage-prod');
---    DECLARE @BackupStorageProdId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'backup-storage-prod');
---    DECLARE @RedisCacheProdId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'redis-cache-prod');
---    DECLARE @RedisCacheStagingId INT = (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceKey = 'redis-cache-staging');
+DECLARE @TagType_Text INT = 0,
+@TagType_Link INT = 1,
+@TagType_Number INT = 2,
+@TagType_Date INT = 3
 
---    -- Use MERGE for all resource tags to make them idempotent
---    MERGE [HTResourceMapper].[ResourceTag] AS target
---    USING (VALUES 
---        -- Production Customer Database tags
---        (@ProdCustomerDbId, @EnvTagId, 'prod', GETUTCDATE()),
---        (@ProdCustomerDbId, @RegionTagId, 'us-east', GETUTCDATE()),
---        (@ProdCustomerDbId, @OwnerTagId, 'data-team', GETUTCDATE()),
---        (@ProdCustomerDbId, @CostTagId, 'CC-100', GETUTCDATE()),
---        (@ProdCustomerDbId, @ProjectTagId, 'customer-management', GETUTCDATE()),
---        (@ProdCustomerDbId, @CriticalityTagId, 'critical', GETUTCDATE()),
---        (@ProdCustomerDbId, @PortalTagId, 'https://portal.azure.com/resource/customer-db-prod', GETUTCDATE()),
---        (@ProdCustomerDbId, @MonitorTagId, 'https://monitor.company.com/database/customer-prod', GETUTCDATE()),
+EXEC #Seed_TagType @TagContentTypeId=@TagType_Text, @TagCode='Text'
+EXEC #Seed_TagType @TagContentTypeId=@TagType_Link, @TagCode='Link'
+EXEC #Seed_TagType @TagContentTypeId=@TagType_Number, @TagCode='Number'
+EXEC #Seed_TagType @TagContentTypeId=@TagType_Date, @TagCode='Date'
 
---        -- Production Inventory Database tags
---        (@ProdInventoryDbId, @EnvTagId, 'prod', GETUTCDATE()),
---        (@ProdInventoryDbId, @RegionTagId, 'us-west', GETUTCDATE()),
---        (@ProdInventoryDbId, @OwnerTagId, 'inventory-team', GETUTCDATE()),
---        (@ProdInventoryDbId, @CostTagId, 'CC-200', GETUTCDATE()),
---        (@ProdInventoryDbId, @ProjectTagId, 'supply-chain', GETUTCDATE()),
---        (@ProdInventoryDbId, @CriticalityTagId, 'high', GETUTCDATE()),
---        (@ProdInventoryDbId, @PortalTagId, 'https://portal.azure.com/resource/inventory-db-prod', GETUTCDATE()),
+-- Create demo resources
+DECLARE @ResourceUid VARCHAR(40)
 
---        -- Production Analytics Database tags
---        (@ProdAnalyticsDbId, @EnvTagId, 'prod', GETUTCDATE()),
---        (@ProdAnalyticsDbId, @RegionTagId, 'eu-west', GETUTCDATE()),
---        (@ProdAnalyticsDbId, @OwnerTagId, 'analytics-team', GETUTCDATE()),
---        (@ProdAnalyticsDbId, @CostTagId, 'CC-300', GETUTCDATE()),
---        (@ProdAnalyticsDbId, @ProjectTagId, 'business-intelligence', GETUTCDATE()),
---        (@ProdAnalyticsDbId, @CriticalityTagId, 'medium', GETUTCDATE()),
---        (@ProdAnalyticsDbId, @DocsTagId, 'https://docs.company.com/analytics-db', GETUTCDATE()),
+-- Application Resources (15 records)
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-1, @ResourceUid=@ResourceUid, @ResourceKey='APP001', @ResourceTypeUid=@ResourceType_Application, @ResourceName='Customer Portal', @Description='Main customer-facing web application for order management and tracking.'
 
---        -- Staging Customer Database tags
---        (@StagingCustomerDbId, @EnvTagId, 'staging', GETUTCDATE()),
---        (@StagingCustomerDbId, @RegionTagId, 'us-east', GETUTCDATE()),
---        (@StagingCustomerDbId, @OwnerTagId, 'data-team', GETUTCDATE()),
---        (@StagingCustomerDbId, @CostTagId, 'CC-100', GETUTCDATE()),
---        (@StagingCustomerDbId, @ProjectTagId, 'customer-management', GETUTCDATE()),
---        (@StagingCustomerDbId, @CriticalityTagId, 'medium', GETUTCDATE()),
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-2, @ResourceUid=@ResourceUid, @ResourceKey='APP002', @ResourceTypeUid=@ResourceType_Application, @ResourceName='Admin Dashboard', @Description='Administrative interface for system configuration and user management.'
 
---        -- Test Integration Database tags
---        (@TestIntegrationDbId, @EnvTagId, 'test', GETUTCDATE()),
---        (@TestIntegrationDbId, @RegionTagId, 'us-east', GETUTCDATE()),
---        (@TestIntegrationDbId, @OwnerTagId, 'qa-team', GETUTCDATE()),
---        (@TestIntegrationDbId, @CostTagId, 'CC-400', GETUTCDATE()),
---        (@TestIntegrationDbId, @ProjectTagId, 'integration-testing', GETUTCDATE()),
---        (@TestIntegrationDbId, @CriticalityTagId, 'low', GETUTCDATE()),
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-3, @ResourceUid=@ResourceUid, @ResourceKey='APP003', @ResourceTypeUid=@ResourceType_Application, @ResourceName='Mobile API Gateway', @Description='RESTful API gateway for mobile application integrations.'
 
---        -- Customer API Production tags
---        (@CustomerApiProdId, @EnvTagId, 'prod', GETUTCDATE()),
---        (@CustomerApiProdId, @RegionTagId, 'us-east', GETUTCDATE()),
---        (@CustomerApiProdId, @OwnerTagId, 'api-team', GETUTCDATE()),
---        (@CustomerApiProdId, @CostTagId, 'CC-100', GETUTCDATE()),
---        (@CustomerApiProdId, @RuntimeTagId, 'dotnet', GETUTCDATE()),
---        (@CustomerApiProdId, @ProtocolTagId, 'https', GETUTCDATE()),
---        (@CustomerApiProdId, @OwnerTagId, 'api-team', GETUTCDATE()),
---        (@CustomerApiProdId, @CostTagId, 'CC-100', GETUTCDATE()),
---        (@CustomerApiProdId, @RuntimeTagId, 'dotnet', GETUTCDATE()),
---        (@CustomerApiProdId, @ProtocolTagId, 'https', GETUTCDATE()),
---        (@CustomerApiProdId, @VersionTagId, '2.1.5', GETUTCDATE()),
---        (@CustomerApiProdId, @ProjectTagId, 'customer-management', GETUTCDATE()),
---        (@CustomerApiProdId, @CriticalityTagId, 'critical', GETUTCDATE()),
---        (@CustomerApiProdId, @PortalTagId, 'https://portal.azure.com/resource/customer-api-prod', GETUTCDATE()),
---        (@CustomerApiProdId, @DocsTagId, 'https://docs.company.com/customer-api', GETUTCDATE()),
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-4, @ResourceUid=@ResourceUid, @ResourceKey='APP004', @ResourceTypeUid=@ResourceType_Application, @ResourceName='Reporting Engine', @Description='Business intelligence and reporting application for analytics and insights.'
 
---        -- Payment Service Production tags
---        (@PaymentServiceProdId, @EnvTagId, 'prod', GETUTCDATE()),
---        (@PaymentServiceProdId, @RegionTagId, 'us-west', GETUTCDATE()),
---        (@PaymentServiceProdId, @OwnerTagId, 'payments-team', GETUTCDATE()),
---        (@PaymentServiceProdId, @CostTagId, 'CC-500', GETUTCDATE()),
---        (@PaymentServiceProdId, @RuntimeTagId, 'java', GETUTCDATE()),
---        (@PaymentServiceProdId, @ProtocolTagId, 'https', GETUTCDATE()),
---        (@PaymentServiceProdId, @VersionTagId, '1.8.2', GETUTCDATE()),
---        (@PaymentServiceProdId, @ProjectTagId, 'payment-processing', GETUTCDATE()),
---        (@PaymentServiceProdId, @CriticalityTagId, 'critical', GETUTCDATE()),
---        (@PaymentServiceProdId, @MonitorTagId, 'https://monitor.company.com/payments', GETUTCDATE()),
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-5, @ResourceUid=@ResourceUid, @ResourceKey='APP005', @ResourceTypeUid=@ResourceType_Application, @ResourceName='Inventory Management', @Description='Real-time inventory tracking and warehouse management system.'
 
---        -- Notification Service tags
---        (@NotificationServiceId, @EnvTagId, 'prod', GETUTCDATE()),
---        (@NotificationServiceId, @RegionTagId, 'asia-pacific', GETUTCDATE()),
---        (@NotificationServiceId, @OwnerTagId, 'platform-team', GETUTCDATE()),
---        (@NotificationServiceId, @CostTagId, 'CC-600', GETUTCDATE()),
---        (@NotificationServiceId, @RuntimeTagId, 'nodejs', GETUTCDATE()),
---        (@NotificationServiceId, @ProtocolTagId, 'https', GETUTCDATE()),
---        (@NotificationServiceId, @VersionTagId, '3.2.1', GETUTCDATE()),
---        (@NotificationServiceId, @ProjectTagId, 'notifications', GETUTCDATE()),
---        (@NotificationServiceId, @CriticalityTagId, 'high', GETUTCDATE()),
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-6, @ResourceUid=@ResourceUid, @ResourceKey='APP006', @ResourceTypeUid=@ResourceType_Application, @ResourceName='Payment Processing', @Description='Secure payment gateway integration and transaction processing system.'
 
---        -- Customer API Staging tags
---        (@CustomerApiStagingId, @EnvTagId, 'staging', GETUTCDATE()),
---        (@CustomerApiStagingId, @RegionTagId, 'us-east', GETUTCDATE()),
---        (@CustomerApiStagingId, @OwnerTagId, 'api-team', GETUTCDATE()),
---        (@CustomerApiStagingId, @CostTagId, 'CC-100', GETUTCDATE()),
---        (@CustomerApiStagingId, @RuntimeTagId, 'dotnet', GETUTCDATE()),
---        (@CustomerApiStagingId, @ProtocolTagId, 'https', GETUTCDATE()),
---        (@CustomerApiStagingId, @VersionTagId, '2.2.0-beta', GETUTCDATE()),
---        (@CustomerApiStagingId, @ProjectTagId, 'customer-management', GETUTCDATE()),
---        (@CustomerApiStagingId, @CriticalityTagId, 'medium', GETUTCDATE()),
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-7, @ResourceUid=@ResourceUid, @ResourceKey='APP007', @ResourceTypeUid=@ResourceType_Application, @ResourceName='User Authentication', @Description='Centralized authentication and authorization service for all applications.'
 
---        -- API Gateway Production tags
---        (@ApiGatewayProdId, @EnvTagId, 'prod', GETUTCDATE()),
---        (@ApiGatewayProdId, @RegionTagId, 'us-east', GETUTCDATE()),
---        (@ApiGatewayProdId, @OwnerTagId, 'platform-team', GETUTCDATE()),
---        (@ApiGatewayProdId, @CostTagId, 'CC-700', GETUTCDATE()),
---        (@ApiGatewayProdId, @ProtocolTagId, 'https', GETUTCDATE()),
---        (@ApiGatewayProdId, @VersionTagId, '4.1.0', GETUTCDATE()),
---        (@ApiGatewayProdId, @ProjectTagId, 'infrastructure', GETUTCDATE()),
---        (@ApiGatewayProdId, @CriticalityTagId, 'critical', GETUTCDATE()),
---        (@ApiGatewayProdId, @MonitorTagId, 'https://monitor.company.com/gateway', GETUTCDATE()),
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-8, @ResourceUid=@ResourceUid, @ResourceKey='APP008', @ResourceTypeUid=@ResourceType_Application, @ResourceName='Notification Service', @Description='Multi-channel notification system for email, SMS, and push notifications.'
 
---        -- Internal Gateway Production tags
---        (@InternalGatewayProdId, @EnvTagId, 'prod', GETUTCDATE()),
---        (@InternalGatewayProdId, @RegionTagId, 'us-west', GETUTCDATE()),
---        (@InternalGatewayProdId, @OwnerTagId, 'platform-team', GETUTCDATE()),
---        (@InternalGatewayProdId, @CostTagId, 'CC-700', GETUTCDATE()),
---        (@InternalGatewayProdId, @ProtocolTagId, 'grpc', GETUTCDATE()),
---        (@InternalGatewayProdId, @VersionTagId, '3.5.2', GETUTCDATE()),
---        (@InternalGatewayProdId, @ProjectTagId, 'infrastructure', GETUTCDATE()),
---        (@InternalGatewayProdId, @CriticalityTagId, 'high', GETUTCDATE()),
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-9, @ResourceUid=@ResourceUid, @ResourceKey='APP009', @ResourceTypeUid=@ResourceType_Application, @ResourceName='Data Migration Tool', @Description='ETL application for migrating data between legacy and modern systems.'
 
---        -- Blob Storage Production tags
---        (@BlobStorageProdId, @EnvTagId, 'prod', GETUTCDATE()),
---        (@BlobStorageProdId, @RegionTagId, 'us-east', GETUTCDATE()),
---        (@BlobStorageProdId, @OwnerTagId, 'storage-team', GETUTCDATE()),
---        (@BlobStorageProdId, @CostTagId, 'CC-800', GETUTCDATE()),
---        (@BlobStorageProdId, @ProjectTagId, 'file-storage', GETUTCDATE()),
---        (@BlobStorageProdId, @CriticalityTagId, 'high', GETUTCDATE()),
---        (@BlobStorageProdId, @PortalTagId, 'https://portal.azure.com/resource/blob-storage-prod', GETUTCDATE()),
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-10, @ResourceUid=@ResourceUid, @ResourceKey='APP010', @ResourceTypeUid=@ResourceType_Application, @ResourceName='Audit Logging', @Description='Centralized audit logging and compliance tracking application.'
 
---        -- Backup Storage Production tags
---        (@BackupStorageProdId, @EnvTagId, 'prod', GETUTCDATE()),
---        (@BackupStorageProdId, @RegionTagId, 'eu-west', GETUTCDATE()),
---        (@BackupStorageProdId, @OwnerTagId, 'backup-team', GETUTCDATE()),
---        (@BackupStorageProdId, @CostTagId, 'CC-900', GETUTCDATE()),
---        (@BackupStorageProdId, @ProjectTagId, 'disaster-recovery', GETUTCDATE()),
---        (@BackupStorageProdId, @CriticalityTagId, 'critical', GETUTCDATE()),
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-11, @ResourceUid=@ResourceUid, @ResourceKey='APP011', @ResourceTypeUid=@ResourceType_Application, @ResourceName='File Upload Service', @Description='Secure file upload and document management service with virus scanning.'
 
---        -- Redis Cache Production tags
---        (@RedisCacheProdId, @EnvTagId, 'prod', GETUTCDATE()),
---        (@RedisCacheProdId, @RegionTagId, 'us-east', GETUTCDATE()),
---        (@RedisCacheProdId, @OwnerTagId, 'platform-team', GETUTCDATE()),
---        (@RedisCacheProdId, @CostTagId, 'CC-700', GETUTCDATE()),
---        (@RedisCacheProdId, @VersionTagId, '6.2.1', GETUTCDATE()),
---        (@RedisCacheProdId, @ProjectTagId, 'caching', GETUTCDATE()),
---        (@RedisCacheProdId, @CriticalityTagId, 'high', GETUTCDATE()),
---        (@RedisCacheProdId, @MonitorTagId, 'https://monitor.company.com/redis', GETUTCDATE()),
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-12, @ResourceUid=@ResourceUid, @ResourceKey='APP012', @ResourceTypeUid=@ResourceType_Application, @ResourceName='Configuration Manager', @Description='Dynamic application configuration management and feature flag system.'
 
---        -- Redis Cache Staging tags
---        (@RedisCacheStagingId, @EnvTagId, 'staging', GETUTCDATE()),
---        (@RedisCacheStagingId, @RegionTagId, 'us-east', GETUTCDATE()),
---        (@RedisCacheStagingId, @OwnerTagId, 'platform-team', GETUTCDATE()),
---        (@RedisCacheStagingId, @CostTagId, 'CC-700', GETUTCDATE()),
---        (@RedisCacheStagingId, @VersionTagId, '6.2.2-beta', GETUTCDATE()),
---        (@RedisCacheStagingId, @ProjectTagId, 'caching', GETUTCDATE()),
---        (@RedisCacheStagingId, @CriticalityTagId, 'medium', GETUTCDATE())
---    ) AS source (ResourceId, TagDefinitionId, TagValue, CreatedOn)
---    ON target.ResourceId = source.ResourceId AND target.TagDefinitionId = source.TagDefinitionId
---    WHEN NOT MATCHED THEN
---        INSERT (ResourceId, TagDefinitionId, TagValue, CreatedOn)
---        VALUES (source.ResourceId, source.TagDefinitionId, source.TagValue, source.CreatedOn)
---    WHEN MATCHED THEN
---        UPDATE SET TagValue = source.TagValue;
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-13, @ResourceUid=@ResourceUid, @ResourceKey='APP013', @ResourceTypeUid=@ResourceType_Application, @ResourceName='Search Engine', @Description='Elasticsearch-powered search service for product and content discovery.'
 
---    -- =============================================
---    -- 7. INSERT RESOURCE TYPE TAGS (IDEMPOTENT)
---    -- =============================================
---    PRINT 'Inserting Resource Type Tags...';
-    
---    MERGE [HTResourceMapper].[ResourceTypeTag] AS target
---    USING (VALUES 
---        (@DatabaseTypeId, 'environment', 1),
---        (@DatabaseTypeId, 'region', 1),
---        (@DatabaseTypeId, 'owner', 1),
---        (@WebServiceTypeId, 'environment', 1),
---        (@WebServiceTypeId, 'runtime', 1),
---        (@WebServiceTypeId, 'version', 2),
---        (@GatewayTypeId, 'environment', 1),
---        (@GatewayTypeId, 'protocol', 1),
---        (@StorageTypeId, 'environment', 1),
---        (@StorageTypeId, 'region', 1),
---        (@CacheTypeId, 'environment', 1),
---        (@CacheTypeId, 'version', 2)
---    ) AS source (ResourceTypeId, Tag, TagValueTypeId)
---    ON target.ResourceTypeId = source.ResourceTypeId AND target.Tag = source.Tag
---    WHEN NOT MATCHED THEN
---        INSERT (ResourceTypeId, Tag, TagValueTypeId)
---        VALUES (source.ResourceTypeId, source.Tag, source.TagValueTypeId);
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-14, @ResourceUid=@ResourceUid, @ResourceKey='APP014', @ResourceTypeUid=@ResourceType_Application, @ResourceName='Backup Scheduler', @Description='Automated backup scheduling and monitoring application for critical data.'
 
---    COMMIT TRANSACTION;
-    
---    PRINT 'Demo data inserted successfully!';
---    PRINT '==============================================';
---    PRINT 'Demo Data Summary:';
---    PRINT '- 5 Resource Types';
---    PRINT '- 12 Tag Definitions (Text and Link types)';
---    PRINT '- 15 Resources across different environments';
---    PRINT '- 100+ Resource Tags demonstrating search scenarios';
---    PRINT '==============================================';
---    PRINT 'Test Search Examples:';
---    PRINT '- Search "prod" - should return 11 production resources';
---    PRINT '- Search "database" - should return 5 database resources';
---    PRINT '- Search "customer" - should return 4 customer-related resources';
---    PRINT '- Search "api" - should return 3 API services';
---    PRINT '- Search "dotnet" - should return 2 .NET services';
---    PRINT '==============================================';
---    PRINT 'IDEMPOTENT: This script can be run multiple times safely';
---    PRINT '==============================================';
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-15, @ResourceUid=@ResourceUid, @ResourceKey='APP015', @ResourceTypeUid=@ResourceType_Application, @ResourceName='Load Balancer Config', @Description='Application for managing load balancer configurations and health checks.'
 
---END TRY
---BEGIN CATCH
---    ROLLBACK TRANSACTION;
-    
---    DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
---    DECLARE @ErrorLine INT = ERROR_LINE();
-    
---    RAISERROR('Error inserting demo data at line %d: %s', 16, 1, @ErrorLine, @ErrorMessage);
---END CATCH;
+-- Azure App Service Resources (12 records)
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-16, @ResourceUid=@ResourceUid, @ResourceKey='AAS001', @ResourceTypeUid=@ResourceType_AppServices, @ResourceName='Production Web App', @Description='Primary production web application hosting on Azure App Service.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-17, @ResourceUid=@ResourceUid, @ResourceKey='AAS002', @ResourceTypeUid=@ResourceType_AppServices, @ResourceName='Staging Environment', @Description='Pre-production staging environment for testing and validation.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-18, @ResourceUid=@ResourceUid, @ResourceKey='AAS003', @ResourceTypeUid=@ResourceType_AppServices, @ResourceName='Development API', @Description='Development environment API service for testing new features.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-19, @ResourceUid=@ResourceUid, @ResourceKey='AAS004', @ResourceTypeUid=@ResourceType_AppServices, @ResourceName='QA Testing Environment', @Description='Quality assurance testing environment for automated and manual testing.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-20, @ResourceUid=@ResourceUid, @ResourceKey='AAS005', @ResourceTypeUid=@ResourceType_AppServices, @ResourceName='Demo Environment', @Description='Customer demonstration environment with sample data and workflows.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-21, @ResourceUid=@ResourceUid, @ResourceKey='AAS006', @ResourceTypeUid=@ResourceType_AppServices, @ResourceName='API Documentation', @Description='Interactive API documentation and testing portal hosted on App Service.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-22, @ResourceUid=@ResourceUid, @ResourceKey='AAS007', @ResourceTypeUid=@ResourceType_AppServices, @ResourceName='Webhook Processor', @Description='Azure App Service for processing incoming webhooks from external systems.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-23, @ResourceUid=@ResourceUid, @ResourceKey='AAS008', @ResourceTypeUid=@ResourceType_AppServices, @ResourceName='Background Job Runner', @Description='App Service hosting background job processing and scheduled tasks.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-24, @ResourceUid=@ResourceUid, @ResourceKey='AAS009', @ResourceTypeUid=@ResourceType_AppServices, @ResourceName='File Processing Service', @Description='Dedicated App Service for processing uploaded files and documents.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-25, @ResourceUid=@ResourceUid, @ResourceKey='AAS010', @ResourceTypeUid=@ResourceType_AppServices, @ResourceName='Monitoring Dashboard', @Description='Real-time monitoring and metrics dashboard hosted on App Service.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-26, @ResourceUid=@ResourceUid, @ResourceKey='AAS011', @ResourceTypeUid=@ResourceType_AppServices, @ResourceName='Integration Hub', @Description='Central integration hub for third-party API connections and data sync.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-27, @ResourceUid=@ResourceUid, @ResourceKey='AAS012', @ResourceTypeUid=@ResourceType_AppServices, @ResourceName='Health Check Endpoint', @Description='Dedicated health check and system status monitoring service.'
+
+-- Azure Redis Resources (8 records)
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-28, @ResourceUid=@ResourceUid, @ResourceKey='REDIS001', @ResourceTypeUid=@ResourceType_AzureRedis, @ResourceName='Session Cache', @Description='Primary Redis cache for storing user session data and authentication tokens.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-29, @ResourceUid=@ResourceUid, @ResourceKey='REDIS002', @ResourceTypeUid=@ResourceType_AzureRedis, @ResourceName='Application Cache', @Description='High-performance cache for frequently accessed application data and queries.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-30, @ResourceUid=@ResourceUid, @ResourceKey='REDIS003', @ResourceTypeUid=@ResourceType_AzureRedis, @ResourceName='Shopping Cart Cache', @Description='Dedicated Redis instance for e-commerce shopping cart data persistence.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-31, @ResourceUid=@ResourceUid, @ResourceKey='REDIS004', @ResourceTypeUid=@ResourceType_AzureRedis, @ResourceName='Real-time Analytics', @Description='Redis cache for real-time analytics data and dashboard metrics.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-32, @ResourceUid=@ResourceUid, @ResourceKey='REDIS005', @ResourceTypeUid=@ResourceType_AzureRedis, @ResourceName='Rate Limiting Cache', @Description='Redis instance for API rate limiting and throttling management.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-33, @ResourceUid=@ResourceUid, @ResourceKey='REDIS006', @ResourceTypeUid=@ResourceType_AzureRedis, @ResourceName='Distributed Lock Manager', @Description='Redis-based distributed locking system for coordinating background processes.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-34, @ResourceUid=@ResourceUid, @ResourceKey='REDIS007', @ResourceTypeUid=@ResourceType_AzureRedis, @ResourceName='Pub/Sub Message Queue', @Description='Redis pub/sub system for real-time messaging and notifications.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-35, @ResourceUid=@ResourceUid, @ResourceKey='REDIS008', @ResourceTypeUid=@ResourceType_AzureRedis, @ResourceName='Feature Flag Cache', @Description='Redis cache for dynamic feature flags and configuration settings.'
+
+-- Azure App Insights Resources (10 records)
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-36, @ResourceUid=@ResourceUid, @ResourceKey='AI001', @ResourceTypeUid=@ResourceType_AppInsights, @ResourceName='Production Monitoring', @Description='Application Insights for production environment monitoring and telemetry.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-37, @ResourceUid=@ResourceUid, @ResourceKey='AI002', @ResourceTypeUid=@ResourceType_AppInsights, @ResourceName='API Performance Tracking', @Description='Dedicated App Insights for API performance monitoring and dependency tracking.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-38, @ResourceUid=@ResourceUid, @ResourceKey='AI003', @ResourceTypeUid=@ResourceType_AppInsights, @ResourceName='User Experience Analytics', @Description='App Insights focused on user behavior analytics and page view tracking.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-39, @ResourceUid=@ResourceUid, @ResourceKey='AI004', @ResourceTypeUid=@ResourceType_AppInsights, @ResourceName='Error Tracking System', @Description='Centralized error tracking and exception monitoring across all applications.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-40, @ResourceUid=@ResourceUid, @ResourceKey='AI005', @ResourceTypeUid=@ResourceType_AppInsights, @ResourceName='Custom Events Tracker', @Description='App Insights for tracking custom business events and conversion metrics.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-41, @ResourceUid=@ResourceUid, @ResourceKey='AI006', @ResourceTypeUid=@ResourceType_AppInsights, @ResourceName='Performance Counter Monitor', @Description='System performance counter monitoring and resource utilization tracking.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-42, @ResourceUid=@ResourceUid, @ResourceKey='AI007', @ResourceTypeUid=@ResourceType_AppInsights, @ResourceName='Database Query Analytics', @Description='Database performance monitoring and slow query detection system.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-43, @ResourceUid=@ResourceUid, @ResourceKey='AI008', @ResourceTypeUid=@ResourceType_AppInsights, @ResourceName='Mobile App Telemetry', @Description='Application Insights for mobile application usage and crash reporting.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-44, @ResourceUid=@ResourceUid, @ResourceKey='AI009', @ResourceTypeUid=@ResourceType_AppInsights, @ResourceName='Security Event Monitor', @Description='Security-focused monitoring for authentication failures and suspicious activities.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-45, @ResourceUid=@ResourceUid, @ResourceKey='AI010', @ResourceTypeUid=@ResourceType_AppInsights, @ResourceName='Availability Test Suite', @Description='Automated availability testing and uptime monitoring for critical services.'
+
+-- Azure App Config Resources (8 records)
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-46, @ResourceUid=@ResourceUid, @ResourceKey='CONFIG001', @ResourceTypeUid=@ResourceType_AppConfiguration, @ResourceName='Production Settings', @Description='Production environment configuration store with connection strings and API keys.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-47, @ResourceUid=@ResourceUid, @ResourceKey='CONFIG002', @ResourceTypeUid=@ResourceType_AppConfiguration, @ResourceName='Feature Flag Manager', @Description='Centralized feature flag configuration for A/B testing and gradual rollouts.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-48, @ResourceUid=@ResourceUid, @ResourceKey='CONFIG003', @ResourceTypeUid=@ResourceType_AppConfiguration, @ResourceName='Development Config', @Description='Development environment configuration store for testing and debugging.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-49, @ResourceUid=@ResourceUid, @ResourceKey='CONFIG004', @ResourceTypeUid=@ResourceType_AppConfiguration, @ResourceName='Multi-tenant Settings', @Description='Tenant-specific configuration management for multi-tenant applications.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-50, @ResourceUid=@ResourceUid, @ResourceKey='CONFIG005', @ResourceTypeUid=@ResourceType_AppConfiguration, @ResourceName='Regional Settings', @Description='Region-specific configuration for global application deployment.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-51, @ResourceUid=@ResourceUid, @ResourceKey='CONFIG006', @ResourceTypeUid=@ResourceType_AppConfiguration, @ResourceName='Security Policies', @Description='Security policy configuration store for authentication and authorization rules.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-52, @ResourceUid=@ResourceUid, @ResourceKey='CONFIG007', @ResourceTypeUid=@ResourceType_AppConfiguration, @ResourceName='Integration Endpoints', @Description='Third-party integration endpoint configuration and credentials management.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-53, @ResourceUid=@ResourceUid, @ResourceKey='CONFIG008', @ResourceTypeUid=@ResourceType_AppConfiguration, @ResourceName='Performance Thresholds', @Description='Application performance monitoring thresholds and alerting configuration.'
+
+-- Azure ServiceBus Resources (10 records)
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-54, @ResourceUid=@ResourceUid, @ResourceKey='SB001', @ResourceTypeUid=@ResourceType_ServiceBus, @ResourceName='Order Processing Queue', @Description='Service Bus queue for processing customer orders and payment transactions.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-55, @ResourceUid=@ResourceUid, @ResourceKey='SB002', @ResourceTypeUid=@ResourceType_ServiceBus, @ResourceName='Notification Topic', @Description='Service Bus topic for distributing notifications across multiple subscriber services.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-56, @ResourceUid=@ResourceUid, @ResourceKey='SB003', @ResourceTypeUid=@ResourceType_ServiceBus, @ResourceName='Audit Event Stream', @Description='Event streaming for audit log processing and compliance reporting.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-57, @ResourceUid=@ResourceUid, @ResourceKey='SB004', @ResourceTypeUid=@ResourceType_ServiceBus, @ResourceName='File Upload Queue', @Description='Queue for processing uploaded files and document conversion tasks.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-58, @ResourceUid=@ResourceUid, @ResourceKey='SB005', @ResourceTypeUid=@ResourceType_ServiceBus, @ResourceName='Integration Events', @Description='Service Bus for handling integration events between microservices.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-59, @ResourceUid=@ResourceUid, @ResourceKey='SB006', @ResourceTypeUid=@ResourceType_ServiceBus, @ResourceName='Error Handling Queue', @Description='Dead letter queue for handling failed message processing and retry logic.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-60, @ResourceUid=@ResourceUid, @ResourceKey='SB007', @ResourceTypeUid=@ResourceType_ServiceBus, @ResourceName='Scheduled Jobs Topic', @Description='Topic for distributing scheduled job triggers and background task coordination.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-61, @ResourceUid=@ResourceUid, @ResourceKey='SB008', @ResourceTypeUid=@ResourceType_ServiceBus, @ResourceName='Real-time Updates', @Description='Service Bus for real-time updates and live dashboard data synchronization.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-62, @ResourceUid=@ResourceUid, @ResourceKey='SB009', @ResourceTypeUid=@ResourceType_ServiceBus, @ResourceName='Webhook Delivery Queue', @Description='Queue for reliable webhook delivery to external systems and partners.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-63, @ResourceUid=@ResourceUid, @ResourceKey='SB010', @ResourceTypeUid=@ResourceType_ServiceBus, @ResourceName='Data Sync Pipeline', @Description='Service Bus pipeline for synchronizing data between different database systems.'
+
+-- Azure Service Fabric Resources (6 records)
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-64, @ResourceUid=@ResourceUid, @ResourceKey='SF001', @ResourceTypeUid=@ResourceType_ServiceFabric, @ResourceName='Microservices Cluster', @Description='Primary Service Fabric cluster hosting microservices architecture.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-65, @ResourceUid=@ResourceUid, @ResourceKey='SF002', @ResourceTypeUid=@ResourceType_ServiceFabric, @ResourceName='Stateful Services', @Description='Service Fabric hosting stateful services with reliable collections.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-66, @ResourceUid=@ResourceUid, @ResourceKey='SF003', @ResourceTypeUid=@ResourceType_ServiceFabric, @ResourceName='Actor Model Services', @Description='Service Fabric cluster running actor-based distributed applications.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-67, @ResourceUid=@ResourceUid, @ResourceKey='SF004', @ResourceTypeUid=@ResourceType_ServiceFabric, @ResourceName='Guest Executables', @Description='Service Fabric hosting legacy applications as guest executables.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-68, @ResourceUid=@ResourceUid, @ResourceKey='SF005', @ResourceTypeUid=@ResourceType_ServiceFabric, @ResourceName='Container Orchestration', @Description='Service Fabric cluster for container orchestration and management.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-69, @ResourceUid=@ResourceUid, @ResourceKey='SF006', @ResourceTypeUid=@ResourceType_ServiceFabric, @ResourceName='High Availability Cluster', @Description='Multi-region Service Fabric cluster for high availability and disaster recovery.'
+
+-- Azure ResourceGroup Resources (6 records)
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-70, @ResourceUid=@ResourceUid, @ResourceKey='RG001', @ResourceTypeUid=@ResourceType_ResourceGroup, @ResourceName='Production Resources', @Description='Primary resource group containing all production environment resources.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-71, @ResourceUid=@ResourceUid, @ResourceKey='RG002', @ResourceTypeUid=@ResourceType_ResourceGroup, @ResourceName='Development Environment', @Description='Resource group for development and testing environment resources.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-72, @ResourceUid=@ResourceUid, @ResourceKey='RG003', @ResourceTypeUid=@ResourceType_ResourceGroup, @ResourceName='Monitoring and Logging', @Description='Resource group dedicated to monitoring, logging, and observability tools.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-73, @ResourceUid=@ResourceUid, @ResourceKey='RG004', @ResourceTypeUid=@ResourceType_ResourceGroup, @ResourceName='Security Services', @Description='Resource group containing security-related services and Key Vault resources.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-74, @ResourceUid=@ResourceUid, @ResourceKey='RG005', @ResourceTypeUid=@ResourceType_ResourceGroup, @ResourceName='Backup and Recovery', @Description='Resource group for backup storage accounts and disaster recovery services.'
+
+SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+EXEC #Seed_Resource @ResourceId=-75, @ResourceUid=@ResourceUid, @ResourceKey='RG006', @ResourceTypeUid=@ResourceType_ResourceGroup, @ResourceName='Shared Infrastructure', @Description='Resource group for shared infrastructure components like networking and DNS.'
+
+SELECT * FROM [HTResourceMapper].ResourceType
+SELECT * FROM [HTResourceMapper].TagContentType
+SELECT * FROM [HTResourceMapper].Resource
+
+--ROLLBACK
+COMMIT
+
+DROP PROC #Seed_ResourceType
+DROP PROC #Seed_TagType
+
