@@ -74,6 +74,11 @@ namespace ResourceMapper.Common.Client.Home
             }
         }
 
+        public void AddResource()
+        {
+            _navigationManager.NavigateTo("/resource?mode=new");
+        }
+
         private async Task<GridData<ResourceGridItemModel>> LoadServerData(GridStateVirtualize<ResourceGridItemModel> state, CancellationToken token)
         {
             try
