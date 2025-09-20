@@ -13,6 +13,8 @@
 --IDEMPOTENT: Safe to run multiple times - will not create duplicates
 --=============================================
 --*/
+USE [ResourceMapper]
+GO
 
 CREATE OR ALTER PROCEDURE #Seed_ResourceType(
 	@ResourceTypeId INT,
@@ -103,6 +105,8 @@ BEGIN
 	IF @@ROWCOUNT = 0
 	BEGIN
 		SET IDENTITY_INSERT [HTResourceMapper].[Resource] ON
+		DECLARE @ResourceTypeId INT
+		SELECT @ResourceTypeId= ResourceTypeId FROM [HTResourceMapper].ResourceType WHERE ResourceTypeUid = @ResourceTypeUid
 		INSERT INTO [HTResourceMapper].[Resource] (
 			ResourceId,
 			ResourceUid,
@@ -114,27 +118,27 @@ BEGIN
 			@ResourceId,
 			@ResourceUid,
 			@ResourceKey,
-			(SELECT ResourceTypeId FROM [HTResourceMapper].ResourceType WHERE ResourceTypeUid = @ResourceTypeUid),
+			@ResourceTypeId,
 			@ResourceName,
 			@Description
 		)
 		SET IDENTITY_INSERT [HTResourceMapper].[Resource] OFF
 	END
-
+	
 END
 GO
 
 BEGIN TRANSACTION
-
+delete [HTResourceMapper].[Resource]
 -- Create demo resource types
-DECLARE @ResourceType_Application VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
-, @ResourceType_AppServices VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
-, @ResourceType_AzureRedis VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
-, @ResourceType_AppInsights VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
-, @ResourceType_ResourceGroup VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
-, @ResourceType_AppConfiguration VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
-, @ResourceType_ServiceBus VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
-, @ResourceType_ServiceFabric VARCHAR(40) =  'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
+DECLARE @ResourceType_Application VARCHAR(40) =  'DEMO-AppUid'
+, @ResourceType_AppServices VARCHAR(40) =  'DEMO-AppServiceUid'
+, @ResourceType_AzureRedis VARCHAR(40) =  'DEMO-AzureUid'
+, @ResourceType_AppInsights VARCHAR(40) =  'DEMO-AppInsightsUid'
+, @ResourceType_ResourceGroup VARCHAR(40) =  'DEMO-ResourceGroupUid'
+, @ResourceType_AppConfiguration VARCHAR(40) =  'DEMO-AppConfigUid'
+, @ResourceType_ServiceBus VARCHAR(40) =  'DEMO-ServicebusUid'
+, @ResourceType_ServiceFabric VARCHAR(40) =  'DEMO-ServiceFabric'
 
 EXEC #Seed_ResourceType @ResourceTypeId=-1, @ResourceTypeUid=@ResourceType_Application, @TypeName='Application', @AllowCustomTags=0
 EXEC #Seed_ResourceType @ResourceTypeId=-2, @ResourceTypeUid=@ResourceType_AppServices, @TypeName='Azure App Service', @AllowCustomTags=0
@@ -150,10 +154,10 @@ DECLARE @TagType_Text INT = 0,
 @TagType_Number INT = 2,
 @TagType_Date INT = 3
 
-EXEC #Seed_TagType @TagContentTypeId=@TagType_Text, @TagCode='Text'
-EXEC #Seed_TagType @TagContentTypeId=@TagType_Link, @TagCode='Link'
-EXEC #Seed_TagType @TagContentTypeId=@TagType_Number, @TagCode='Number'
-EXEC #Seed_TagType @TagContentTypeId=@TagType_Date, @TagCode='Date'
+--EXEC #Seed_TagType @TagContentTypeId=@TagType_Text, @TagCode='Text'
+--EXEC #Seed_TagType @TagContentTypeId=@TagType_Link, @TagCode='Link'
+--EXEC #Seed_TagType @TagContentTypeId=@TagType_Number, @TagCode='Number'
+--EXEC #Seed_TagType @TagContentTypeId=@TagType_Date, @TagCode='Date'
 
 -- Create demo resources
 DECLARE @ResourceUid VARCHAR(40)
@@ -393,11 +397,11 @@ EXEC #Seed_Resource @ResourceId=-75, @ResourceUid=@ResourceUid, @ResourceKey='RG
 
 SELECT * FROM [HTResourceMapper].ResourceType
 SELECT * FROM [HTResourceMapper].TagContentType
-SELECT * FROM [HTResourceMapper].Resource
+SELECT * FROM [HTResourceMapper].[Resource]
 
 --ROLLBACK
 COMMIT
 
 DROP PROC #Seed_ResourceType
 DROP PROC #Seed_TagType
-
+DROP PROC #Seed_Resource

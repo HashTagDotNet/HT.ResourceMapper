@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="laptop.publish.publish.xml" />
     <None Include="localhost.publish.xml" />
   </ItemGroup>
   
