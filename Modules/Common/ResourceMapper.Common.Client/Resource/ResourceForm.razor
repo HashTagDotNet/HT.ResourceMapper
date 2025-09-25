@@ -1,8 +1,53 @@
 ﻿@page "/resource/{ResourceUid?}"
+@using MudBlazor
 
 @if (!_isInitialized)
 {
     return;
 }
-<h3>ResourceForm</h3>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-0">
+    <!-- Fixed Header -->
+    <MudAppBar Color="Color.Surface" Elevation="1" Class="mud-width-full">
+        <MudText Typo="Typo.h6" Class="ml-3">Resource: My Resource Name</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-2" OnClick="OnApplyClicked">Apply</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Class="mr-2" OnClick="OnDeleteClicked">Delete</MudButton>
+        <MudIconButton Icon="Icons.Material.Filled.Close" Color="Color.Default" />
+    </MudAppBar>
+
+    <!-- Main Layout -->
+    <MudContainer MaxWidth="MaxWidth.False" Class="pa-0" Style="height: calc(100vh - 64px);">
+        <MudGrid Class="mud-height-full">
+            <!-- Left Navigation Panel -->
+            <MudItem xs="3" Class="pa-0">
+                <MudPaper Class="mud-height-full" Elevation="1" Square="true">
+                    <MudList T="string" Clickable="true" Class="py-0">
+                        <MudListItem T="string" Text="Resource Properties" Icon="Icons.Material.Filled.Settings" />
+                        <MudListItem T="string" Text="Search Tags" Icon="Icons.Material.Filled.Tag" />
+                        <MudListItem T="string" Text="Depends On" Icon="Icons.Material.Filled.CallMade" />
+                        <MudListItem T="string" Text="Dependent On" Icon="Icons.Material.Filled.CallReceived" />
+                    </MudList>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Main Content Area -->
+            <MudItem xs="9" Class="pa-4">
+                <MudPaper Class="pa-4" Elevation="0">
+                    <MudText Typo="Typo.h6" Class="mb-4">Resource Properties</MudText>
+                   
+                        <div>
+                            <div>Example User Input</div>
+                            <div>Field help text</div>
+                            <div><MudTextField T="string"></MudTextField></div>
+                            <div>Error messages</div>
+                        </div>
+                    <ResourceMapper.Common.Client.Components.EditorField>
+                        <Input>input</Input>
+                    </ResourceMapper.Common.Client.Components.EditorField>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+</MudContainer>
 

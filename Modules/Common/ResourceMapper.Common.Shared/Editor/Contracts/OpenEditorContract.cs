@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace ResourceMapper.Common.Shared.Editor.Contracts
+﻿namespace ResourceMapper.Common.Shared.Editor.Contracts
 {
-    internal class OpenEditorContract
+    public class OpenEditorRequest
     {
+        public string Mode { get; set; }
+        public string ResourceUid { get; set; }
+    }
+    public class OpenEditorResponse
+    {
+        public ResourceEditorModel EditorModel { get; set; }
     }
 }
