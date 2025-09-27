@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/Database/">
-    <Project Path="Database/ResourceMapperDatabase/ResourceMapperDatabase.sqlproj" Type="42ea0dbd-9cf1-443e-919e-be9c484e4577" Id="f7575642-422b-4edd-8f29-4f8d28af10e4" />
+    <Project Path="Database/ResourceMapperDatabase/ResourceMapperDatabase.sqlproj" Id="f5e2e775-5396-4400-a60b-608f080be28c">
+      <Build />
+    </Project>
   </Folder>
   <Folder Name="/Libraries/" />
   <Folder Name="/Libraries/ApiContracts/">

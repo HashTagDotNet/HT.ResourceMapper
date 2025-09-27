@@ -33,19 +33,86 @@
 
             <!-- Main Content Area -->
             <MudItem xs="9" Class="pa-4">
-                <MudPaper Class="pa-4" Elevation="0">
-                    <MudText Typo="Typo.h6" Class="mb-4">Resource Properties</MudText>
-                   
-                        <div>
-                            <div>Example User Input</div>
-                            <div>Field help text</div>
-                            <div><MudTextField T="string"></MudTextField></div>
-                            <div>Error messages</div>
-                        </div>
-                    <ResourceMapper.Common.Client.Components.EditorField>
-                        <Input>input</Input>
-                    </ResourceMapper.Common.Client.Components.EditorField>
-                </MudPaper>
+
+
+                <MudForm @ref="editorForm"
+                         Model="@_editorModel"
+                         @bind-IsValid="@_success"
+                         Disabled="@_isDisabled">
+
+                    <MudTextField T="string"
+                                  @bind-Value="_editorModel.Code"
+                                  Label="Code"
+                                  For="@(()=>_editorModel.Code)"
+                                  Required="true"
+                                  RequiredError="You must provide at least a code for this resource"
+                                  Validation="@ValidateCode"></MudTextField>
+
+                    <MudTextField T="string"
+                                  @bind-Value="_editorModel.Name"
+                                  Label="Name"></MudTextField>
+                    <MudSelect T="string" @bind-Value="_editorModel.ResourceType" Label="Resource Type" Required="true" RequiredError="Every resource must be associated with a specific resource type">
+                        <MudSelectItem T="string" Value="@("None")">None</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Application")">Application</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Service Bus")">Service Bus</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Database")">Database</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Storage Account")">Storage Account</MudSelectItem>
+                    </MudSelect>
+                    <MudTextField T="string"
+                                  @bind-Value="_editorModel.Notes"
+                                  Label="Notes"></MudTextField>
+
+                    <div class="d-flex align-center mb-3">
+                        <MudText Typo="Typo.h5" Class="mr-4">Tags</MudText>
+                        <MudButton StartIcon="Icons.Material.Filled.ContentPaste"
+                                   Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   OnClick="PasteLinkAsync">
+                            Paste Link
+                        </MudButton>
+                    </div>
+                    
+                    <MudSimpleTable Hover="true" Dense="true">
+                        <thead>
+                            <tr>
+                                <th>Tag</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>App Service</td>
+                                <td><a href="https://www.google.com">App Service</a></td>
+                            </tr>
+                        <tr>
+                            <td>Environment</td>
+                            <td>Development</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <MudTextField T="string" 
+                                              @bind-Value="_editorModel.NewTagName"
+                                              Placeholder="Tag name"
+                                              Variant="Variant.Outlined"></MudTextField>
+                            </td>
+                            <td>
+                                <MudTextField T="string" 
+                                              @bind-Value="_editorModel.NewTagValue"
+                                              Placeholder="Tag value or URL"
+                                              Variant="Variant.Outlined"></MudTextField>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </MudSimpleTable>
+                    <MudButton OnClick="@(async () => SubmitAsync())"
+                               Disabled="@(!_success)">Save</MudButton>
+
+
+                </MudForm>
+
+
+
             </MudItem>
         </MudGrid>
     </MudContainer>
