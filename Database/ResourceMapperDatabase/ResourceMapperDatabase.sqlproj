@@ -7,23 +7,28 @@
     <ModelCollation>1033, CI</ModelCollation>
     <RootNamespace>ResourceMapperDatabase</RootNamespace>
     <AssemblyName>ResourceMapperDatabase</AssemblyName>
+    <TargetDatabaseSet>True</TargetDatabaseSet>
+    <ProjectGuid>{f5e2e775-5396-4400-a60b-608f080be28c}</ProjectGuid>
   </PropertyGroup>
-  
   <!-- Include all SQL files as Build items -->
   <ItemGroup>
     <Build Include="HTResourceMapper\Tables\*.sql" />
     <Build Include="HTResourceMapper\StoredProcedures\*.sql" />
     <Build Include="HTResourceMapper\Security\*.sql" />
   </ItemGroup>
-
   <ItemGroup>
     <None Include="HTResourceMapper\Scripts\*.sql" />
   </ItemGroup>
-
   <ItemGroup>
     <None Include="laptop.publish.publish.xml" />
     <None Include="localhost.publish.xml" />
   </ItemGroup>
-  
+  <ItemGroup>
+    <Folder Include="HTResourceMapper\" />
+    <Folder Include="HTResourceMapper\Tables\" />
+    <Folder Include="HTResourceMapper\StoredProcedures\" />
+    <Folder Include="HTResourceMapper\Security\" />
+    <Folder Include="HTResourceMapper\Scripts\" />
+  </ItemGroup>
   <!-- Publish profiles -->
 </Project>

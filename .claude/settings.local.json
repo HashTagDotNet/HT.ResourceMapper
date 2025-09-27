@@ -12,7 +12,13 @@
       "Bash(git push:*)",
       "Bash(code:*)",
       "Bash(dotnet nuget locals:*)",
-      "Bash(dotnet restore:*)"
+      "Bash(dotnet restore:*)",
+      "Bash(findstr:*)",
+      "Bash(dotnet run:*)",
+      "Bash(start https://localhost:7068/resource)",
+      "Bash(dotnet dev-certs:*)",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)"
     ],
     "deny": [],
     "ask": []
