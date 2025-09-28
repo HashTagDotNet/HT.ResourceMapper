@@ -8,6 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Sample\**" />
+    <EmbeddedResource Remove="Sample\**" />
+    <None Remove="Sample\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -25,10 +31,6 @@
     <Using Include="Xunit" />
     <Using Include="Moq" />
     <Using Include="FluentAssertions" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Sample\" />
   </ItemGroup>
 
 

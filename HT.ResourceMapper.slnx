@@ -1,7 +1,8 @@
 <Solution>
   <Folder Name="/Database/">
-    <Project Path="Database/ResourceMapperDatabase/ResourceMapperDatabase.sqlproj" Id="f5e2e775-5396-4400-a60b-608f080be28c">
+    <Project Path="Database/HTResourceMapperDb/HTResourceMapperDb.sqlproj" Id="3d5ce90e-8f6e-41f1-93f0-f04a394dbb88">
       <Build />
+      <Deploy />
     </Project>
   </Folder>
   <Folder Name="/Libraries/" />
