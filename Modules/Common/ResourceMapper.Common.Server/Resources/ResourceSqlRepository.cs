@@ -1,5 +1,6 @@
 ﻿using HT.Microsoft.SqlClient.Extensions;
 using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces;
+
 using Microsoft.Data.SqlClient;
 using ResourceMapper.Common.Server.Resources.Interfaces;
 using ResourceMapper.Common.Server.Resources.Models;
@@ -16,27 +17,47 @@ namespace ResourceMapper.Common.Server.Resources
             _db = db;
         }
 
+        public async Task<List<ResourceType>> GetAllResourceTypesAsync(CancellationToken cancellationToken)
+        {
+            const string sql = "[HTResourceMapper].ResourceType_GetAll";
+
+            using var _cmd = _db.RO.SprocCommand(sql);
+            return await _db.Execute.ExecuteQueryAsync(_cmd, dr =>
+            {
+                return new ResourceType()
+                {
+                    AllowCustomTags = dr.ReadBoolean("AllowCustomTags"),
+                    CreatedOn = dr.ReadDateTime("CreatedOn"),
+                    UpdatedOn = dr.ReadDateTime("UpdatedOn"),
+                    ResourceTypeId = dr.ReadInt("ResourceTypeId"),
+                    ResourceTypeUid = dr.ReadString("ResourceTypeUid"),
+                    TypeName = dr.ReadString("TypeName")
+                };
+            }, cancellationToken:cancellationToken);
+
+        }
+
         // Original method signature for backward compatibility
         public async Task<(int TotalCount, List<ResourceGridItem> GridItems)> GetResourceGridItemsAsync(
-            string? requestSearchFor, 
-            string? requestOrderBy, 
+            string? requestSearchFor,
+            string? requestOrderBy,
             string? requestOrderDirection,
-            int skipRecords, 
-            int takeRecords, 
+            int skipRecords,
+            int takeRecords,
             CancellationToken cancellationToken)
         {
             // Call the new method with default tag limit of 5
-            return await GetResourceGridItemsAsync(requestSearchFor, requestOrderBy, requestOrderDirection, 
+            return await GetResourceGridItemsAsync(requestSearchFor, requestOrderBy, requestOrderDirection,
                 skipRecords, takeRecords, 5, cancellationToken);
         }
 
         // New method signature with tag limit
         public async Task<(int TotalCount, List<ResourceGridItem> GridItems)> GetResourceGridItemsAsync(
-            string? requestSearchFor, 
-            string? requestOrderBy, 
+            string? requestSearchFor,
+            string? requestOrderBy,
             string? requestOrderDirection,
-            int skipRecords, 
-            int takeRecords, 
+            int skipRecords,
+            int takeRecords,
             int tagLimit,
             CancellationToken cancellationToken)
         {
@@ -50,10 +71,10 @@ namespace ResourceMapper.Common.Server.Resources
 
             // Execute and get the denormalized result set
             var rawResults = await _db.Execute.ExecuteQueryAsync(cmd, MapDenormalizedRow, cancellationToken: cancellationToken);
-            
+
             // Group by ResourceUid and apply tag limit
             var groupedResults = new Dictionary<string, ResourceGridItem>();
-            
+
             foreach (var row in rawResults)
             {
                 if (row.ResourceUid != null && !groupedResults.ContainsKey(row.ResourceUid))
@@ -71,8 +92,8 @@ namespace ResourceMapper.Common.Server.Resources
                 }
 
                 // Add tag if we have tag data and haven't exceeded limit
-                if (row.ResourceUid != null && 
-                    !string.IsNullOrEmpty(row.TagUid) && 
+                if (row.ResourceUid != null &&
+                    !string.IsNullOrEmpty(row.TagUid) &&
                     groupedResults[row.ResourceUid].Tags!.Count < tagLimit)
                 {
                     groupedResults[row.ResourceUid].Tags!.Add(new ResourceGridTag

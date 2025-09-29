@@ -27,5 +27,7 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
             int requestTake, 
             int tagLimit,
             CancellationToken cancellationToken);
+
+        Task<List<ResourceType>> GetAllResourceTypesAsync(CancellationToken cancellationToken);
     }
 }

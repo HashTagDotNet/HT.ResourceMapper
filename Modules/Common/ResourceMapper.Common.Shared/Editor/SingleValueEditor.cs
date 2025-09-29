@@ -1,6 +1,6 @@
 ﻿namespace ResourceMapper.Common.Shared.Editor
 {
-    public class EditorFieldModel
+    public class SingleValueEditor
     {
         public string FieldName { get; set; }
         public string OriginalValue { get; set; }

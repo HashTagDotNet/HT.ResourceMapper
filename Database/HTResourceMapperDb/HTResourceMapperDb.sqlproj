@@ -86,4 +86,7 @@
     <None Include="Scripts\Demo_Insert_ResourceItemsForGrid.sql" />
     <None Include="Scripts\Demo_Purge_ResourceItemsForGrid.sql" />
   </ItemGroup>
+  <ItemGroup>
+    <Build Include="Stored Procedures\ResourceType_GetAll.sql" />
+  </ItemGroup>
 </Project>

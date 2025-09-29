@@ -5,6 +5,7 @@ using ResourceMapper.Common.Server.Resources.Interfaces;
 using ResourceMapper.Common.Server.Resources.Models;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
 using ResourceMapper.Common.Shared.HomePage;
+using ResourceMapper.Common.Shared.Editor.Contracts;
 
 namespace ResourceMapper.Common.Server.Resources
 {
@@ -63,7 +64,29 @@ namespace ResourceMapper.Common.Server.Resources
                 return builder.BuildResponse();
             }
         }
+        public async Task<ApiServiceResponse<OpenEditorResponse>> GetResourceEditorModelAsync(OpenEditorRequest request,CancellationToken cancellationToken=default)
+        {
+            var response = new ApiServiceResponse<OpenEditorResponse>();
 
+            var allResourceTypes = await _repo.GetAllResourceTypesAsync(cancellationToken);
+
+            // new response
+            response.ApiResponse.Data ??= new()
+            {
+                ResourceTypes = allResourceTypes.Select(r => new KeyValuePair<string, string>(r.ResourceTypeUid, r.TypeName)).ToList()
+            };
+            response.ApiResponse.Data.EditorModel = new Shared.Editor.ResourceEditorModel()
+            {
+                Code = new(),
+                Name = new(),
+                Notes = new(),
+                ResourceType = new(),
+                ResourceUid = Guid.NewGuid().ToString(),
+            };
+
+            return response;
+
+        }
         /// <summary>
         /// Example method showing how to handle resource not found vs endpoint not found
         /// </summary>

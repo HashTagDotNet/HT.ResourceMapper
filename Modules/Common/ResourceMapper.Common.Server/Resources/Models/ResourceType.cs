@@ -1,13 +1,10 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ResourceMapper.Common.Server.Resources.Models
 {
-    [Table("ResourceType", Schema = "HTResourceMapper")]
     public class ResourceType
     {
-        [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    
         public int ResourceTypeId { get; set; }
 
         [Required]
@@ -26,9 +23,5 @@ namespace ResourceMapper.Common.Server.Resources.Models
 
         public DateTime? UpdatedOn { get; set; }
 
-        // Navigation properties
-        public virtual ICollection<Resource> Resources { get; set; } = new List<Resource>();
-
-        public virtual ICollection<ResourceTypeTag> ResourceTypeTags { get; set; } = new List<ResourceTypeTag>();
     }
 }
