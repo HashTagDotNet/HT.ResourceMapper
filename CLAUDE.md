@@ -29,7 +29,7 @@ dotnet test --filter "FullyQualifiedName~ResourceMapper.Common.Server.Tests.Reso
 dotnet test --filter "FullyQualifiedName=Namespace.ClassName.MethodName"
 ```
 
-> **Note**: The SQL database project (`Database/HTResourceMapperDb/HTResourceMapperDb.sqlproj`) requires Visual Studio with SSDT installed and cannot be built with `dotnet build` alone.
+> **Note**: The SQL database project uses `Microsoft.Build.Sql/2.2.0` SDK format and builds with `dotnet build` to produce a `.dacpac`. It also builds in VS 2026 with SSDT installed. `TargetFramework=net472` is pinned explicitly so `dotnet restore` and VS full-MSBuild both produce matching assets — do not remove this property.
 
 ## Solution Structure
 
@@ -37,7 +37,7 @@ dotnet test --filter "FullyQualifiedName=Namespace.ClassName.MethodName"
 Libraries/       HT.* shared utility libraries (net8.0/net9.0)
 Modules/         Feature modules as Client/Server/Shared triplets
 UI/              Blazor WASM client + ASP.NET Core server host
-Database/        SQL Server database project (SSDT format)
+Database/        SQL Server database project (Microsoft.Build.Sql SDK format)
 _Tests/          Test projects mirroring source structure
 __ProjectNotes/  Architectural notes and user stories
 ```
@@ -115,8 +115,9 @@ See `test-conventions.md` (root) and `docs/test-conventions.md` for the full ref
 
 ## Key Technologies
 
-- **.NET 9.0** / C# 13, nullable reference types enabled everywhere
-- **Blazor WebAssembly** hosted by ASP.NET Core, MudBlazor 8.x component library
+- **.NET 10.0** / C# 13, nullable reference types enabled everywhere; `$(HTTargetFramework)` in `Directory.Build.props` sets TFM for all projects
+- **Central Package Management** via `Directory.Packages.props` — all NuGet versions live there, no `Version=` in individual `.csproj` files
+- **Blazor WebAssembly** hosted by ASP.NET Core, MudBlazor 9.x component library
 - **SQL Server** with stored procedures; `Microsoft.Data.SqlClient`
 - **Serilog** with daily rolling file sink (`Logs/`)
 - **xUnit / Moq / FluentAssertions** for testing
