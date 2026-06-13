@@ -82,7 +82,7 @@ Discussion needed: AppBar injection mechanism (layout slot vs. hardcoded), how A
 
 | Column | Width | Sortable | Notes |
 |--------|-------|----------|-------|
-| Resource Name | 40% | ✅ A→Z default | Plain clickable link → detail page (same frame) |
+| Resource Name | 40% | ✅ A→Z default | Plain clickable link → detail page (same frame); hover icons if default URL is set |
 | Resource Type | 25% | ✅ | Plain text — no chip or badge styling |
 | Tags | 25% | ❌ | Plain text — see tag display rules below |
 | Last Updated | 10% fixed | ✅ | Relative text ("2 hours ago") |
@@ -97,6 +97,17 @@ Discussion needed: AppBar injection mechanism (layout slot vs. hardcoded), how A
 - Max 5 tags shown; overflow displays `(X more...)`
 - Vertical spacing: as compact as feasible while remaining readable
 
+**Resource Name hover behavior (default URL):**
+Each resource may have an optional **default URL** (e.g. a link to its Azure App Service, portal page, or monitoring dashboard). When a default URL is set, hovering over the resource name in the grid reveals two icons:
+- **Link icon** — opens the default URL in a new window/tab
+- **Copy icon** — copies the default URL to clipboard; shows brief "copied" feedback
+
+Icons are invisible until hover (same pattern as GitHub code copy). The resource name itself remains a link to the resource detail page (same frame) — the default URL is a separate concept surfaced only via the hover icons.
+
+Data model note: a `DefaultUrl` field (or equivalent) needs to be added to `ResourceGridItemModel` and populated by the API. Mock data should include a mix of resources with and without a default URL set to exercise both states during UI development.
+
+⚠️ **Potential conflict — TBD:** The default URL copy icon (copies the external URL) may conflict visually and conceptually with the copy-resource-link behavior defined in the Resource Editor (copies the window URL / resource detail page URL). Both use a copy icon on hover in proximity to the resource name. Resolution — which icon copies what, whether both are shown simultaneously, and how to disambiguate them for the user — is to be decided in a future design discussion.
+
 **Empty state:** "No Resources Found" with "Add Your First Resource" CTA.
 
 **Loading state:** `MudProgressCircular` centered in grid area.
@@ -105,7 +116,10 @@ Discussion needed: AppBar injection mechanism (layout slot vs. hardcoded), how A
 
 - **Scope:** global — searches resource name, description, type, tag keys, tag values
 - **Triggers:** Enter key or search icon click (saved to history); 400ms debounce for live filtering (not saved)
-- **Clear:** X button or Escape key; empty search = no filter, grid returns to default (alphabetical by name)
+- **Clear:** Visible **X button** inside the search input (appears only when the search has content); also triggered by Escape key. Clears the search query, removes all filters, and resets the grid to the default state: resource name sorted A→Z. On clear:
+  - URL is updated to remove all query parameters
+  - Saved local startup state is updated to reflect the cleared/default state
+  - Search history (IndexedDB) is **not** affected — clearing the current search does not delete history entries
 - Grid columns (Name, Type) sort and filter in response to the active search query
 
 ### URL State Persistence
@@ -114,6 +128,14 @@ Every grid state change must update the URL so the view is fully bookmarkable an
 - Parameters: search query, sort column, sort direction, active filters, page/offset
 - **Load priority:** URL parameters → saved local state → application defaults (URL always wins)
 - Goal: copy URL → paste in new browser → identical view
+
+### Startup State Restoration
+
+On every startup (fresh browser tab with no URL parameters), restore the user's **most recent grid state** from local storage:
+- Restores: last search query, sort column, sort direction, active filters
+- **No age limit** — this restoration applies even if the last session was weeks or months ago
+- Distinct from search history (which has a 10-day rolloff): the last active state is always preserved, regardless of how old it is
+- If URL parameters are present they take full priority over restored state (per URL State Persistence rules above)
 
 ### Search History ⚠️ *Design discussion needed before implementation*
 
