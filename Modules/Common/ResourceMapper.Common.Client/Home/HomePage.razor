@@ -33,7 +33,7 @@
         </MudItem>
 
         <!-- Data Grid Card -->
-        <MudItem xs="12" lg="8">
+        <MudItem xs="12">
             <MudCard Elevation="2" Style="height: 70vh; display: flex; flex-direction: column;">
                 <MudCardHeader>
                     <CardHeaderContent>
@@ -79,15 +79,6 @@
                                              Variant="Variant.Text">
                                         @(context.Item.ResourceType ?? "Unknown")
                                     </MudChip>
-                                </CellTemplate>
-                            </TemplateColumn>
-
-                            <TemplateColumn Title="Description" Sortable="false">
-                                <CellTemplate>
-                                    <MudText Typo="Typo.body2"
-                                             Style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                        @context.Item.Description
-                                    </MudText>
                                 </CellTemplate>
                             </TemplateColumn>
 
