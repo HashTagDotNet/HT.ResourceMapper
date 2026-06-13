@@ -12,7 +12,7 @@ namespace ResourceMapper.UI.Server.Controllers.Api
 
         Task<ApiServiceResponse<OpenEditorResponse>> GetResourceEditorModelAsync(OpenEditorRequest request, CancellationToken cancellationToken = default)
         {
-
+            throw new NotImplementedException();
         }
     }
 }

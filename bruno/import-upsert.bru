@@ -1,0 +1,40 @@
+meta {
+  name: import-upsert
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://localhost:7068/api/resources/import
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "version": "1.0",
+    "policy": { "onConflict": "upsert" },
+    "resourceTypes": {
+      "AppConfiguration": { "allowCustomTags": true }
+    },
+    "tagDefinitions": {
+      "environment": {
+        "contentType": "string",
+        "allowCustomValue": false,
+        "isMultiValued": false,
+        "allowedValues": ["dev", "int", "preprod", "prod"]
+      }
+    },
+    "resources": [
+      {
+        "key": "visibility-app-config-prod",
+        "name": "Visibility App Configuration",
+        "type": "AppConfiguration",
+        "description": "Azure App Configuration store for Visibility (production)",
+        "tags": {
+          "environment": "prod"
+        }
+      }
+    ]
+  }
+}

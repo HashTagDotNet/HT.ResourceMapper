@@ -2,12 +2,14 @@
 {
     public class ResourceEditorModel
     {
-        public string ResourceUid { get; set; }
+        public string ResourceUid { get; set; } = "";
 
-        public SingleValueEditor ResourceType { get; set; }
+        public SingleValueEditor ResourceType { get; set; } = new();
+        public SingleValueEditor Code { get; set; } = new();
+        public SingleValueEditor Name { get; set; } = new();
+        public SingleValueEditor Notes { get; set; } = new();
 
-        public SingleValueEditor Code { get; set; }
-        public SingleValueEditor Name { get; set; }
-        public SingleValueEditor Notes { get; set; }
-
+        public string NewTagName { get; set; } = "";
+        public string NewTagValue { get; set; } = "";
+    }
 }

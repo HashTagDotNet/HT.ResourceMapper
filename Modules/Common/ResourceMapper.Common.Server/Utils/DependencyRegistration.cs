@@ -22,6 +22,7 @@ namespace ResourceMapper.Common.Server.Utils
 
             services.TryAddScoped<IResourceRepository,ResourceSqlRepository>();
             services.TryAddScoped<IResourceService,ResourceService>();
+            services.TryAddScoped<IImportService,ImportService>();
         }
     }
 }

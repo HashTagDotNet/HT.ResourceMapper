@@ -4,41 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HT.ResourceMapper is a cloud resource management application that serves as a sophisticated, searchable catalog of resources across multiple cloud environments. The system combines organizational capabilities with advanced tagging, metadata management, and dependency tracking - conceptually similar to an enhanced enterprise-grade bookmark manager for cloud resources.
-
-## Architecture
-
-### Solution Structure
-This is a .NET 9.0 solution organized into four main areas:
-
-- **Libraries/**: Shared utility libraries (HT.* namespace)
-  - `ApiContracts`: API contract definitions
-  - `Collections`: Collection utilities
-  - `Configuration`: IConfiguration extensions with type-safe access
-  - `Logging`: ILogger extensions
-  - `SqlClient`: SqlClient abstractions and extensions
-
-- **Database/**: SQL Server database project
-  - `HTServices`: Database schema, tables, stored procedures, and seed scripts
-  - Uses Microsoft.Build.Sql SDK for database project management
-
-- **Modules/**: Feature modules organized as Client/Server/Shared triplets
-  - `Common`: Shared common functionality
-  - `Feature1`: Example feature implementation
-  - Each module follows Blazor architecture patterns
-
-- **UI/**: User interface layer
-  - `ResourceMapper.UI.Client`: Blazor WebAssembly client
-  - `ResourceMapper.UI.Server`: ASP.NET Core server hosting the client
-
-### Core Domain Model
-The application centers around six primary entities:
-1. **Resources** - The main entities being managed (websites, databases, gateways, etc.)
-2. **Resource Types** - Extensible catalog of resource classifications
-3. **Advanced Tagging System** - Multi-valued tags with type constraints and custom values
-4. **Resource Dependencies** - Bidirectional "depends on"/"depended by" relationships
-5. **Tag Content Types** - Extensible content type system (Text, Link, etc.)
-6. **Resource Type Tags** - Template system for pre-defined tag schemas per resource type
+HT.ResourceMapper is a cloud resource management application — a searchable catalog of resources across multiple cloud environments with advanced tagging, metadata management, and dependency tracking. Conceptually an enterprise-grade bookmark manager for cloud infrastructure.
 
 ## Development Commands
 
@@ -48,65 +14,128 @@ The application centers around six primary entities:
 dotnet build
 
 # Build specific project
-dotnet build UI/BlazorTemplate.UI.Server
+dotnet build UI/ResourceMapper.UI.Server
 
-# Build in Release mode
-dotnet build -c Release
-```
-
-### Database Operations
-```bash
-# Build database project
-dotnet build Database/HTServices/HTServices.sqlproj
-```
-
-### Running the Application
-```bash
-# Run the server (which hosts the Blazor WebAssembly client)
+# Run the server (hosts Blazor WebAssembly client)
 dotnet run --project UI/ResourceMapper.UI.Server
+
+# Run all tests
+dotnet test
+
+# Run tests for a specific class
+dotnet test --filter "FullyQualifiedName~ResourceMapper.Common.Server.Tests.ResourceService"
+
+# Run a single test method
+dotnet test --filter "FullyQualifiedName=Namespace.ClassName.MethodName"
 ```
+
+> **Note**: The SQL database project (`Database/HTResourceMapperDb/HTResourceMapperDb.sqlproj`) requires Visual Studio with SSDT installed and cannot be built with `dotnet build` alone.
+
+## Solution Structure
+
+```
+Libraries/       HT.* shared utility libraries (net8.0/net9.0)
+Modules/         Feature modules as Client/Server/Shared triplets
+UI/              Blazor WASM client + ASP.NET Core server host
+Database/        SQL Server database project (SSDT format)
+_Tests/          Test projects mirroring source structure
+__ProjectNotes/  Architectural notes and user stories
+```
+
+## Architecture
+
+### Module Pattern (Client/Server/Shared)
+Each feature is a triplet of projects under `Modules/`:
+- **`*.Shared`** — Contracts, DTOs, and editor models shared across boundaries
+- **`*.Server`** — Business logic, repositories, `IResourceService` implementations
+- **`*.Client`** — Razor components, MudBlazor UI, client-side only code
+
+Modules register dependencies via an extension method in `*/Utils/DependencyRegistration.cs`:
+```csharp
+// Called from UI.Server/Program.cs
+builder.Services.RegisterCommonDependencies();
+```
+This registers `GlobalConfig`, `IDbConnector`, `IResourceRepository`, and `IResourceService` using `TryAdd` semantics.
+
+### API Response Pattern
+Two-layer contract system:
+
+**`HT.Api.Client.Contracts`** — Wire format (`ApiResponse<T>`, `Message`, `MetaData`, `CallStatusCode`). Used by Blazor client. Contains resource DTOs (`ResourceDto`, `ResourceTagDto`, etc.).
+
+**`HT.Api.Service.Contracts`** — Server-side wrapper (`ApiServiceResponse<T>`) plus a fluent `ServiceResponseBuilder<T>`:
+```csharp
+var builder = ServiceResponseBuilder<MyDto>.Create();
+builder.Validation.AddValidation("fieldName", "error message");
+builder.Errors.AddError(CallStatusCode.NotFound, "detail", "property");
+var response = builder.BuildResponse();  // auto-sets CallStatus from errors
+```
+`ApiServiceResponse<T>.IsOk` checks errors, `MetaData.CallStatus`, and HTTP status code.
+
+### Controllers
+All controllers inherit `ApiControllerBase` which provides `MapServiceResponseToActionResult<T>(ApiServiceResponse<T>)` to translate service responses to appropriate HTTP `ActionResult` with status codes and custom reason phrases.
+
+### Database Access
+`IDbConnector` abstraction (from `HT.Microsoft.SqlClient.Extensions`) exposes separate read-only (`.RO`) and read-write (`.Execute`) connections. Repositories use extension methods for sproc calls:
+```csharp
+await _db.RO.SprocCommand("Resource_GetItems")
+    .AddNVarchar("@SearchFor", request.SearchFor)
+    .ExecuteQueryAsync<ResourceRow>(cancellationToken);
+```
+Connection strings are read from `ResourceMapper:ConnectionStrings:Database:RO` and `ResourceMapper:ConnectionStrings:Database:RW`.
+
+### Editor Model Pattern
+`SingleValueEditor` in `Modules/Common/ResourceMapper.Common.Shared/Editor/` tracks change state for form fields:
+```csharp
+public class SingleValueEditor {
+    public string OriginalValue { get; set; }
+    public string EditedValue { get; set; }        // bind MudTextField to this
+    public bool IsChanged => ...;
+    public List<EditorMessage> Messages { get; set; }
+}
+```
+`ResourceEditorModel` composes multiple `SingleValueEditor` instances (Code, Name, Notes, ResourceType). Razor components bind to `.EditedValue`:
+```razor
+<MudTextField @bind-Value="_editorModel.Code.EditedValue"
+              For="@(()=>_editorModel.Code.EditedValue)" />
+```
+
+## Test Conventions
+
+Tests use **xUnit** + **Moq 4.18.4** (do not upgrade) + **FluentAssertions 7.1.0** (do not upgrade).
+
+- Test method naming: `MethodName_StateUnderTest_ExpectedBehavior` (no "Should" prefix)
+- `[Trait]` attributes at class level only; use hierarchical namespace traits
+- `// ReSharper disable InconsistentNaming` at top of each test file
+- Always include `[Trait("Category", "Unit")]`
+- Arrange-Act-Assert pattern; helper methods in a `#region` at the bottom
+- Mock concrete dependencies only when they have interfaces; use concrete implementations otherwise
+- Always add a `"because"` clause to FluentAssertions
+
+See `test-conventions.md` (root) and `docs/test-conventions.md` for the full reference.
 
 ## Key Technologies
 
-- **.NET 9.0** with C# 13 features
-- **Nullable reference types** enabled across all projects
-- **Blazor WebAssembly** with ASP.NET Core server
-- **SQL Server** with database project using Microsoft.Build.Sql SDK
-- **Serilog** for structured logging
-- **Microsoft.AspNetCore.Components.WebAssembly.Server** for hosting
+- **.NET 9.0** / C# 13, nullable reference types enabled everywhere
+- **Blazor WebAssembly** hosted by ASP.NET Core, MudBlazor 8.x component library
+- **SQL Server** with stored procedures; `Microsoft.Data.SqlClient`
+- **Serilog** with daily rolling file sink (`Logs/`)
+- **xUnit / Moq / FluentAssertions** for testing
 
 ## Configuration
 
-The application uses a sophisticated configuration system via the HT.Microsoft.IConfiguration.Extensions library that provides:
+`HT.Microsoft.IConfiguration.Extensions` provides type-safe access:
+```csharp
+config.GetString("ResourceMapper:ConnectionStrings:Database:RW")
+config.GetTypedSection<MyOptions>("Section:Key")
+config.IsDevelopment()
+config.ValidateRequiredKeys("key1", "key2")
+```
+User secrets are configured for `UI.Server` (for local connection strings).
 
-- Type-safe configuration access (GetString, GetInt, GetBool, etc.)
-- Array and collection support with customizable separators
-- Strongly-typed configuration sections via GetTypedSection<T>()
-- Environment detection helpers (IsDevelopment, IsProduction, etc.)
-- Configuration validation with ValidateRequiredKeys()
-- Enhanced connection string management
+## Project Notes
 
-## Project Conventions
-
-### Naming Patterns
-- Libraries use `HT.` prefix (e.g., HT.ApiContracts)
-- Modules use `ResourceMapper.ModuleName.Layer` pattern
-- UI projects use `ResourceMapper.UI.Layer` pattern
-
-### Project Structure
-- Each module follows Client/Server/Shared architecture
-- Libraries are organized by functional area
-- Database schema organized under ResourceMapper namespace
-- Seed scripts numbered sequentially (01_, 02_, etc.)
-
-### Dependencies
-- UI.Server references UI.Client and feature modules
-- Feature modules reference shared libraries
-- All projects target net9.0 with ImplicitUsings and Nullable enabled
-
-## Development Notes
-
-- The solution uses .slnx format (Visual Studio solution file)
-- User secrets are configured for the UI.Server project
-- Serilog is configured with file sink in UI.Server
-- The project includes comprehensive project notes in `__ProjectNotes/` directory with architectural concepts and user stories
+`__ProjectNotes/` contains architectural decisions and user stories. Key files:
+- `Concept1.md` — Core architectural concepts
+- `UserStories.md` — Feature requirements (US-001 through US-010)
+- `UserStoryMapping.md` — Workflow analysis
+- `HomePageGridDesign.md` / `SearchBehaviorDesign.md` — Feature-specific design

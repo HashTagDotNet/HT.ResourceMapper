@@ -41,17 +41,17 @@
                          Disabled="@_isDisabled">
 
                     <MudTextField T="string"
-                                  @bind-Value="_editorModel.Code"
+                                  @bind-Value="_editorModel.Code.EditedValue"
                                   Label="Code"
-                                  For="@(()=>_editorModel.Code)"
+                                  For="@(()=>_editorModel.Code.EditedValue)"
                                   Required="true"
                                   RequiredError="You must provide at least a code for this resource"
                                   Validation="@ValidateCode"></MudTextField>
 
                     <MudTextField T="string"
-                                  @bind-Value="_editorModel.Name"
+                                  @bind-Value="_editorModel.Name.EditedValue"
                                   Label="Name"></MudTextField>
-                    <MudSelect T="string" @bind-Value="_editorModel.ResourceType" Label="Resource Type" Required="true" RequiredError="Every resource must be associated with a specific resource type">
+                    <MudSelect T="string" @bind-Value="_editorModel.ResourceType.EditedValue" Label="Resource Type" Required="true" RequiredError="Every resource must be associated with a specific resource type">
                         <MudSelectItem T="string" Value="@("None")">None</MudSelectItem>
                         <MudSelectItem T="string" Value="@("Application")">Application</MudSelectItem>
                         <MudSelectItem T="string" Value="@("Service Bus")">Service Bus</MudSelectItem>
@@ -59,7 +59,7 @@
                         <MudSelectItem T="string" Value="@("Storage Account")">Storage Account</MudSelectItem>
                     </MudSelect>
                     <MudTextField T="string"
-                                  @bind-Value="_editorModel.Notes"
+                                  @bind-Value="_editorModel.Notes.EditedValue"
                                   Label="Notes"></MudTextField>
 
                     <div class="d-flex align-center mb-3">

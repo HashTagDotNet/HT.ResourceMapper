@@ -5,6 +5,7 @@ using ResourceMapper.Common.Shared.HomePage.Contracts;
 using System.Net;
 using HT.Api.Service.Contracts;
 using System.ComponentModel.DataAnnotations;
+using ResourceMapper.Common.Shared.Editor.Contracts;
 
 namespace ResourceMapper.UI.Server.Controllers.Api;
 
@@ -63,9 +64,9 @@ public class ResourceGridController : ApiControllerBase
         return MapServiceResponseToActionResult(svcResponse);
     }
 
-    [HttpGet]
-    public async Task<ActionResult<ApiResponse<>>> GetResourceEditorForm()
+    [HttpGet("editor")]
+    public Task<ActionResult<ApiResponse<OpenEditorResponse>>> GetResourceEditorForm()
     {
-
+        throw new NotImplementedException();
     }
 }

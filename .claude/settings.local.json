@@ -18,7 +18,11 @@
       "Bash(start https://localhost:7068/resource)",
       "Bash(dotnet dev-certs:*)",
       "Bash(taskkill:*)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "PowerShell(dotnet build 2>&1 | Select-String -Pattern \": error \" | ForEach-Object { $_.Line })",
+      "Bash(dotnet test *)",
+      "PowerShell(dotnet build UI/ResourceMapper.UI.Server -v q --nologo)",
+      "Skill(fewer-permission-prompts)"
     ],
     "deny": [],
     "ask": []
