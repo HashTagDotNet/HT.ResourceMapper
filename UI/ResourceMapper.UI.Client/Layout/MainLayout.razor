@@ -36,24 +36,6 @@
     private bool _isDarkMode = false;
     private bool _drawerOpen = true;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            // Use the compatible method for MudBlazor 8.1.0
-            try
-            {
-                _isDarkMode = await _mudThemeProvider.GetSystemPreference();
-            }
-            catch
-            {
-                // Fallback to light mode if detection fails
-                _isDarkMode = false;
-            }
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
     private void DrawerToggle()
     {
         _drawerOpen = !_drawerOpen;

@@ -1,19 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>$(HTTargetFramework)</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Primitives" Version="9.0.8" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="Microsoft.Extensions.Primitives">
-      <HintPath>..\..\..\..\nuget\microsoft.extensions.primitives\9.0.1\lib\net9.0\Microsoft.Extensions.Primitives.dll</HintPath>
-    </Reference>
+    <PackageReference Include="Microsoft.Extensions.Primitives" />
   </ItemGroup>
 
 </Project>

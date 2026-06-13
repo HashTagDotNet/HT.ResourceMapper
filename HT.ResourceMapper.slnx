@@ -38,6 +38,8 @@
     <Project Path="UI/ResourceMapper.UI.Server/ResourceMapper.UI.Server.csproj" />
   </Folder>
   <Folder Name="/_Solution Documents/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
     <File Path="README.md" />
   </Folder>
   <Folder Name="/_Tests/">

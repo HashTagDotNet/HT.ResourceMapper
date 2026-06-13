@@ -1,92 +1,22 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+<Project>
+  <Sdk Name="Microsoft.Build.Sql" Version="2.2.0" />
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <Name>HTResourceMapperDb</Name>
-    <SchemaVersion>2.0</SchemaVersion>
-    <ProjectVersion>4.1</ProjectVersion>
-    <ProjectGuid>{3d5ce90e-8f6e-41f1-93f0-f04a394dbb88}</ProjectGuid>
     <DSP>Microsoft.Data.Tools.Schema.Sql.Sql160DatabaseSchemaProvider</DSP>
-    <OutputType>Database</OutputType>
-    <RootPath>
-    </RootPath>
-    <RootNamespace>HTResourceMapperDb</RootNamespace>
-    <AssemblyName>HTResourceMapperDb</AssemblyName>
     <ModelCollation>1033, CI</ModelCollation>
-    <DefaultFileStructure>BySchemaAndSchemaType</DefaultFileStructure>
-    <DeployToDatabase>True</DeployToDatabase>
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
-    <TargetLanguage>CS</TargetLanguage>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <SqlServerVerification>False</SqlServerVerification>
-    <IncludeCompositeObjects>True</IncludeCompositeObjects>
     <TargetDatabaseSet>True</TargetDatabaseSet>
+    <ProjectGuid>{3d5ce90e-8f6e-41f1-93f0-f04a394dbb88}</ProjectGuid>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <OutputPath>bin\Release\</OutputPath>
-    <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>
-    <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <DefineDebug>false</DefineDebug>
-    <DefineTrace>true</DefineTrace>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <OutputPath>bin\Debug\</OutputPath>
-    <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <DefineDebug>true</DefineDebug>
-    <DefineTrace>true</DefineTrace>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup>
-    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">11.0</VisualStudioVersion>
-    <!-- Default to the v11.0 targets path if the targets file for the current VS version is not found -->
-    <SSDTExists Condition="Exists('$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\SSDT\Microsoft.Data.Tools.Schema.SqlTasks.targets')">True</SSDTExists>
-    <VisualStudioVersion Condition="'$(SSDTExists)' == ''">11.0</VisualStudioVersion>
-  </PropertyGroup>
-  <Import Condition="'$(SQLDBExtensionsRefPath)' != ''" Project="$(SQLDBExtensionsRefPath)\Microsoft.Data.Tools.Schema.SqlTasks.targets" />
-  <Import Condition="'$(SQLDBExtensionsRefPath)' == ''" Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\SSDT\Microsoft.Data.Tools.Schema.SqlTasks.targets" />
   <ItemGroup>
-    <Folder Include="Properties" />
-    <Folder Include="Scripts" />
-    <Folder Include="Tables" />
-    <Folder Include="Security" />
-    <Folder Include="Stored Procedures" />
+    <!-- Exclude duplicate files left from previous SDK attempt -->
+    <Build Remove="HTResourceMapper\**" />
+    <!-- Exclude seed/demo data scripts — not schema objects -->
+    <Build Remove="Scripts\**" />
+    <!-- Exclude build output -->
+    <Build Remove="bin\**" />
+    <None Include="Scripts\**" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Scripts\01_Seed_TagContentTypes.sql" />
-    <Build Include="Security\HTResourceMapper.sql" />
-    <Build Include="Tables\Resource.sql" />
-    <Build Include="Tables\ResourceDependency.sql" />
-    <Build Include="Tables\ResourceTag.sql" />
-    <Build Include="Tables\ResourceType.sql" />
-    <Build Include="Tables\ResourceTypeTag.sql" />
-    <Build Include="Tables\TagContentType.sql" />
-    <Build Include="Tables\TagDefinition.sql" />
-    <Build Include="Tables\TagValueType.sql" />
-    <Build Include="Stored Procedures\PlaceholderStoredProcedure.sql" />
-    <Build Include="Stored Procedures\Resource_Create.sql" />
-    <Build Include="Stored Procedures\Resource_GetByResourceUid.sql" />
-    <Build Include="Stored Procedures\Resource_GetDaysAgo.sql" />
-    <Build Include="Stored Procedures\Resource_GetItems.sql" />
-    <None Include="localhost.publish.publish.xml" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Scripts\02_Seed_PropertyTypes.sql" />
-    <None Include="Scripts\03_Seed_SystemTags.sql" />
-    <None Include="Scripts\04_Seed_All.sql" />
-    <None Include="Scripts\Demo_Insert_ResourceItemsForGrid.sql" />
-    <None Include="Scripts\Demo_Purge_ResourceItemsForGrid.sql" />
-  </ItemGroup>
-  <ItemGroup>
-    <Build Include="Stored Procedures\ResourceType_GetAll.sql" />
+    <Folder Include="Scripts\" />
   </ItemGroup>
 </Project>
