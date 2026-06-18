@@ -14,6 +14,9 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddMudServices();
 
+// API controllers (e.g. POST /api/resources/import for external/Bruno use; the UI calls services in-process).
+builder.Services.AddControllers();
+
 // Reuse the shared backend (GlobalConfig, IDbConnector, repositories, services).
 builder.Services.RegisterCommonDependencies();
 
@@ -29,6 +32,7 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapControllers();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

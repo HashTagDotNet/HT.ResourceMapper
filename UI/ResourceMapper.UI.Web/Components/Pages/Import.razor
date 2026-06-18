@@ -1,0 +1,155 @@
+@page "/import"
+@using System.Text.Json
+@using ResourceMapper.Common.Server.Resources.Interfaces
+@using ResourceMapper.Common.Shared.Import.Contracts
+@inject IImportService ImportService
+@inject ISnackbar Snackbar
+
+<PageTitle>Import — Hashtag Resource Mapper</PageTitle>
+
+<MudText Typo="Typo.h5" Style="font-weight:600;">Import</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    Import resources from a JSON file in the import-contract format.
+</MudText>
+
+<MudPaper Elevation="0" Class="pa-6 mb-4" Style="border:1px solid var(--mud-palette-divider);">
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">Choose a JSON file to import:</MudText>
+    <InputFile OnChange="OnInputFileChange" accept=".json" />
+
+    @if (_fileName is not null)
+    {
+        <div class="d-flex align-center mt-4 gap-4">
+            <MudText Typo="Typo.body2">@_fileName</MudText>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_busy || _request is null)"
+                       OnClick="RunImport">
+                @(_busy ? "Importing…" : "Import")
+            </MudButton>
+        </div>
+    }
+</MudPaper>
+
+@if (_busy)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+
+@if (_message is not null)
+{
+    <MudAlert Severity="@_messageSeverity" Variant="Variant.Outlined" Dense="true" Class="mb-3">@_message</MudAlert>
+}
+
+@if (_summary is not null)
+{
+    <MudSimpleTable Dense="true" Bordered="true" Elevation="0"
+                    Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
+        <thead>
+            <tr><th>Section</th><th>Created</th><th>Updated</th><th>Skipped</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Resource Types</td><td>@_summary.ResourceTypes.Created</td><td>@_summary.ResourceTypes.Updated</td><td>@_summary.ResourceTypes.Skipped</td></tr>
+            <tr><td>Tag Definitions</td><td>@_summary.TagDefinitions.Created</td><td>@_summary.TagDefinitions.Updated</td><td>@_summary.TagDefinitions.Skipped</td></tr>
+            <tr><td>Resources</td><td>@_summary.Resources.Created</td><td>@_summary.Resources.Updated</td><td>@_summary.Resources.Skipped</td></tr>
+        </tbody>
+    </MudSimpleTable>
+}
+
+@if (_errors is { Count: > 0 })
+{
+    <MudSimpleTable Dense="true" Bordered="true" Elevation="0"
+                    Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
+        <thead>
+            <tr><th>Section</th><th>Key</th><th>Field</th><th>Message</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var e in _errors)
+            {
+                <tr><td>@e.Section</td><td>@e.Key</td><td>@e.Field</td><td>@e.Message</td></tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+}
+
+@code {
+    private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
+
+    private string? _fileName;
+    private ImportRequest? _request;
+    private bool _busy;
+    private ImportSummary? _summary;
+    private List<ImportError>? _errors;
+    private string? _message;
+    private Severity _messageSeverity = Severity.Info;
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        await OnFileSelected(e.FileCount > 0 ? e.File : null);
+    }
+
+    private async Task OnFileSelected(IBrowserFile? file)
+    {
+        Reset();
+        if (file is null) return;
+        _fileName = file.Name;
+        try
+        {
+            await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
+            _request = await JsonSerializer.DeserializeAsync<ImportRequest>(stream, JsonOpts);
+            if (_request is null)
+                Show("The file did not contain a valid import document.", Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            _fileName = null;
+            Show($"Could not read the file: {ex.Message}", Severity.Warning);
+        }
+    }
+
+    private async Task RunImport()
+    {
+        if (_request is null) return;
+        _busy = true;
+        _summary = null;
+        _errors = null;
+        _message = null;
+        try
+        {
+            var response = await ImportService.ImportAsync(_request, CancellationToken.None);
+            var data = response.ApiResponse.Data;
+            if (response.IsSuccess() && data is not null)
+            {
+                _summary = data.Summary;
+                Show("Import succeeded.", Severity.Success);
+                Snackbar.Add("Import succeeded", Severity.Success);
+            }
+            else
+            {
+                _errors = data?.Errors ?? new();
+                Show($"Import failed — {_errors.Count} issue(s).", Severity.Error);
+                Snackbar.Add("Import failed validation", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Show($"Import error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void Reset()
+    {
+        _fileName = null;
+        _request = null;
+        _summary = null;
+        _errors = null;
+        _message = null;
+    }
+
+    private void Show(string message, Severity severity)
+    {
+        _message = message;
+        _messageSeverity = severity;
+    }
+}
