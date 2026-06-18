@@ -1,0 +1,231 @@
+{
+  "version": "1.0",
+  "policy": { "onConflict": "upsert" },
+  "resourceTypes": {
+    "AppConfiguration": { "allowCustomTags": true },
+    "AppInsights": { "allowCustomTags": true },
+    "AppService": { "allowCustomTags": true },
+    "Redis": { "allowCustomTags": true },
+    "ServiceBus": { "allowCustomTags": true },
+    "ServiceFabric": { "allowCustomTags": true },
+    "StorageAccount": { "allowCustomTags": true }
+  },
+  "tagDefinitions": {
+    "Environment": { "contentType": "Text", "allowCustomValue": true, "isMultiValued": false },
+    "Link": { "contentType": "Link", "allowCustomValue": true, "isMultiValued": false },
+    "Search": { "contentType": "Text", "allowCustomValue": true, "isMultiValued": false }
+  },
+  "resources": [
+    {
+      "key": "usspi-apc-dt-mplt-07",
+      "name": "usspi-apc-dt-mplt-07",
+      "type": "AppConfiguration",
+      "description": "App Configuration - Visibility",
+      "tags": {
+        "Environment": "non-prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-92/providers/Microsoft.AppConfiguration/configurationStores/usspi-apc-dt-mplt-07/kvs"
+      }
+    },
+    {
+      "key": "usspi-apc-pd-mp-01",
+      "name": "usspi-apc-pd-mp-01",
+      "type": "AppConfiguration",
+      "description": "App Configuration - Visibility",
+      "tags": {
+        "Environment": "prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/6904df25-40a0-4531-9fb0-f6fde48f6785/resourceGroups/usspi-rsg-pd-mplt-01/providers/Microsoft.AppConfiguration/configurationStores/usspi-apc-pd-mp-01/kvs"
+      }
+    },
+    {
+      "key": "usspi-apc-dt-mplt-06",
+      "name": "usspi-apc-dt-mplt-06",
+      "type": "AppConfiguration",
+      "description": "App Configuration - Proxy & LITE",
+      "tags": {
+        "Environment": "non-prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/usspi-rsg-dt-mplt-92/providers/Microsoft.AppConfiguration/configurationStores/usspi-apc-dt-mplt-06/kvs"
+      }
+    },
+    {
+      "key": "usspi-apc-pd-mplt-01",
+      "name": "usspi-apc-pd-mplt-01",
+      "type": "AppConfiguration",
+      "description": "App Configuration - Proxy & LITE",
+      "tags": {
+        "Environment": "prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/6904df25-40a0-4531-9fb0-f6fde48f6785/resourceGroups/usspi-rsg-pd-mplt-01/providers/Microsoft.AppConfiguration/configurationStores/usspi-apc-pd-mplt-01/kvs"
+      }
+    },
+    {
+      "key": "usspi-ain-mplt-dt-server-01",
+      "name": "usspi-ain-mplt-dt-server-01",
+      "type": "AppInsights",
+      "description": "App Insights - vNext",
+      "tags": {
+        "Environment": "non-prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourcegroups/USSPI-RSG-DT-MPLT-01/providers/microsoft.insights/components/usspi-ain-mplt-dt-server-01/logs"
+      }
+    },
+    {
+      "key": "usspi-ain-mplt-pd-mp-server",
+      "name": "USSPI-AIN-MPLT-PD-MP-Server",
+      "type": "AppInsights",
+      "description": "App Insights - vNext",
+      "tags": {
+        "Environment": "prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/6904df25-40a0-4531-9fb0-f6fde48f6785/resourcegroups/USSPI-RSG-PD-MPLT-01/providers/microsoft.insights/components/USSPI-AIN-MPLT-PD-MP-Server/logs"
+      }
+    },
+    {
+      "key": "usspi-ain-mplt-visibility-dev-02",
+      "name": "usspi-ain-mplt-visibility-dev-02",
+      "type": "AppInsights",
+      "description": "App Insights - Proxy & LITE",
+      "tags": {
+        "Environment": "non-prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/usspi-rsg-dt-mplt-01/providers/microsoft.insights/components/usspi-ain-mplt-visibility-dev-02/logs"
+      }
+    },
+    {
+      "key": "usspi-ain-mplt-pd-visibility-telemetrics",
+      "name": "USSPI-AIN-MPLT-PD-Visibility-Telemetrics",
+      "type": "AppInsights",
+      "description": "App Insights - Proxy & LITE",
+      "tags": {
+        "Environment": "prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/6904df25-40a0-4531-9fb0-f6fde48f6785/resourceGroups/usspi-rsg-pd-mplt-01/providers/microsoft.insights/components/USSPI-AIN-MPLT-PD-Visibility-Telemetrics/logs"
+      }
+    },
+    {
+      "key": "usspi-aps-dt-mplt-dev-visibility-macropoint-com",
+      "name": "usspi-aps-dt-mplt-dev-visibility-macropoint-com",
+      "type": "AppService",
+      "description": "App Service - vNext",
+      "tags": {
+        "Environment": "non-prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/usspi-rsg-dt-mplt-03/providers/Microsoft.Web/sites/usspi-aps-dt-mplt-dev-visibility-macropoint-com/appServices"
+      }
+    },
+    {
+      "key": "usaus-aps-dt-mplt-dev-visibility-macropoint-com",
+      "name": "usaus-aps-dt-mplt-dev-visibility-macropoint-com",
+      "type": "AppService",
+      "description": "App Service - vNext",
+      "tags": {
+        "Environment": "non-prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/usaus-rsg-dt-mplt-03/providers/Microsoft.Web/sites/usaus-aps-dt-mplt-dev-visibility-macropoint-com/appServices"
+      }
+    },
+    {
+      "key": "health-check",
+      "name": "Health Check",
+      "type": "AppService",
+      "description": "App Service - vNext",
+      "tags": {
+        "Environment": "prod",
+        "Link": "https://visibility.macropoint.com/health/response-check?hctoken=f33c7177705f45af96d83edd042e8f1d"
+      }
+    },
+    {
+      "key": "usspi-aps-dt-mplt-dev-vnextproxy-macropoint-com",
+      "name": "usspi-aps-dt-mplt-dev-vnextproxy-macropoint-com",
+      "type": "AppService",
+      "description": "App Service - Proxy",
+      "tags": {
+        "Environment": "non-prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/usspi-rsg-dt-mplt-03/providers/Microsoft.Web/sites/usspi-aps-dt-mplt-dev-vnextproxy-macropoint-com/appServices"
+      }
+    },
+    {
+      "key": "usaus-aps-dt-mplt-dev-vnextproxy-macropoint-com",
+      "name": "usaus-aps-dt-mplt-dev-vnextproxy-macropoint-com/appServices",
+      "type": "AppService",
+      "description": "App Service - Proxy",
+      "tags": {
+        "Environment": "non-prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/usaus-rsg-dt-mplt-03/providers/Microsoft.Web/sites/usaus-aps-dt-mplt-dev-vnextproxy-macropoint-com/appServices"
+      }
+    },
+    {
+      "key": "usspi-red-dt-mplt-01",
+      "name": "usspi-red-dt-mplt-01",
+      "type": "Redis",
+      "description": "Azure Cache for Redis",
+      "tags": {
+        "Environment": "non-prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-02/providers/Microsoft.Cache/Redis/usspi-red-dt-mplt-01"
+      }
+    },
+    {
+      "key": "usspi-rsg-dt-mplt-01-azure-managed-redis",
+      "name": "USSPI-RSG-DT-MPLT-01 - Azure Managed Redis",
+      "type": "Redis",
+      "description": "Azure Cache for Redis",
+      "tags": {
+        "Environment": "non-prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-01/providers/Microsoft.Cache/redisEnterprise/usspi-red-dt-mplt-04/overview"
+      }
+    },
+    {
+      "key": "usspi-sbn-dt-mplt-02",
+      "name": "USSPI-SBN-DT-MPLT-02",
+      "type": "ServiceBus",
+      "description": "Service Bus",
+      "tags": {
+        "Environment": "non-prod",
+        "Search": "macropoint-alerting",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues"
+      }
+    },
+    {
+      "key": "usspi-sbn-pd-mplt-02",
+      "name": "USSPI-SBN-PD-MPLT-02",
+      "type": "ServiceBus",
+      "description": "Service Bus",
+      "tags": {
+        "Environment": "prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/6904df25-40a0-4531-9fb0-f6fde48f6785/resourceGroups/USSPI-RSG-PD-MPLT-11/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-PD-MPLT-02/overview"
+      }
+    },
+    {
+      "key": "usspi-sfc-dt-mplt-12",
+      "name": "usspi-sfc-dt-mplt-12",
+      "type": "ServiceFabric",
+      "description": "Service Fabric",
+      "tags": {
+        "Environment": "non-prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-33/providers/Microsoft.ServiceFabric/managedclusters/usspi-sfc-dt-mplt-12/overview"
+      }
+    },
+    {
+      "key": "macropointalerting-sf-prod",
+      "name": "MacropointAlerting.SF-Prod",
+      "type": "ServiceFabric",
+      "description": "Service Fabric",
+      "tags": {
+        "Environment": "prod",
+        "Link": "https://usspi-sfc-pd-mplt-04.northcentralus.cloudapp.azure.com:19080/Explorer/index.html#/apptype/MacropointAlerting.SF-Prod"
+      }
+    },
+    {
+      "key": "usspistadtmplt04",
+      "name": "usspistadtmplt04",
+      "type": "StorageAccount",
+      "description": "Storage Account (Blob)",
+      "tags": {
+        "Environment": "non-prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-01/providers/Microsoft.Storage/storageAccounts/usspistadtmplt04/storagebrowser"
+      }
+    },
+    {
+      "key": "usspistapdmplt01",
+      "name": "usspistapdmplt01",
+      "type": "StorageAccount",
+      "description": "Storage Account (Blob)",
+      "tags": {
+        "Environment": "prod",
+        "Link": "https://portal.azure.com/#@descartessystems.onmicrosoft.com/resource/subscriptions/6904df25-40a0-4531-9fb0-f6fde48f6785/resourceGroups/usspi-rsg-pd-mplt-01/providers/Microsoft.Storage/storageAccounts/usspistapdmplt01/containersList"
+      }
+    }
+  ]
+}
