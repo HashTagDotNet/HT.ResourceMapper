@@ -1,5 +1,8 @@
 # HT Resource Mapper – UX & Architecture Plan
 
+# Project Summary
+
+
 > **Living document.** Update this file whenever a design decision is made. Sections marked ⚠️ are open for design discussion — do not implement until resolved.
 >
 > **Wireframes:** `docs/Wireframes/`
