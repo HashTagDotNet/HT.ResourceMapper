@@ -1,6 +1,9 @@
 @page "/"
+@using Microsoft.AspNetCore.Components
 @using ResourceMapper.Common.Server.Resources.Interfaces
+@implements IDisposable
 @inject IResourceService ResourceService
+@inject PersistentComponentState AppState
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
 
@@ -11,7 +14,7 @@
     <MudSpacer />
     @if (_items is not null && _loadError is null)
     {
-        <MudText Typo="Typo.caption" Color="Color.Secondary">@_items.Count of @_total</MudText>
+        <MudText Typo="Typo.caption" Color="Color.Secondary">@_items.Count resources</MudText>
     }
 </div>
 <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
@@ -35,25 +38,26 @@ else
                 <CellTemplate>
                     @if (context.Item.Tags is null || context.Item.Tags.Count == 0)
                     {
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">No tags</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">—</MudText>
                     }
                     else
                     {
-                        <div class="d-flex flex-wrap gap-3">
+                        <div class="d-flex flex-wrap rm-tags">
                             @foreach (var tag in context.Item.Tags)
                             {
                                 @if (string.Equals(tag.ContentType, "Link", StringComparison.OrdinalIgnoreCase))
                                 {
                                     <span class="rm-tag">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" Class="rm-tagicon" />
                                         <MudLink Href="@tag.TagValue" Target="_blank" Typo="Typo.body2">@tag.TagKey</MudLink>
                                         <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
-                                                       Class="rm-copy ml-1" aria-label="Copy link"
+                                                       Class="rm-copy" aria-label="Copy link"
                                                        OnClick="@(() => CopyAsync(tag.TagValue))" />
                                     </span>
                                 }
                                 else
                                 {
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@tag.TagKey: @tag.TagValue</MudText>
+                                    <span class="rm-tagtext"><span class="rm-tagkey">@tag.TagKey:</span> @tag.TagValue</span>
                                 }
                             }
                         </div>
@@ -63,7 +67,7 @@ else
         </Columns>
         <NoRecordsContent>
             <div class="pa-10 d-flex justify-center">
-                <MudText Color="Color.Secondary">No resources yet — use the menu's <strong>&nbsp;Import…&nbsp;</strong> to load data.</MudText>
+                <MudText Color="Color.Secondary">No resources yet — use the menu's&nbsp;<strong>Import…</strong>&nbsp;to load data.</MudText>
             </div>
         </NoRecordsContent>
     </MudDataGrid>
@@ -73,24 +77,25 @@ else
     private List<ResourceGridItemModel>? _items;
     private int _total;
     private string? _loadError;
+    private PersistingComponentStateSubscription _persistSub;
 
     protected override async Task OnInitializedAsync()
     {
-        // NOTE: with InteractiveServer + prerender this runs twice (prerender + circuit start),
-        // so the grid query executes twice. Acceptable at this volume; revisit with
-        // PersistentComponentState if it matters.
+        _persistSub = AppState.RegisterOnPersisting(PersistState);
+
+        // Reuse the prerender result on the interactive pass instead of querying the DB twice.
+        if (AppState.TryTakeFromJson<GridSnapshot>("grid", out var snap) && snap is not null)
+        {
+            _items = snap.Items ?? new();
+            _total = snap.Total;
+            _loadError = snap.Error;
+            return;
+        }
+
         try
         {
-            var request = new ResourceGridRequest
-            {
-                Skip = 0,
-                Take = 100,
-                OrderBy = "ResourceName",
-                OrderDirection = "Asc"
-            };
-
+            var request = new ResourceGridRequest { Skip = 0, Take = 100, OrderBy = "ResourceName", OrderDirection = "Asc" };
             var response = await ResourceService.GetResourceGridItems(request, CancellationToken.None);
-
             if (response.IsSuccess() && response.ApiResponse.Data is not null)
             {
                 _items = response.ApiResponse.Data.Items ?? new();
@@ -109,6 +114,14 @@ else
         }
     }
 
+    private Task PersistState()
+    {
+        AppState.PersistAsJson("grid", new GridSnapshot { Items = _items, Total = _total, Error = _loadError });
+        return Task.CompletedTask;
+    }
+
+    public void Dispose() => _persistSub.Dispose();
+
     private async Task CopyAsync(string url)
     {
         try
@@ -120,5 +133,12 @@ else
         {
             Snackbar.Add("Couldn't copy link", Severity.Warning);
         }
+    }
+
+    private sealed class GridSnapshot
+    {
+        public List<ResourceGridItemModel>? Items { get; set; }
+        public int Total { get; set; }
+        public string? Error { get; set; }
     }
 }

@@ -9,10 +9,29 @@ html, body {
     color: var(--mud-palette-text-secondary);
 }
 
-/* Link tag with GitHub-style copy-on-hover. */
+/* Tags: compact, data-forward; operations (copy) stay hidden until hover. */
+.rm-tags {
+    gap: .3rem 1rem;
+    align-items: center;
+}
+
+.rm-tagtext {
+    white-space: nowrap;
+    font-size: .85rem;
+}
+
+.rm-tagkey {
+    color: var(--mud-palette-text-secondary);
+}
+
 .rm-tag {
     display: inline-flex;
     align-items: center;
+}
+
+.rm-tagicon {
+    color: var(--mud-palette-text-secondary);
+    margin-right: 2px;
 }
 
 .rm-tag .rm-copy {

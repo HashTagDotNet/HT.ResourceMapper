@@ -29,7 +29,6 @@
   </Folder>
   <Folder Name="/Modules/" />
   <Folder Name="/Modules/Common/">
-    <Project Path="Modules/Common/ResourceMapper.Common.Client/ResourceMapper.Common.Client.csproj" />
     <Project Path="Modules/Common/ResourceMapper.Common.Server/ResourceMapper.Common.Server.csproj" />
     <Project Path="Modules/Common/ResourceMapper.Common.Shared/ResourceMapper.Common.Shared.csproj" />
   </Folder>
