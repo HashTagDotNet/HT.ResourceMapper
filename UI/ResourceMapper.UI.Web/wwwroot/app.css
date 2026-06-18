@@ -1,0 +1,25 @@
+html, body {
+    font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Keep operations visually secondary so data stays the focus (UX-Plan rule). */
+.mud-appbar .mud-icon-button {
+    color: var(--mud-palette-text-secondary);
+}
+
+/* Link tag with GitHub-style copy-on-hover. */
+.rm-tag {
+    display: inline-flex;
+    align-items: center;
+}
+
+.rm-tag .rm-copy {
+    visibility: hidden;
+    padding: 2px;
+}
+
+.rm-tag:hover .rm-copy {
+    visibility: visible;
+}

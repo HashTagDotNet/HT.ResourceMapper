@@ -81,5 +81,45 @@ namespace HT.Microsoft.SqlClient.Extensions
             var value = command.Parameters[parameterName].Value;
             return value == DBNull.Value ? 0 : (int)value;
         }
+
+        /// <summary>
+        /// Adds a table-valued parameter (TVP). <paramref name="typeName"/> is the SQL type name,
+        /// e.g. "[HTResourceMapper].[TagKeyValueList]".
+        /// </summary>
+        public static SqlCommand AddTvp(this SqlCommand command, string parameterName, string typeName, DataTable rows)
+        {
+            if (!parameterName.StartsWith('@')) parameterName = "@" + parameterName;
+            var p = command.Parameters.Add(parameterName, SqlDbType.Structured);
+            p.TypeName = typeName;
+            p.Value = rows;
+            return command;
+        }
+
+        /// <summary>
+        /// Adds a VarChar parameter with an explicit size and direction (e.g. for OUTPUT parameters).
+        /// </summary>
+        public static SqlCommand AddVarchar(this SqlCommand command, string parameterName, string parameterValue, int size, ParameterDirection direction)
+        {
+            if (!parameterName.StartsWith('@')) parameterName = "@" + parameterName;
+            command.Parameters.Add(new SqlParameter
+            {
+                SqlDbType = SqlDbType.VarChar,
+                Size = size,
+                Direction = direction,
+                ParameterName = parameterName,
+                Value = (object)parameterValue ?? DBNull.Value
+            });
+            return command;
+        }
+
+        /// <summary>
+        /// Reads a string output parameter value, returning null for DBNull.
+        /// </summary>
+        public static string ReadString(this SqlCommand command, string parameterName)
+        {
+            if (!parameterName.StartsWith('@')) parameterName = "@" + parameterName;
+            var value = command.Parameters[parameterName].Value;
+            return value == DBNull.Value ? null : (string)value;
+        }
     }
 }

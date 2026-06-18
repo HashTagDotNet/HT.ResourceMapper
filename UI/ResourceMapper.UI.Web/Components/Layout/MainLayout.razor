@@ -1,0 +1,50 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="@_theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="0" Color="Color.Surface" Dense="true"
+               Style="border-bottom:1px solid var(--mud-palette-divider);">
+        <MudMenu Icon="@Icons.Material.Outlined.Menu" Color="Color.Inherit" Dense="true" AriaLabel="Application menu">
+            <MudMenuItem Href="/import" Icon="@Icons.Material.Outlined.UploadFile">Import…</MudMenuItem>
+        </MudMenu>
+        <MudText Typo="Typo.subtitle1" Class="ml-2" Style="font-weight:600;letter-spacing:.2px;">
+            Hashtag Resource Mapper
+        </MudText>
+        <MudSpacer />
+    </MudAppBar>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.False" Class="px-8 py-6">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    // Modern, lightweight, professional light theme (slate neutrals + restrained blue accent).
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#2563EB",
+            Secondary = "#64748B",
+            Background = "#F8FAFC",
+            Surface = "#FFFFFF",
+            AppbarBackground = "#FFFFFF",
+            AppbarText = "#1E293B",
+            TextPrimary = "#1E293B",
+            TextSecondary = "#64748B",
+            Divider = "#E2E8F0",
+            DrawerBackground = "#FFFFFF",
+            ActionDefault = "#64748B"
+        },
+        LayoutProperties = new LayoutProperties
+        {
+            DefaultBorderRadius = "8px"
+        }
+    };
+}

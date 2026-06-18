@@ -1,0 +1,124 @@
+@page "/"
+@using ResourceMapper.Common.Server.Resources.Interfaces
+@inject IResourceService ResourceService
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<PageTitle>Resources — Hashtag Resource Mapper</PageTitle>
+
+<div class="d-flex align-center mb-1">
+    <MudText Typo="Typo.h5" Style="font-weight:600;">Resources</MudText>
+    <MudSpacer />
+    @if (_items is not null && _loadError is null)
+    {
+        <MudText Typo="Typo.caption" Color="Color.Secondary">@_items.Count of @_total</MudText>
+    }
+</div>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    Searchable catalog of cloud resources across environments.
+</MudText>
+
+@if (_loadError is not null)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">@_loadError</MudAlert>
+}
+else
+{
+    <MudDataGrid T="ResourceGridItemModel" Items="@(_items ?? new())" Loading="@(_items is null)"
+                 Dense="true" Hover="true" Elevation="0" SortMode="SortMode.Single"
+                 Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
+        <Columns>
+            <PropertyColumn Property="x => x.ResourceName" Title="Name" />
+            <PropertyColumn Property="x => x.ResourceType" Title="Type" />
+            <PropertyColumn Property="x => x.Description" Title="Description" />
+            <TemplateColumn Title="Tags" Sortable="false">
+                <CellTemplate>
+                    @if (context.Item.Tags is null || context.Item.Tags.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">No tags</MudText>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-wrap gap-3">
+                            @foreach (var tag in context.Item.Tags)
+                            {
+                                @if (string.Equals(tag.ContentType, "Link", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <span class="rm-tag">
+                                        <MudLink Href="@tag.TagValue" Target="_blank" Typo="Typo.body2">@tag.TagKey</MudLink>
+                                        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
+                                                       Class="rm-copy ml-1" aria-label="Copy link"
+                                                       OnClick="@(() => CopyAsync(tag.TagValue))" />
+                                    </span>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@tag.TagKey: @tag.TagValue</MudText>
+                                }
+                            }
+                        </div>
+                    }
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent>
+            <div class="pa-10 d-flex justify-center">
+                <MudText Color="Color.Secondary">No resources yet — use the menu's <strong>&nbsp;Import…&nbsp;</strong> to load data.</MudText>
+            </div>
+        </NoRecordsContent>
+    </MudDataGrid>
+}
+
+@code {
+    private List<ResourceGridItemModel>? _items;
+    private int _total;
+    private string? _loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // NOTE: with InteractiveServer + prerender this runs twice (prerender + circuit start),
+        // so the grid query executes twice. Acceptable at this volume; revisit with
+        // PersistentComponentState if it matters.
+        try
+        {
+            var request = new ResourceGridRequest
+            {
+                Skip = 0,
+                Take = 100,
+                OrderBy = "ResourceName",
+                OrderDirection = "Asc"
+            };
+
+            var response = await ResourceService.GetResourceGridItems(request, CancellationToken.None);
+
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+            {
+                _items = response.ApiResponse.Data.Items ?? new();
+                _total = response.ApiResponse.Data.TotalItems;
+            }
+            else
+            {
+                _items = new();
+                _loadError = "Unable to load resources.";
+            }
+        }
+        catch
+        {
+            _items = new();
+            _loadError = "Unable to load resources — the database may not be available yet.";
+        }
+    }
+
+    private async Task CopyAsync(string url)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
+            Snackbar.Add("Link copied", Severity.Normal);
+        }
+        catch
+        {
+            Snackbar.Add("Couldn't copy link", Severity.Warning);
+        }
+    }
+}

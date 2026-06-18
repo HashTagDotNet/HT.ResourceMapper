@@ -36,6 +36,7 @@
   <Folder Name="/UI &amp; Hosts/">
     <Project Path="UI/ResourceMapper.UI.Client/ResourceMapper.UI.Client.csproj" />
     <Project Path="UI/ResourceMapper.UI.Server/ResourceMapper.UI.Server.csproj" />
+    <Project Path="UI/ResourceMapper.UI.Web/ResourceMapper.UI.Web.csproj" />
   </Folder>
   <Folder Name="/_Solution Documents/">
     <File Path="Directory.Build.props" />

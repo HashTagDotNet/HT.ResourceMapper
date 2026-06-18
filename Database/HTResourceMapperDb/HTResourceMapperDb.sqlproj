@@ -6,12 +6,12 @@
     <TargetDatabaseSet>True</TargetDatabaseSet>
     <ProjectGuid>{3d5ce90e-8f6e-41f1-93f0-f04a394dbb88}</ProjectGuid>
     <EnableDefaultSqlItems>false</EnableDefaultSqlItems>
-    <TargetFramework>net472</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
     <Build Include="Security\*.sql" />
     <Build Include="Stored Procedures\*.sql" />
     <Build Include="Tables\*.sql" />
+    <Build Include="User Defined Types\*.sql" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Scripts\**" />
@@ -19,5 +19,7 @@
     <Folder Include="Security\" />
     <Folder Include="Stored Procedures\" />
     <Folder Include="Tables\" />
+    <Folder Include="User Defined Types\" />
+    <None Include="localhost.publish.xml" />
   </ItemGroup>
 </Project>

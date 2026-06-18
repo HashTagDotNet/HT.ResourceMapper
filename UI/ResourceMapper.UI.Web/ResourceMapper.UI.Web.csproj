@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>$(HTTargetFramework)</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Reuse the prior host's UserSecretsId so local connection-string secrets carry over. -->
+    <UserSecretsId>1a3b74ec-d315-416c-9c29-a2781962918d</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MudBlazor" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Libraries\ApiContracts\HT.Api.Service.Contracts\HT.Api.Service.Contracts.csproj" />
+    <ProjectReference Include="..\..\Modules\Common\ResourceMapper.Common.Server\ResourceMapper.Common.Server.csproj" />
+    <ProjectReference Include="..\..\Modules\Common\ResourceMapper.Common.Shared\ResourceMapper.Common.Shared.csproj" />
+  </ItemGroup>
+
+</Project>
