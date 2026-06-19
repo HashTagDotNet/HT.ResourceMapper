@@ -1,3 +1,8 @@
+> ⚠️ **SUPERSEDED — do not use this to resume.** This captures the planning phase (Dec 2024) and is now
+> historical. The current, authoritative resume doc is **`docs/plans/Phase1-Status.md`** (Phase 1 complete:
+> import pipeline + new Blazor Web App SSR UI live on branch `home-page`, .NET 10). Everything below is kept
+> for history only — branch `develop`, .NET 9, and "planning phase" references are all out of date.
+
 # Resource Management Application - Session Resume Context
 
 ## Session Date: December 19, 2024

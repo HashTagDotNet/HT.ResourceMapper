@@ -46,6 +46,17 @@ WASM UI is removed. Commits on branch `home-page`: `eda23be`, `67c9d6f`, `a57904
   (camelCase JSON; every tag key needs a tagDefinition; every type a resourceType; keys case-insensitive;
   dependencies omitted this phase). Full design: `docs/plans/ImportExportApiDesign.md`.
 
+## Current working-tree state (as of session close 2026-06-19)
+HEAD is `4b5bf35` on branch `home-page` (4 commits ahead of `origin/home-page` — **not pushed**). Two
+**uncommitted** modifications are in the working tree:
+- `Database/HTResourceMapperDb/HTResourceMapperDb.sqlproj` — the legacy-SSDT-format rewrite (see below). Left
+  **uncommitted on purpose**; decide whether to keep it before staging. Do not revert without asking.
+- `.claude/settings.local.json` — permission-allow entries added while running `mp-code-review` on an unrelated
+  repo (PR 272445, macropoint.com). **Unrelated to this project**; safe to keep or discard.
+
+Leftover (untracked-ish) cruft: `UI/ResourceMapper.UI.Client/obj` and `UI/ResourceMapper.UI.Server/obj` remain
+after the source projects were deleted — empty build output, safe to delete.
+
 ## Known issues / watch-outs
 - **DB project is now legacy SSDT format** (`Database/HTResourceMapperDb/HTResourceMapperDb.sqlproj`, changed by
   a concurrent agent). It **does not build under `dotnet build`** (needs VS/MSBuild + SSDT). Build the .NET
