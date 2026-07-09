@@ -235,6 +235,33 @@ POST /api/resources
 
 ---
 
+## Epic 5: Navigation Preferences
+
+### US-011: Configurable Resource-Name Click Behavior
+**As a** user of the resource catalog
+**I want to** choose what happens when I click a resource's name in the grid
+**So that** the click takes me straight to the tool I use most — either the resource's primary external reference or the ResourceMapper details page
+
+**Acceptance Criteria:**
+- [ ] A **User Preferences** page exposes a setting: *"When I click a resource name, open…"* with two choices — **Primary external link** (default) or **ResourceMapper details page**
+- [ ] The preference is persisted client-side in `localStorage` (same mechanism as the home-page "resume last view" state — see `ViewStorageKey` in `Home.razor`), under a distinct key
+- [ ] **Default behavior** (no preference set, or set to "Primary external link"): clicking the resource name opens that resource's *primary* external reference link
+- [ ] When the preference is "ResourceMapper details page": clicking the name opens the details page instead
+- [ ] **Missing primary link fallback:** if a resource has no primary reference link defined, the name is not a dead link. Show a tooltip (or equivalent affordance) offering **"Open details to define primary resource link"**, which navigates to the details page where the user can set one
+- [ ] Behavior is consistent across the home grid and any other place resource names are rendered as clickable
+
+**Prerequisite / Database Impact:**
+- Requires a **"primary reference link"** concept that does not yet exist. Today the grid renders *all* `Link`-content-type tags with no primary designation (`Home.razor`, external-links menu). Options to evaluate:
+  - Add an `IsPrimary` flag on the link-type resource tag (e.g. on `ResourceTag`), or
+  - A dedicated primary-reference field on `Resource`
+- The details page (US-010 link-type tag management) must let the user designate which link is primary
+
+**Notes:**
+- Preference is per-browser (localStorage), not per-user-in-DB, matching the current last-used-URL/resume storage approach. Revisit if cross-device sync is needed later.
+- Relates to US-010 (link-type tag management) and the home-page row quick-actions already shipped (open/copy external + details).
+
+---
+
 ## Story Template for Future Use
 
 ### US-XXX: [Story Title]
@@ -270,3 +297,4 @@ POST /api/resources
 | US-003 | Planned | Low | 3 | - | Advanced search features |
 | US-005 | Planned | Low | 3 | - | Bulk operations |
 | US-008 | Planned | Low | 3 | - | Advanced dependency analysis |
+| US-011 | Planned | Low | - | - | Name-click behavior pref; needs "primary link" concept first |

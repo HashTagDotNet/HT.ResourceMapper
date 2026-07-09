@@ -27,7 +27,8 @@
       "PowerShell(pwsh -NoProfile -File \"C:/Users/spowell/.claude/plugins/cache/macropoint-plugins/mp-code-review/1.0.2/skills/mp-code-review/scripts/Initialize-RunFolder.ps1\" -RepoName \"HT.ResourceMapper\" -SessionId \"b8ba8ee6\")",
       "PowerShell(pwsh -NoProfile -File \"C:/Users/spowell/.claude/plugins/cache/macropoint-plugins/mp-code-review/1.0.2/skills/mp-code-review/scripts/Get-PrInfo.ps1\" -PrId \"272445\")",
       "PowerShell(pwsh -NoProfile -File \"C:/Users/spowell/.claude/plugins/cache/macropoint-plugins/mp-code-review/1.0.2/skills/mp-code-review/scripts/Get-ReviewDiff.ps1\" -SourceCommit \"a0f1a7cc331b4582d4aceba374095a826997ee7d\" -TargetCommit \"796d531874e70a64e60b5ae78078748a3afe3d6f\" -RepoName \"macropoint.com\" -PrId \"272445\" -SessionId \"b8ba8ee6\")",
-      "PowerShell(pwsh -NoProfile -File \"C:/Users/spowell/.claude/plugins/cache/macropoint-plugins/mp-code-review/1.0.2/skills/mp-code-review/scripts/Get-Conventions.ps1\" -RepoName \"macropoint.com\" -ManifestPath \"C:\\\\src\\\\code-reviews\\\\macropoint.com\\\\PR-272445\\\\runs\\\\001\\\\conventions-manifest.json\")"
+      "PowerShell(pwsh -NoProfile -File \"C:/Users/spowell/.claude/plugins/cache/macropoint-plugins/mp-code-review/1.0.2/skills/mp-code-review/scripts/Get-Conventions.ps1\" -RepoName \"macropoint.com\" -ManifestPath \"C:\\\\src\\\\code-reviews\\\\macropoint.com\\\\PR-272445\\\\runs\\\\001\\\\conventions-manifest.json\")",
+      "Bash(az account *)"
     ],
     "deny": [],
     "ask": []
