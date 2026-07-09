@@ -2,6 +2,32 @@ html, body {
     font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    height: 100%;
+}
+
+/* App-shell: the main content area owns the scroll, not the document. This lets the
+   Home page pin its filter bar and give the grid its own internal scroll region so
+   rows can never bleed across the filter. Other pages still scroll normally here. */
+.mud-layout {
+    height: 100%;
+}
+
+.rm-main {
+    height: 100%;
+    overflow-y: auto;
+}
+
+/* Home page: filter bar (static) stacked above a grid that fills the rest and scrolls. */
+.rm-page {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.rm-grid {
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 /* Keep operations visually secondary so data stays the focus (UX-Plan rule). */
@@ -43,9 +69,12 @@ html, body {
     visibility: visible;
 }
 
-/* Filter bar: chips read as compact, secondary controls above the data. */
+/* Filter bar: compact, secondary controls above the data. Static row — it stays
+   put because the grid below it (not the bar) owns the scroll region. */
 .rm-filterbar {
+    flex: 0 0 auto;
     row-gap: .5rem;
+    padding-bottom: .5rem;
 }
 
 .rm-chip {

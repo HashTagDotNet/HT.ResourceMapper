@@ -128,22 +128,26 @@ BEGIN
 
     SET @whereClause = @whereClause + @filterClause;
 
-    -- Build ORDER BY clause with whitelist validation
+    -- Build ORDER BY expression with whitelist validation. This expression is used both to select
+    -- the top-N page (OFFSET/FETCH) AND to number the rows (ROW_NUMBER) so the final result set is
+    -- returned in the requested order - not ResourceUid order. It references the projected column
+    -- names of the DistinctResources CTE below (e.g. ResourceType, not rt_type.TypeName). Only
+    -- whitelisted identifiers are ever concatenated, so there is no injection surface.
+    DECLARE @orderByExpr NVARCHAR(MAX) = N'ResourceName ' + @OrderDirection; -- default
     IF @OrderBy IS NOT NULL AND LTRIM(RTRIM(@OrderBy)) <> ''
     BEGIN
-        -- Strict whitelist validation to prevent SQL injection
-        IF @OrderBy IN ('ResourceId', 'ResourceUid', 'ResourceKey', 'ResourceName', 'Description', 'CreatedOn', 'UpdatedOn', 'TypeName')
-        BEGIN
-            IF @OrderBy = 'TypeName'
-                SET @orderClause = 'ORDER BY rt_type.TypeName ' + @OrderDirection + ', r.ResourceName ASC';
-            ELSE
-                SET @orderClause = 'ORDER BY r.' + @OrderBy + ' ' + @OrderDirection;
-        END
-        ELSE
-            SET @orderClause = 'ORDER BY r.ResourceName ASC'; -- Default fallback for invalid columns
+        IF @OrderBy = 'TypeName'
+            SET @orderByExpr = N'ResourceType ' + @OrderDirection + N', ResourceName ASC';
+        ELSE IF @OrderBy = 'ResourceName'
+            SET @orderByExpr = N'ResourceName ' + @OrderDirection;
+        ELSE IF @OrderBy IN ('ResourceId', 'ResourceUid', 'ResourceKey', 'Description', 'CreatedOn', 'UpdatedOn')
+            SET @orderByExpr = @OrderBy + N' ' + @OrderDirection + N', ResourceName ASC';
+        -- else: invalid column -> keep the default expression
     END
-    ELSE
-        SET @orderClause = 'ORDER BY r.ResourceName ASC'; -- Default order
+    -- Unique final tiebreak so the ROW_NUMBER order and the OFFSET/FETCH order are identical even
+    -- when the sort column has duplicate values (ResourceId is the identity key).
+    SET @orderByExpr = @orderByExpr + N', ResourceId ASC';
+    SET @orderClause = N'ORDER BY ' + @orderByExpr;
 
     -- Shared parameter definition for the (possibly NULL) search value and the filter TVP.
     DECLARE @countParamDef NVARCHAR(MAX) =
@@ -165,12 +169,18 @@ BEGIN
 
     -- Get paged resources with their tags (capped at @TagLimit per resource in SQL) in a single resultset
     SET @sql = '
-    ;WITH PagedResources AS (
-        SELECT DISTINCT r.ResourceId, r.ResourceUid, r.ResourceName, rt_type.TypeName as ResourceType,
-               r.Description, COALESCE(r.UpdatedOn, r.CreatedOn) as LastUpdatedOn
+    ;WITH DistinctResources AS (
+        SELECT DISTINCT r.ResourceId, r.ResourceUid, r.ResourceKey, r.ResourceName,
+               rt_type.TypeName as ResourceType, r.Description,
+               r.CreatedOn, r.UpdatedOn, COALESCE(r.UpdatedOn, r.CreatedOn) as LastUpdatedOn
         FROM [HTResourceMapper].[Resource] r WITH(NOLOCK)
         LEFT JOIN [HTResourceMapper].[ResourceType] rt_type WITH(NOLOCK) ON r.ResourceTypeId = rt_type.ResourceTypeId
         ' + @whereClause + '
+    ),
+    PagedResources AS (
+        SELECT ResourceId, ResourceUid, ResourceName, ResourceType, Description, LastUpdatedOn,
+               ROW_NUMBER() OVER (' + @orderClause + ') as SortSeq
+        FROM DistinctResources
         ' + @orderClause + '
         OFFSET @SkipParam ROWS
         FETCH NEXT @TakeParam ROWS ONLY
@@ -182,6 +192,7 @@ BEGIN
             pr.ResourceType,
             pr.Description,
             pr.LastUpdatedOn,
+            pr.SortSeq,
             td.TagDefinitionUid as TagUid,
             td.TagDefinitionKey as TagKey,
             tct.TagCode as ContentType,
@@ -211,7 +222,7 @@ BEGIN
         TagRank
     FROM TagsWithPriority
     WHERE TagRank <= @TagLimitParam
-    ORDER BY ResourceUid, Priority, TagRank';
+    ORDER BY SortSeq, Priority, TagRank';
 
     EXEC sp_executesql @sql, @pageParamDef,
         @SafeSearchForParam = @SafeSearchFor,

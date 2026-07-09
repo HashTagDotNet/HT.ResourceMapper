@@ -13,6 +13,7 @@
 
 <PageTitle>Resources — Hashtag Resource Mapper</PageTitle>
 
+<div class="rm-page">
 <ResourceFilterBar State="_state" TagKeys="_tagKeys" Total="_total" Shown="@(_items?.Count ?? 0)"
                    FacetLoader="LoadFacet" OnReload="HandleReload" />
 
@@ -23,9 +24,10 @@
 
 <MudDataGrid @ref="_grid" T="ResourceGridItemModel" ServerData="LoadGridData"
              Dense="true" Hover="true" Elevation="0" SortMode="SortMode.Single"
+             FixedHeader="true" Height="100%" Class="rm-grid"
              Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
     <Columns>
-        <PropertyColumn Property="x => x.ResourceName" Title="Name" />
+        <PropertyColumn Property="x => x.ResourceName" Title="Name" InitialDirection="SortDirection.Ascending" />
         <PropertyColumn Property="x => x.ResourceType" Title="Type" />
         <PropertyColumn Property="x => x.Description" Title="Description" />
         <TemplateColumn Title="Tags" Sortable="false">
@@ -65,6 +67,7 @@
         </div>
     </NoRecordsContent>
 </MudDataGrid>
+</div>
 
 @code {
     private ResourceFilterState _state = new();
@@ -77,10 +80,16 @@
     private bool _pushNext;
     private string _lastQuery = "";
 
+    // Sort intent parsed from the URL, captured before the grid's initial load can mutate _state.
+    private string _urlOrderBy = "ResourceName";
+    private string _urlOrderDirection = "Asc";
+
     protected override async Task OnInitializedAsync()
     {
         // Restore state from the URL (safe on both prerender and interactive passes).
         _state = ResourceFilterState.FromQueryString(Navigation.Uri);
+        _urlOrderBy = _state.OrderBy;
+        _urlOrderDirection = _state.OrderDirection;
         _lastQuery = _state.ToQueryString();
         Navigation.LocationChanged += OnLocationChanged;
 
@@ -94,6 +103,34 @@
         {
             // Tag-key list is non-critical; the bar simply won't offer tag filters.
         }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _grid is null)
+            return;
+
+        // The Name column declares InitialDirection=Ascending, so the grid boots showing "Name ↑" —
+        // which matches the default state. If the URL restored a different sort, move the sort
+        // indicator (and re-query) to match it. Uses the URL-captured intent, not _state, because the
+        // grid's initial load has already overwritten _state with its own (default) sort by now.
+        var field = _urlOrderBy switch
+        {
+            "TypeName" => "ResourceType",
+            "Description" => "Description",
+            _ => "ResourceName"
+        };
+        var desc = string.Equals(_urlOrderDirection, "Desc", StringComparison.OrdinalIgnoreCase);
+        if (field == "ResourceName" && !desc)
+            return; // already the column's initial (default) sort — no reconcile needed
+
+        Func<ResourceGridItemModel, object?> selector = field switch
+        {
+            "ResourceType" => x => x.ResourceType,
+            "Description" => x => x.Description,
+            _ => x => x.ResourceName
+        };
+        await _grid.SetSortAsync(field, desc ? SortDirection.Descending : SortDirection.Ascending, selector);
     }
 
     // The grid's server-side data source: returns the top-N (DisplayCount) of the filtered/sorted set.
@@ -189,7 +226,12 @@
         try
         {
             await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
-            Snackbar.Add("Link copied", Severity.Normal);
+            Snackbar.Add("Link copied", Severity.Normal, config =>
+            {
+                config.VisibleStateDuration = 500;   // brief confirmation — 0.5s is enough
+                config.ShowTransitionDuration = 100;
+                config.HideTransitionDuration = 150;
+            });
         }
         catch
         {
