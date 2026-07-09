@@ -60,7 +60,7 @@ This registers `GlobalConfig`, `IDbConnector`, `IResourceRepository`, and `IReso
 ### API Response Pattern
 Two-layer contract system:
 
-**`HT.Api.Client.Contracts`** — Wire format (`ApiResponse<T>`, `Message`, `MetaData`, `CallStatusCode`). Used by Blazor client. Contains resource DTOs (`ResourceDto`, `ResourceTagDto`, etc.).
+**`HT.Api.Client.Contracts`** — Wire **envelope only** (`ApiResponse<T>`, `Message`, `MetaData`, `CallStatusCode`). Used by Blazor client. It does **not** hold per-feature resource DTOs — those live in `Common.Shared` alongside each feature (e.g. `ResourceMapper.Common.Shared.HomePage` for the grid, `ResourceMapper.Common.Shared.Editor` for the resource editor), each with its own `Contracts` subfolder for request/response envelopes.
 
 **`HT.Api.Service.Contracts`** — Server-side wrapper (`ApiServiceResponse<T>`) plus a fluent `ServiceResponseBuilder<T>`:
 ```csharp

@@ -162,11 +162,13 @@ namespace ResourceMapper.Common.Server.Resources
             };
             response.ApiResponse.Data.EditorModel = new Shared.Editor.ResourceEditorModel()
             {
-                Code = new(),
+                Key = new(),
                 Name = new(),
-                Notes = new(),
+                Description = new(),
                 ResourceType = new(),
+                Domain = new(),
                 ResourceUid = Guid.NewGuid().ToString(),
+                Mode = string.Equals(request.Mode, "Edit", StringComparison.OrdinalIgnoreCase) ? "Edit" : "Create",
             };
 
             return response;
