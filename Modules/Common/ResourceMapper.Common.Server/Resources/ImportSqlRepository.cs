@@ -41,17 +41,16 @@ namespace ResourceMapper.Common.Server.Resources
             }, cancellationToken: cancellationToken);
         }
 
-        public async Task<HashSet<string>> GetExistingResourceKeysAsync(CancellationToken cancellationToken)
+        public async Task<List<ResourceIdentity>> GetAllResourceIdentitiesAsync(CancellationToken cancellationToken)
         {
             using var cmd = _db.RO.SprocCommand("[HTResourceMapper].Resource_GetAllKeys");
-            var keys = await _db.Execute.ExecuteQueryAsync(
-                cmd,
-                dr => dr.ReadString("ResourceKey"),
-                cancellationToken: cancellationToken);
-
-            return new HashSet<string>(
-                keys.Where(k => !string.IsNullOrEmpty(k)),
-                StringComparer.OrdinalIgnoreCase);
+            return await _db.Execute.ExecuteQueryAsync(cmd, dr => new ResourceIdentity
+            {
+                ResourceId = dr.ReadInt("ResourceId"),
+                ResourceKey = dr.ReadString("ResourceKey"),
+                TypeName = dr.ReadString("TypeName"),
+                Domain = dr.ReadString("Domain")
+            }, cancellationToken: cancellationToken);
         }
 
         // ---------------- writes ----------------
@@ -89,7 +88,7 @@ namespace ResourceMapper.Common.Server.Resources
         }
 
         public async Task<(string Result, int ResourceId)> UpsertResourceAsync(string resourceKey, string resourceUid,
-            string? typeName, string resourceName, string? description,
+            string? typeName, string resourceName, string? description, string? domain,
             string onConflict, CancellationToken cancellationToken)
         {
             using var cmd = _db.RW.SprocCommand("[HTResourceMapper].Resource_Upsert")
@@ -98,6 +97,7 @@ namespace ResourceMapper.Common.Server.Resources
                 .AddNVarchar("@TypeName", typeName)
                 .AddNVarchar("@ResourceName", resourceName)
                 .AddNVarchar("@Description", description)
+                .AddNVarchar("@Domain", domain)
                 .AddVarchar("@OnConflict", onConflict)
                 .AddInteger("@ResourceId", 0, ParameterDirection.Output)
                 .AddVarchar("@Result", null, 10, ParameterDirection.Output);

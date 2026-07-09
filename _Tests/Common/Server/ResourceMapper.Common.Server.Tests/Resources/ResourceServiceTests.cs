@@ -338,7 +338,7 @@ namespace ResourceMapper.Common.Server.Tests.Resources
         [Fact]
         public async Task SaveResourceAsync_KeyCollision_ReturnsValidationErrorAndDoesNotCallRepo()
         {
-            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(false);
 
             var request = new SaveResourceRequest { Mode = "Create", ResourceUid = Guid.NewGuid().ToString(), ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api" };
@@ -353,9 +353,9 @@ namespace ResourceMapper.Common.Server.Tests.Resources
         public async Task SaveResourceAsync_HappyPath_CallsRepoAndReturnsSavedToastMessage()
         {
             var uid = Guid.NewGuid().ToString();
-            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
-            _repo.Setup(r => r.SaveResourceAsync(uid, 5, "orders-api", "Orders API", It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            _repo.Setup(r => r.SaveResourceAsync(uid, 5, "orders-api", "Orders API", It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(("created", 10));
             _repo.Setup(r => r.GetResourceByUidAsync(uid, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new ResourceDetail { ResourceId = 10, ResourceUid = uid, ResourceKey = "orders-api", ResourceTypeId = 5, ResourceName = "Orders API" });
@@ -370,6 +370,31 @@ namespace ResourceMapper.Common.Server.Tests.Resources
             response.IsSuccess().Should().BeTrue("because a valid, non-colliding save should succeed");
             response.ApiResponse.Data!.Message.Should().Be("Saved Orders API", "because the toast message names the saved resource");
             response.ApiResponse.Data!.ResourceUid.Should().Be(uid, "because the response echoes the resource's uid");
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_WithDomain_PassesDomainThroughToRepositoryAndProjection()
+        {
+            var uid = Guid.NewGuid().ToString();
+            string? capturedDomain = null;
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            _repo.Setup(r => r.SaveResourceAsync(uid, 5, "orders-api", "Orders API", It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+                .Callback((string _, int _, string _, string _, string? _, string? domain, int? _, CancellationToken _) => capturedDomain = domain)
+                .ReturnsAsync(("created", 10));
+            _repo.Setup(r => r.GetResourceByUidAsync(uid, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 10, ResourceUid = uid, ResourceKey = "orders-api", ResourceTypeId = 5, ResourceName = "Orders API", Domain = "non-prod" });
+            _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceType>());
+            _repo.Setup(r => r.GetTagsForResourceAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceTagRead>());
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceRelationshipItem>());
+
+            var request = new SaveResourceRequest { Mode = "Create", ResourceUid = uid, ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api", Domain = "non-prod" };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because a valid, non-colliding save should succeed");
+            capturedDomain.Should().Be("non-prod", "because the request's Domain must reach the repository");
+            response.ApiResponse.Data!.Saved!.Domain.Should().Be("non-prod", "because the saved projection reflects the persisted domain");
         }
 
         [Fact]
@@ -394,7 +419,7 @@ namespace ResourceMapper.Common.Server.Tests.Resources
         [Fact]
         public async Task CheckUniquenessAsync_Unique_ReturnsIsUniqueTrue()
         {
-            _repo.Setup(r => r.CheckResourceUniqueAsync(5, "orders-api", null, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+            _repo.Setup(r => r.CheckResourceUniqueAsync(5, "orders-api", null, null, It.IsAny<CancellationToken>())).ReturnsAsync(true);
             _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<ResourceType> { new() { ResourceTypeId = 5, TypeName = "AppService" } });
 
@@ -407,7 +432,7 @@ namespace ResourceMapper.Common.Server.Tests.Resources
         [Fact]
         public async Task CheckUniquenessAsync_Collision_ReturnsIsUniqueFalseWithMessage()
         {
-            _repo.Setup(r => r.CheckResourceUniqueAsync(5, "orders-api", null, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+            _repo.Setup(r => r.CheckResourceUniqueAsync(5, "orders-api", null, null, It.IsAny<CancellationToken>())).ReturnsAsync(false);
             _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<ResourceType> { new() { ResourceTypeId = 5, TypeName = "AppService" } });
 
@@ -519,7 +544,7 @@ namespace ResourceMapper.Common.Server.Tests.Resources
         {
             _repo.Verify(r => r.SaveResourceAsync(
                 It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(),
-                It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Never,
+                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Never,
                 "because validation must short-circuit before the repository is called");
         }
 

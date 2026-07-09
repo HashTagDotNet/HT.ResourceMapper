@@ -20,6 +20,8 @@ namespace ResourceMapper.Common.Server.Tests.Resources
     [Trait("Category", "ResourceMapper/Common/Server/Resources/ImportService")]
     public class ImportServiceTests
     {
+        private const string DefaultType = "DefaultType";
+
         private readonly Mock<IResourceRepository> _resourceRepo;
         private readonly Mock<IImportRepository> _importRepo;
         private readonly ImportService _sut;
@@ -29,12 +31,14 @@ namespace ResourceMapper.Common.Server.Tests.Resources
             _resourceRepo = new Mock<IResourceRepository>();
             _importRepo = new Mock<IImportRepository>();
 
+            // No domain tag defined by default (design §6 "Unused" state) — most tests exercise
+            // the (Type+Key) fallback identity and never touch domain logic at all.
             _resourceRepo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new List<ResourceType>());
+                .ReturnsAsync(new List<ResourceType> { new() { ResourceTypeId = 1, TypeName = DefaultType } });
             _importRepo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<TagDefinition>());
-            _importRepo.Setup(r => r.GetExistingResourceKeysAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            _importRepo.Setup(r => r.GetAllResourceIdentitiesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceIdentity>());
 
             // Write-method defaults: everything "created" unless a test overrides.
             _importRepo.Setup(r => r.UpsertResourceTypeAsync(
@@ -46,7 +50,7 @@ namespace ResourceMapper.Common.Server.Tests.Resources
                 .ReturnsAsync("created");
             _importRepo.Setup(r => r.UpsertResourceAsync(
                     It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(("created", 1));
             _importRepo.Setup(r => r.SetResourceTagsAsync(
                     It.IsAny<int>(), It.IsAny<IReadOnlyList<(string, string)>>(), It.IsAny<CancellationToken>()))
@@ -233,8 +237,11 @@ namespace ResourceMapper.Common.Server.Tests.Resources
         [Fact]
         public async Task ImportAsync_ConflictWithFailPolicy_ReturnsConflictError()
         {
-            _importRepo.Setup(r => r.GetExistingResourceKeysAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new HashSet<string>(new[] { "res-1" }, StringComparer.OrdinalIgnoreCase));
+            _importRepo.Setup(r => r.GetAllResourceIdentitiesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceIdentity>
+                {
+                    new() { ResourceId = 1, ResourceKey = "res-1", TypeName = DefaultType, Domain = null }
+                });
 
             var request = ValidRequest(Resource("res-1", "Resource One"));
             request.Policy.OnConflict = "fail";
@@ -244,6 +251,274 @@ namespace ResourceMapper.Common.Server.Tests.Resources
             response.IsSuccess().Should().BeFalse("because the resource already exists and policy is fail");
             ErrorsOf(response).Should().Contain(e => e.Section == "resources" && e.Key == "res-1",
                 "because the conflicting resource should be reported");
+        }
+
+        #endregion
+
+        #region domain resolution
+
+        [Fact]
+        public async Task ImportAsync_DomainOverride_TakesPrecedenceOverBatchDefault()
+        {
+            _importRepo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition> { DomainTagDef(allowedValues: new[] { "prod", "non-prod" }) });
+
+            string? capturedDomain = null;
+            _importRepo.Setup(r => r.UpsertResourceAsync(
+                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Callback((string _, string _, string _, string _, string _, string? d, string _, CancellationToken _) => capturedDomain = d)
+                .ReturnsAsync(("created", 1));
+
+            var resource = Resource("orders-queue", "Orders Queue");
+            resource.Tags = new Dictionary<string, JsonElement> { ["Domain"] = Str("prod") };
+            var request = ValidRequest(resource);
+            request.Defaults.Domain = "non-prod";
+
+            var response = await _sut.ImportAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because 'prod' is a valid domain value");
+            capturedDomain.Should().Be("prod", "because a per-resource override wins over the batch default");
+        }
+
+        [Fact]
+        public async Task ImportAsync_NoOverride_FallsBackToBatchDefaultDomain()
+        {
+            _importRepo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition> { DomainTagDef(allowedValues: new[] { "prod", "non-prod" }) });
+
+            string? capturedDomain = null;
+            _importRepo.Setup(r => r.UpsertResourceAsync(
+                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Callback((string _, string _, string _, string _, string _, string? d, string _, CancellationToken _) => capturedDomain = d)
+                .ReturnsAsync(("created", 1));
+
+            var request = ValidRequest(Resource("orders-queue", "Orders Queue"));
+            request.Defaults.Domain = "non-prod";
+
+            var response = await _sut.ImportAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because a batch default should apply when no override is given");
+            capturedDomain.Should().Be("non-prod", "because the batch default applies when no per-resource override is given");
+        }
+
+        [Fact]
+        public async Task ImportAsync_DomainRequiredAndMissing_ReturnsValidationErrorAndNoWrites()
+        {
+            _importRepo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition> { DomainTagDef(required: true, allowedValues: new[] { "prod", "non-prod" }) });
+
+            var request = ValidRequest(Resource("orders-queue", "Orders Queue")); // no default, no override
+
+            var response = await _sut.ImportAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because Domain is RequirementLevel=Error and nothing supplies it");
+            ErrorsOf(response).Should().Contain(e => e.Field == "domain", "because the missing domain should be reported");
+            _importRepo.Verify(r => r.UpsertResourceAsync(
+                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                Times.Never, "because validation must fail before any write");
+        }
+
+        [Fact]
+        public async Task ImportAsync_DomainNotInAllowedValues_ReturnsValidationError()
+        {
+            _importRepo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition> { DomainTagDef(allowedValues: new[] { "prod", "non-prod" }) });
+
+            var request = ValidRequest(Resource("orders-queue", "Orders Queue"));
+            request.Defaults.Domain = "staging";
+
+            var response = await _sut.ImportAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because 'staging' is not in the domain's allowed values");
+            ErrorsOf(response).Should().Contain(e => e.Field == "domain", "because the invalid domain value should be reported");
+        }
+
+        [Fact]
+        public async Task ImportAsync_SameKeyDifferentDomain_IsNotADuplicate()
+        {
+            _importRepo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition> { DomainTagDef(allowedValues: new[] { "prod", "non-prod" }) });
+
+            var nonProd = Resource("orders-queue", "Orders Queue");
+            nonProd.Tags = new Dictionary<string, JsonElement> { ["Domain"] = Str("non-prod") };
+            var prod = Resource("orders-queue", "Orders Queue");
+            prod.Tags = new Dictionary<string, JsonElement> { ["Domain"] = Str("prod") };
+            var request = ValidRequest(nonProd, prod);
+
+            var response = await _sut.ImportAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the two resources are distinct under (domain+type+key)");
+            response.ApiResponse.Data!.Summary!.Resources.Created.Should().Be(2, "because both are new, distinct resources");
+        }
+
+        [Fact]
+        public async Task ImportAsync_LegacyStringContentType_MapsToText()
+        {
+            var request = ValidRequest(Resource("res-1", "One"));
+            request.TagDefinitions = new()
+            {
+                ["env"] = new ImportTagDefinitionModel { ContentType = "string", IsMultiValued = true, AllowCustomValue = true }
+            };
+
+            var response = await _sut.ImportAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the legacy 'string' content type is mapped to 'Text'");
+            _importRepo.Verify(r => r.UpsertTagDefinitionAsync("env", It.IsAny<string>(), "Text", true, true, It.IsAny<string>(), "upsert", It.IsAny<CancellationToken>()),
+                Times.Once, "because 'string' must be normalized to 'Text' before writing");
+        }
+
+        [Fact]
+        public async Task ImportAsync_InvalidContentType_ReturnsValidationError()
+        {
+            var request = ValidRequest(Resource("res-1", "One"));
+            request.TagDefinitions = new()
+            {
+                ["env"] = new ImportTagDefinitionModel { ContentType = "boolean", IsMultiValued = true, AllowCustomValue = true }
+            };
+
+            var response = await _sut.ImportAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because contentType must be 'Text' or 'Link'");
+            ErrorsOf(response).Should().Contain(e => e.Field == "contentType",
+                "because an unrecognized content type (other than the legacy 'string') must be rejected, not auto-registered");
+        }
+
+        #endregion
+
+        #region dependency resolution
+
+        [Fact]
+        public async Task ImportAsync_ResolvableDependency_WritesRelationshipEdge()
+        {
+            _importRepo.Setup(r => r.UpsertResourceAsync("orders-queue", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("created", 100));
+            _importRepo.Setup(r => r.UpsertResourceAsync("orders-db", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("created", 200));
+
+            var queue = Resource("orders-queue", "Orders Queue");
+            queue.Dependencies = new List<string> { "orders-db" };
+            var db = Resource("orders-db", "Orders DB");
+            var request = ValidRequest(queue, db);
+
+            var response = await _sut.ImportAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the dependency resolves to exactly one target");
+            _resourceRepo.Verify(r => r.AddRelationshipAsync(100, 200, It.IsAny<CancellationToken>()), Times.Once,
+                "because the queue depends on the db, resolved to their upserted ids");
+            response.ApiResponse.Data!.Summary!.ResourceRelationships.Created.Should().Be(1);
+        }
+
+        [Fact]
+        public async Task ImportAsync_SelfReferenceDependency_ReturnsValidationErrorAndNoWrites()
+        {
+            var resource = Resource("orders-queue", "Orders Queue");
+            resource.Dependencies = new List<string> { "orders-queue" };
+            var request = ValidRequest(resource);
+
+            var response = await _sut.ImportAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because a resource cannot depend on itself");
+            ErrorsOf(response).Should().Contain(e => e.Field == "dependencies", "because the self-reference should be reported");
+            _importRepo.Verify(r => r.UpsertResourceAsync(
+                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                Times.Never, "because dependency validation runs before any write");
+        }
+
+        [Fact]
+        public async Task ImportAsync_UnresolvedDependency_ReturnsValidationErrorAndNoWrites()
+        {
+            var resource = Resource("orders-queue", "Orders Queue");
+            resource.Dependencies = new List<string> { "ghost-target" };
+            var request = ValidRequest(resource);
+
+            var response = await _sut.ImportAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because 'ghost-target' matches nothing");
+            ErrorsOf(response).Should().Contain(e => e.Field == "dependencies", "because the unresolved dependency should be reported");
+            _importRepo.Verify(r => r.UpsertResourceAsync(
+                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                Times.Never, "because dependency validation runs before any write");
+        }
+
+        [Fact]
+        public async Task ImportAsync_AmbiguousDependency_ReturnsValidationErrorAndNoWrites()
+        {
+            var queueA = Resource("orders", "Orders Queue");
+            queueA.Type = "Queue";
+            var dbA = Resource("orders", "Orders DB");
+            dbA.Type = "Database";
+            var dependent = Resource("billing", "Billing");
+            dependent.Dependencies = new List<string> { "orders" };
+
+            var request = ValidRequest(queueA, dbA, dependent);
+            request.ResourceTypes = new()
+            {
+                ["Queue"] = new ImportResourceTypeDefinition(),
+                ["Database"] = new ImportResourceTypeDefinition()
+            };
+
+            var response = await _sut.ImportAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because 'orders' matches both Queue and Database");
+            ErrorsOf(response).Should().Contain(e => e.Field == "dependencies" && e.Key == "billing",
+                "because the ambiguous dependency should be reported against the dependent resource");
+            _importRepo.Verify(r => r.UpsertResourceAsync(
+                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                Times.Never, "because ambiguity must fail the whole import before any write");
+        }
+
+        [Fact]
+        public async Task ImportAsync_DependencyToPreExistingResourceNotInPayload_ResolvesViaExistingIdentities()
+        {
+            _importRepo.Setup(r => r.GetAllResourceIdentitiesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceIdentity>
+                {
+                    new() { ResourceId = 999, ResourceKey = "orders-db", TypeName = DefaultType, Domain = null }
+                });
+            _importRepo.Setup(r => r.UpsertResourceAsync("orders-queue", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("created", 100));
+
+            var queue = Resource("orders-queue", "Orders Queue");
+            queue.Dependencies = new List<string> { "orders-db" };
+            var request = ValidRequest(queue); // orders-db is NOT redeclared in this payload
+
+            var response = await _sut.ImportAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because 'orders-db' resolves against the pre-existing identity set");
+            _resourceRepo.Verify(r => r.AddRelationshipAsync(100, 999, It.IsAny<CancellationToken>()), Times.Once,
+                "because the pre-existing target's id must be used");
+        }
+
+        [Fact]
+        public async Task ImportAsync_SkippedSourceResource_DoesNotWriteItsOutEdges()
+        {
+            _importRepo.Setup(r => r.UpsertResourceAsync("orders-queue", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("skipped", 100));
+            _importRepo.Setup(r => r.UpsertResourceAsync("orders-db", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("created", 200));
+
+            var queue = Resource("orders-queue", "Orders Queue");
+            queue.Dependencies = new List<string> { "orders-db" };
+            var db = Resource("orders-db", "Orders DB");
+            var request = ValidRequest(queue, db);
+            request.Policy.OnConflict = "skip";
+
+            var response = await _sut.ImportAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue();
+            _resourceRepo.Verify(r => r.AddRelationshipAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never,
+                "because skip-means-skip extends to a skipped resource's out-edges");
         }
 
         #endregion
@@ -259,7 +534,7 @@ namespace ResourceMapper.Common.Server.Tests.Resources
             response.ApiResponse.Data!.Summary!.Resources.Created.Should().Be(0, "because nothing was supplied");
             _importRepo.Verify(r => r.UpsertResourceAsync(
                     It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
                 Times.Never, "because there are no resources to write");
         }
 
@@ -271,7 +546,7 @@ namespace ResourceMapper.Common.Server.Tests.Resources
             response.IsSuccess().Should().BeTrue("because the request is valid");
             response.ApiResponse.Data!.Summary!.Resources.Created.Should().Be(1, "because the repo reported 'created'");
             _importRepo.Verify(r => r.UpsertResourceAsync(
-                    "res-new", It.IsAny<string>(), It.IsAny<string>(), "New", It.IsAny<string>(), "upsert", It.IsAny<CancellationToken>()),
+                    "res-new", It.IsAny<string>(), It.IsAny<string>(), "New", It.IsAny<string>(), It.IsAny<string?>(), "upsert", It.IsAny<CancellationToken>()),
                 Times.Once, "because the resource should be upserted exactly once");
         }
 
@@ -280,7 +555,7 @@ namespace ResourceMapper.Common.Server.Tests.Resources
         {
             _importRepo.Setup(r => r.UpsertResourceAsync(
                     It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(("updated", 1));
 
             var response = await _sut.ImportAsync(ValidRequest(Resource("res-1", "One")), CancellationToken.None);
@@ -293,7 +568,7 @@ namespace ResourceMapper.Common.Server.Tests.Resources
         {
             _importRepo.Setup(r => r.UpsertResourceAsync(
                     It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(("skipped", 9));
 
             var resource = Resource("res-1", "One");
@@ -318,7 +593,7 @@ namespace ResourceMapper.Common.Server.Tests.Resources
         {
             _importRepo.Setup(r => r.UpsertResourceAsync(
                     It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(("created", 42));
 
             var resource = Resource("res-1", "One");
@@ -373,7 +648,17 @@ namespace ResourceMapper.Common.Server.Tests.Resources
             Resources = resources.ToList()
         };
 
-        private static ImportResourceItem Resource(string key, string name) => new() { Key = key, Name = name };
+        private static ImportResourceItem Resource(string key, string name) => new() { Key = key, Name = name, Type = DefaultType };
+
+        private static TagDefinition DomainTagDef(bool required = true, bool allowCustom = false, string[]? allowedValues = null) => new()
+        {
+            TagDefinitionKey = "Domain",
+            IsDomainTag = true,
+            RequirementLevel = required ? "Error" : "Optional",
+            AllowCustomValue = allowCustom,
+            AllowedValues = allowedValues is { Length: > 0 } ? JsonSerializer.Serialize(allowedValues) : null,
+            ContentType = "Text"
+        };
 
         private static JsonElement Str(string value) => JsonSerializer.SerializeToElement(value);
 

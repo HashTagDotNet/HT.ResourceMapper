@@ -15,8 +15,9 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
         /// <summary>All tag definitions, for reference/value validation against the import payload.</summary>
         Task<List<TagDefinition>> GetAllTagDefinitionsAsync(CancellationToken cancellationToken);
 
-        /// <summary>Every existing resource key, as a case-insensitive set, for conflict checks.</summary>
-        Task<HashSet<string>> GetExistingResourceKeysAsync(CancellationToken cancellationToken);
+        /// <summary>Every existing resource's full (Domain + Type + Key) identity, for triple
+        /// conflict/dedup checks and dependency-target resolution.</summary>
+        Task<List<ResourceIdentity>> GetAllResourceIdentitiesAsync(CancellationToken cancellationToken);
 
         // ---- writes (after validation) ----
 
@@ -31,7 +32,7 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
 
         /// <returns>(result: 'created'|'updated'|'skipped', resourceId — returned even on skip)</returns>
         Task<(string Result, int ResourceId)> UpsertResourceAsync(string resourceKey, string resourceUid,
-            string? typeName, string resourceName, string? description,
+            string? typeName, string resourceName, string? description, string? domain,
             string onConflict, CancellationToken cancellationToken);
 
         /// <summary>Replaces all tags for the resource with the supplied (key, value) pairs.</summary>

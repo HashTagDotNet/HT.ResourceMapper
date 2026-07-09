@@ -211,5 +211,54 @@ desired-state reconciliation is deferred; revisit if import becomes the authorit
    `dependencies[]`; assert two same-key/different-domain resources are distinct, the domain tag is
    applied, edges are written, and a re-import is idempotent (all `updated`, no new rows/edges).
 
+## Execution notes
+
+- **All steps completed and verified.** Dacpac built via full MSBuild and republished via
+  `sqlpackage /p:DropObjectsNotInSource=True` after the sproc edits. All five sprocs
+  (`Resource_Upsert`, `Resource_Save`, `Resource_CheckUnique`, `Resource_GetAllKeys`,
+  `ResourceTag_SetForResource`) exercised via `sqlcmd`: same `(type+key)` with different
+  `@Domain` correctly creates **two** distinct resources (confirmed live, per the explicit
+  "same resource + different domain must be supported" requirement); domain-change-on-update
+  correctly rejected by `Resource_Save`; `Resource_CheckUnique` correctly scopes collisions to
+  the matching domain only. `dotnet build` — zero `error CS` (only the pre-existing, documented
+  `HTResourceMapperDb.sqlproj` non-SDK limitation fails under `dotnet build`, unrelated).
+  `dotnet test` — 65/65 passing (52 prior + 13 new: domain override/default, required/vocab
+  validation, same-key/different-domain non-duplicate, legacy `"string"`→`Text` mapping,
+  resolvable/self-reference/unresolved/ambiguous dependencies, pre-existing-target resolution,
+  skip-means-skip for out-edges). The in-process import smoke test (a throwaway xUnit test
+  against the live `(localdb)` DB, deleted before commit) ran a full
+  create → re-import-idempotent → distinct-same-key-different-domain flow successfully.
+- **One sqlcmd false alarm, caught and resolved during verification:** an initial manual sqlcmd
+  script reused the same output-parameter variable across successive `EXEC` calls in one batch
+  without resetting it; T-SQL's `EXEC @out = @localvar OUTPUT` convention carries the variable's
+  *current* value into the call, so a "no match found" result silently kept the previous call's
+  id instead of going `NULL`, making it look like the second domain's insert had wrongly matched
+  the first domain's row. Rerunning with freshly `DECLARE`d/`NULL`-initialized variables per call
+  confirmed the sproc logic was correct all along; the production C#/ADO.NET path is unaffected
+  (each `SqlCommand` gets a fresh parameter collection per call, and slice #2's/#4's already-
+  verified created→updated round-trips prove pure-`Output` parameters don't carry a client value
+  into the RPC call). No code change resulted from this — noted here in case anyone else scripts
+  sqlcmd verification against these sprocs and reuses a variable across calls.
+- **Two additions beyond the original plan, made to keep "Domain enters identity" coherent:**
+  - **`Resource_CheckUnique` also had to become domain-aware.** The plan's SQL list didn't
+    enumerate it, but the sproc's own pre-existing comment already said "Domain joins this
+    predicate in slice #5" — and leaving it `(type+key)`-only would have made the domain-aware
+    `Resource_Save` unreachable: the uniqueness check called just before it would have falsely
+    reported a same-key/different-domain save as a collision. Widened `Resource_CheckUnique` +
+    `CheckResourceUniqueAsync` (repo/service) + `SaveResourceAsync`/`CheckUniquenessAsync`
+    (service) to take and pass `Domain` through, and added a Domain-mismatch check in
+    `SaveResourceAsync`'s edit-mode path mirroring the existing Type-mismatch check.
+  - **The read side of Domain was still hardcoded to null.** `ResourceDetailModel.Domain`,
+    `GetResourceEditorModelAsync`'s `IdentityPreview.Domain`, and the General-tab `Domain`
+    `SingleValueEditor` all carried `// #5` comments deferring them — but with this slice
+    literally titled "Domain enters identity," leaving reads null would have been a half-finished
+    result and would have forced slice #6 to redo this plumbing anyway. Extended
+    `Resource_GetByResourceUid` with the same domain-tag `LEFT JOIN` pattern, added `Domain` to
+    `ResourceDetail` (repo model), and wired it through `ProjectResourceDetailAsync` and
+    `BuildEditEditorModel`.
+- **OQ1/OQ2 defaults were implemented as documented** (dependency resolution by
+  same-domain-key with ambiguity/unresolved errors; additive-only edge writes on re-import) —
+  no user override requested.
+
 Then: flip slice #5 → Done and slice #6 → Planning in `00-implementation-plan-list.md`, and
 commit. Per our pattern, planning is on the stronger model; execution switches to the cheaper one.

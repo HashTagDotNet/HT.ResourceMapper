@@ -176,6 +176,7 @@ namespace ResourceMapper.Common.Server.Resources
                 ResourceName = dr.ReadString("ResourceName"),
                 Description = dr.ReadString("Description"),
                 PrimaryTagDefinitionId = dr.ReadNullableInt("PrimaryTagDefinitionId"),
+                Domain = dr.ReadString("Domain"),
                 CreatedOn = dr.ReadDateTime("CreatedOn"),
                 UpdatedOn = dr.ReadNullableDateTime("UpdatedOn")
             }, cancellationToken: cancellationToken);
@@ -225,8 +226,8 @@ namespace ResourceMapper.Common.Server.Resources
         }
 
         public async Task<(string Result, int ResourceId)> SaveResourceAsync(string resourceUid, int resourceTypeId,
-            string resourceKey, string resourceName, string? description, int? primaryTagDefinitionId,
-            CancellationToken cancellationToken)
+            string resourceKey, string resourceName, string? description, string? domain,
+            int? primaryTagDefinitionId, CancellationToken cancellationToken)
         {
             using var cmd = _db.RW.SprocCommand("[HTResourceMapper].Resource_Save")
                 .AddVarchar("@ResourceUid", resourceUid)
@@ -234,6 +235,7 @@ namespace ResourceMapper.Common.Server.Resources
                 .AddNVarchar("@ResourceKey", resourceKey)
                 .AddNVarchar("@ResourceName", resourceName)
                 .AddNVarchar("@Description", description)
+                .AddNVarchar("@Domain", domain)
                 .AddInteger("@PrimaryTagDefinitionId", primaryTagDefinitionId)
                 .AddInteger("@ResourceId", 0, ParameterDirection.Output)
                 .AddVarchar("@Result", null, 10, ParameterDirection.Output);
@@ -260,12 +262,13 @@ namespace ResourceMapper.Common.Server.Resources
             }, cancellationToken: cancellationToken);
         }
 
-        public async Task<bool> CheckResourceUniqueAsync(int resourceTypeId, string resourceKey,
+        public async Task<bool> CheckResourceUniqueAsync(int resourceTypeId, string resourceKey, string? domain,
             string? excludeResourceUid, CancellationToken cancellationToken)
         {
             using var cmd = _db.RO.SprocCommand("[HTResourceMapper].Resource_CheckUnique")
                 .AddInteger("@ResourceTypeId", resourceTypeId)
                 .AddNVarchar("@ResourceKey", resourceKey)
+                .AddNVarchar("@Domain", domain)
                 .AddVarchar("@ExcludeResourceUid", excludeResourceUid);
 
             cmd.Parameters.Add(new SqlParameter

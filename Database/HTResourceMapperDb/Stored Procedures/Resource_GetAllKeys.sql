@@ -3,9 +3,19 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Slice 1: bulk existing-key lookup for import conflict/dry-run checks.
-    -- Returns every resource key; the service intersects in C# (case-insensitive).
-    -- A TVP-based "keys-in-payload" variant is deferred to the write slice.
-    SELECT r.ResourceKey
-    FROM [HTResourceMapper].[Resource] r;
+    -- Bulk identity lookup for import conflict/dedup/dependency-resolution checks. Returns the
+    -- full (Domain + Type + Key) tuple per resource (Domain is NULL when no domain tag is
+    -- applied, e.g. no domain tag is defined at all — design §6 "Unused" state).
+    DECLARE @DomainTagDefId INT =
+        (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE IsDomainTag = 1);
+
+    SELECT
+        r.ResourceId,
+        r.ResourceKey,
+        rty.TypeName,
+        dt.TagValue AS Domain
+    FROM [HTResourceMapper].[Resource] r
+    INNER JOIN [HTResourceMapper].[ResourceType] rty ON rty.ResourceTypeId = r.ResourceTypeId
+    LEFT JOIN [HTResourceMapper].[ResourceTag] dt
+        ON dt.ResourceId = r.ResourceId AND dt.TagDefinitionId = @DomainTagDefId;
 END

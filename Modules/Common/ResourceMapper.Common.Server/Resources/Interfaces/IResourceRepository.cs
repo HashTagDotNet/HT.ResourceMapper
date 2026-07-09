@@ -67,17 +67,18 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
         Task DeleteResourceAsync(int resourceId, CancellationToken cancellationToken);
 
         // Editor create/update, keyed by the immutable ResourceUid (not (type+key) — the editor
-        // allows Key rename). Result is 'created' | 'updated' | 'error' (Type changed post-save).
+        // allows Key rename). Result is 'created' | 'updated' | 'error' (Type or Domain changed
+        // post-save).
         Task<(string Result, int ResourceId)> SaveResourceAsync(string resourceUid, int resourceTypeId,
-            string resourceKey, string resourceName, string? description, int? primaryTagDefinitionId,
-            CancellationToken cancellationToken);
+            string resourceKey, string resourceName, string? description, string? domain,
+            int? primaryTagDefinitionId, CancellationToken cancellationToken);
 
         // Every applied tag value for the resource, joined to its definition.
         Task<List<ResourceTagRead>> GetTagsForResourceAsync(int resourceId, CancellationToken cancellationToken);
 
-        // True iff (resourceTypeId, resourceKey) is not already used by another resource
+        // True iff (domain, resourceTypeId, resourceKey) is not already used by another resource
         // (excluding the one identified by excludeResourceUid, for edit-mode self-exclusion).
-        Task<bool> CheckResourceUniqueAsync(int resourceTypeId, string resourceKey,
+        Task<bool> CheckResourceUniqueAsync(int resourceTypeId, string resourceKey, string? domain,
             string? excludeResourceUid, CancellationToken cancellationToken);
 
         // Full tag dictionary (all TagDefinition rows), for the editor's "Add tag" picker.

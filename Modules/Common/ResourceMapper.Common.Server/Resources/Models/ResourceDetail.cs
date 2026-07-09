@@ -12,6 +12,7 @@ namespace ResourceMapper.Common.Server.Resources.Models
         public string ResourceName { get; set; } = string.Empty;
         public string? Description { get; set; }
         public int? PrimaryTagDefinitionId { get; set; }
+        public string? Domain { get; set; }
         public DateTime CreatedOn { get; set; }
         public DateTime? UpdatedOn { get; set; }
     }

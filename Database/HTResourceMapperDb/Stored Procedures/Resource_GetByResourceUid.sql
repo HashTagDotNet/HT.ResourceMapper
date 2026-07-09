@@ -4,16 +4,22 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    DECLARE @DomainTagDefId INT =
+        (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE IsDomainTag = 1);
+
     SELECT
-        ResourceId,
-        ResourceUid,
-        ResourceKey,
-        ResourceTypeId,
-        ResourceName,
-        [Description],
-        PrimaryTagDefinitionId,
-        CreatedOn,
-        UpdatedOn
-    FROM [HTResourceMapper].[Resource] WITH(NOLOCK)
-    WHERE ResourceUid = @ResourceUid;
+        r.ResourceId,
+        r.ResourceUid,
+        r.ResourceKey,
+        r.ResourceTypeId,
+        r.ResourceName,
+        r.[Description],
+        r.PrimaryTagDefinitionId,
+        dt.TagValue AS Domain,
+        r.CreatedOn,
+        r.UpdatedOn
+    FROM [HTResourceMapper].[Resource] r WITH(NOLOCK)
+    LEFT JOIN [HTResourceMapper].[ResourceTag] dt
+        ON dt.ResourceId = r.ResourceId AND dt.TagDefinitionId = @DomainTagDefId
+    WHERE r.ResourceUid = @ResourceUid;
 END

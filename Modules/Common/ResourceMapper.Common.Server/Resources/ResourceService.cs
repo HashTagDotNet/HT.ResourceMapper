@@ -280,9 +280,16 @@ namespace ResourceMapper.Common.Server.Resources
                         builder.Validation.AddValidation("request.ResourceTypeId", "Resource type cannot be changed after save");
                         return builder.BuildResponse();
                     }
+
+                    if (!string.IsNullOrEmpty(existing.Domain) && !string.IsNullOrEmpty(request.Domain)
+                        && !string.Equals(existing.Domain, request.Domain, StringComparison.Ordinal))
+                    {
+                        builder.Validation.AddValidation("request.Domain", "Domain cannot be changed after save");
+                        return builder.BuildResponse();
+                    }
                 }
 
-                var isUnique = await _repo.CheckResourceUniqueAsync(request.ResourceTypeId, request.ResourceKey, request.ResourceUid, cancellationToken);
+                var isUnique = await _repo.CheckResourceUniqueAsync(request.ResourceTypeId, request.ResourceKey, request.Domain, request.ResourceUid, cancellationToken);
                 if (!isUnique)
                 {
                     builder.Validation.AddValidation("request.ResourceKey", "Another resource of this type already uses this key");
@@ -291,11 +298,11 @@ namespace ResourceMapper.Common.Server.Resources
 
                 var (result, _) = await _repo.SaveResourceAsync(
                     request.ResourceUid, request.ResourceTypeId, request.ResourceKey, request.ResourceName,
-                    request.Description, request.PrimaryTagDefinitionId, cancellationToken);
+                    request.Description, request.Domain, request.PrimaryTagDefinitionId, cancellationToken);
 
                 if (string.Equals(result, "error", StringComparison.Ordinal))
                 {
-                    builder.Validation.AddValidation("request.ResourceTypeId", "Resource type cannot be changed after save");
+                    builder.Validation.AddValidation("request.ResourceTypeId", "Resource type or Domain cannot be changed after save");
                     return builder.BuildResponse();
                 }
 
@@ -334,7 +341,7 @@ namespace ResourceMapper.Common.Server.Resources
                 if (!builder.IsOk)
                     return builder.BuildResponse();
 
-                var isUnique = await _repo.CheckResourceUniqueAsync(request.ResourceTypeId, request.ResourceKey, request.ExcludeResourceUid, cancellationToken);
+                var isUnique = await _repo.CheckResourceUniqueAsync(request.ResourceTypeId, request.ResourceKey, request.Domain, request.ExcludeResourceUid, cancellationToken);
 
                 var typeName = (await _repo.GetAllResourceTypesAsync(cancellationToken))
                     .FirstOrDefault(t => t.ResourceTypeId == request.ResourceTypeId)?.TypeName ?? string.Empty;
@@ -343,7 +350,7 @@ namespace ResourceMapper.Common.Server.Resources
                 {
                     IsUnique = isUnique,
                     Message = isUnique ? null : "Another resource of this type already uses this key",
-                    IdentityDisplay = BuildIdentityDisplay(null, typeName, request.ResourceKey)
+                    IdentityDisplay = BuildIdentityDisplay(request.Domain, typeName, request.ResourceKey)
                 });
                 return builder.BuildResponse();
             }
@@ -542,10 +549,10 @@ namespace ResourceMapper.Common.Server.Resources
                 Description = detail.Description,
                 ResourceTypeId = detail.ResourceTypeId,
                 ResourceTypeName = typeName,
-                Domain = null, // #5
+                Domain = detail.Domain,
                 PrimaryTagDefinitionId = detail.PrimaryTagDefinitionId,
                 PrimaryLinkUrl = primaryLinkUrl,
-                IdentityDisplay = BuildIdentityDisplay(null, typeName, detail.ResourceKey),
+                IdentityDisplay = BuildIdentityDisplay(detail.Domain, typeName, detail.ResourceKey),
                 Tags = tagModels,
                 Relationships = relationshipModels,
                 CreatedOn = detail.CreatedOn,
@@ -619,7 +626,7 @@ namespace ResourceMapper.Common.Server.Resources
             {
                 ResourceUid = detail.ResourceUid,
                 ResourceType = MakeUnchangedEditor(typeName),
-                Domain = MakeUnchangedEditor(null), // #5
+                Domain = MakeUnchangedEditor(detail.Domain),
                 Name = MakeUnchangedEditor(detail.ResourceName),
                 Key = MakeUnchangedEditor(detail.ResourceKey),
                 Description = MakeUnchangedEditor(detail.Description),
@@ -631,7 +638,7 @@ namespace ResourceMapper.Common.Server.Resources
                 UpdatedOn = detail.UpdatedOn,
                 IdentityPreview = new IdentityPreview
                 {
-                    Domain = null, // #5
+                    Domain = detail.Domain,
                     ResourceType = typeName,
                     Key = detail.ResourceKey
                 }
