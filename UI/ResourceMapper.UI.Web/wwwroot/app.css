@@ -42,3 +42,47 @@ html, body {
 .rm-tag:hover .rm-copy {
     visibility: visible;
 }
+
+/* Filter bar: chips read as compact, secondary controls above the data. */
+.rm-filterbar {
+    row-gap: .5rem;
+}
+
+.rm-chip {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--mud-palette-divider);
+    border-radius: 16px;
+    background: var(--mud-palette-background-grey);
+    padding-right: 2px;
+}
+
+.rm-chip-open {
+    border-color: var(--mud-palette-primary);
+}
+
+.rm-chip .rm-chip-label {
+    text-transform: none;
+    border-radius: 16px 0 0 16px;
+    padding: 0 .5rem;
+    min-width: 0;
+}
+
+.rm-chip .rm-chip-x {
+    padding: 2px;
+}
+
+.rm-facet-count {
+    color: var(--mud-palette-text-secondary);
+    margin-left: .25rem;
+    font-size: .8em;
+}
+
+.rm-filter-overlay {
+    background: transparent;
+}
+
+.rm-filter-all {
+    border-bottom: 1px solid var(--mud-palette-divider);
+    margin-bottom: .25rem;
+}

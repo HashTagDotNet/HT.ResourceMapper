@@ -1,0 +1,104 @@
+@using ResourceMapper.Common.Shared.HomePage.Contracts
+@using ResourceMapper.Common.Shared.HomePage.Filtering
+
+<div style="position:relative;display:inline-block;">
+    <div class="rm-chip @(_open ? "rm-chip-open" : "")">
+        <MudButton Variant="Variant.Text" Size="Size.Small" Class="rm-chip-label" DisableElevation="true"
+                   OnClick="Toggle" aria-label="@($"Edit {ResourceFilterState.ColumnDisplay(Filter)} filter")">
+            @ResourceFilterState.ChipLabel(Filter)
+        </MudButton>
+        <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" Class="rm-chip-x"
+                       OnClick="Remove" aria-label="@($"Remove {ResourceFilterState.ColumnDisplay(Filter)} filter")" />
+    </div>
+
+    <MudPopover Open="_open" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft"
+                Class="rm-filter-popover" Elevation="8">
+        @if (_open)
+        {
+            @if (Filter.Kind == ResourceGridFilterKind.Text)
+            {
+                <TextFilterEditor Filter="Filter" OnApply="Apply" OnCancel="Cancel" />
+            }
+            else
+            {
+                <EnumerableFilterEditor Filter="Filter" FacetLoader="FacetLoader" OnApply="Apply" OnCancel="Cancel" />
+            }
+        }
+    </MudPopover>
+</div>
+
+@if (_open)
+{
+    <MudOverlay Visible="true" OnClick="Cancel" AutoClose="false" Class="rm-filter-overlay" />
+}
+
+@code {
+    [Parameter] public ActiveFilter Filter { get; set; } = default!;
+    [Parameter] public Func<ActiveFilter, Task<ResourceGridFacetResponse?>> FacetLoader { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback<ActiveFilter> OnRemove { get; set; }
+    /// <summary>Open the editor immediately (used when a brand-new filter is added).</summary>
+    [Parameter] public bool AutoOpen { get; set; }
+
+    private bool _open;
+    private bool _autoOpenHandled;
+
+    // Snapshot for cancel-revert.
+    private HashSet<string> _snapValues = new();
+    private bool _snapBlank;
+    private ResourceGridFilterOperator _snapOperator;
+    private string? _snapText;
+
+    protected override void OnParametersSet()
+    {
+        if (AutoOpen && !_autoOpenHandled)
+        {
+            _autoOpenHandled = true;
+            Open();
+        }
+    }
+
+    private void Toggle()
+    {
+        if (_open) Cancel();
+        else Open();
+    }
+
+    private void Open()
+    {
+        _snapValues = new HashSet<string>(Filter.SelectedValues, StringComparer.Ordinal);
+        _snapBlank = Filter.IncludeBlank;
+        _snapOperator = Filter.Operator;
+        _snapText = Filter.Text;
+        _open = true;
+    }
+
+    private async Task Apply()
+    {
+        _open = false;
+        // A brand-new filter left empty (never constrained) is auto-removed rather than squatting a slot.
+        if (!ResourceFilterState.IsConstraining(Filter))
+        {
+            await OnRemove.InvokeAsync(Filter);
+            return;
+        }
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task Cancel()
+    {
+        _open = false;
+        // Revert working edits.
+        Filter.SelectedValues.Clear();
+        foreach (var v in _snapValues) Filter.SelectedValues.Add(v);
+        Filter.IncludeBlank = _snapBlank;
+        Filter.Operator = _snapOperator;
+        Filter.Text = _snapText;
+
+        // If this was a brand-new, never-applied filter, remove it on cancel.
+        if (!ResourceFilterState.IsConstraining(Filter) && AutoOpen)
+            await OnRemove.InvokeAsync(Filter);
+    }
+
+    private async Task Remove() => await OnRemove.InvokeAsync(Filter);
+}

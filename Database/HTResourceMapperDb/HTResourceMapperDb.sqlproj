@@ -73,6 +73,7 @@
     <Build Include="Stored Procedures\Resource_GetAllKeys.sql" />
     <Build Include="Stored Procedures\Resource_GetByResourceUid.sql" />
     <Build Include="Stored Procedures\Resource_GetDaysAgo.sql" />
+    <Build Include="Stored Procedures\Resource_GetFilterValues.sql" />
     <Build Include="Stored Procedures\Resource_GetItems.sql" />
     <Build Include="Stored Procedures\Resource_Upsert.sql" />
     <Build Include="Stored Procedures\TagDefinition_GetAll.sql" />
@@ -85,6 +86,7 @@
     <Build Include="Tables\TagContentType.sql" />
     <Build Include="Tables\TagDefinition.sql" />
     <Build Include="Tables\TagValueType.sql" />
+    <Build Include="User Defined Types\ResourceFilterList.sql" />
     <Build Include="User Defined Types\TagKeyValueList.sql" />
   </ItemGroup>
   <ItemGroup>
@@ -94,5 +96,6 @@
     <None Include="Scripts\04_Seed_All.sql" />
     <None Include="Scripts\Demo_Insert_ResourceItemsForGrid.sql" />
     <None Include="Scripts\Demo_Purge_ResourceItemsForGrid.sql" />
+    <None Include="localhost.publish.xml" />
   </ItemGroup>
 </Project>

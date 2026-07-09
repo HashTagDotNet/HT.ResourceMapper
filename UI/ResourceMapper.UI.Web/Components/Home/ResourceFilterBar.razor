@@ -1,0 +1,86 @@
+@using ResourceMapper.Common.Shared.HomePage.Contracts
+@using ResourceMapper.Common.Shared.HomePage.Filtering
+
+<div class="rm-filterbar d-flex flex-wrap align-center mb-3" style="gap:8px;">
+    <MudTextField T="string" Value="State.SearchFor" ValueChanged="OnSearchChanged" Immediate="true"
+                  DebounceInterval="300" Placeholder="Filter for any field…" Clearable="true"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.FilterList"
+                  Variant="Variant.Outlined" Margin="Margin.Dense" Class="rm-search" Style="max-width:320px;"
+                  aria-label="Filter for any field" />
+
+    @foreach (var filter in State.Filters)
+    {
+        <FilterChip @key="filter" Filter="filter" FacetLoader="FacetLoader"
+                    AutoOpen="@(ReferenceEquals(filter, _newFilter))"
+                    OnChanged="OnFilterApplied" OnRemove="RemoveFilter" />
+    }
+
+    <AddFilterMenu State="State" TagKeys="TagKeys" OnAdd="OnFilterAdded" />
+
+    @* Right-aligned group: ml-auto pushes it flush to the grid's right edge. *@
+    <div class="d-flex align-center ml-auto" style="gap:12px;">
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="rm-showing">
+            @if (Total > Shown)
+            {
+                <span>Showing @Shown of @Total — refine to narrow</span>
+            }
+            else
+            {
+                <span>Showing @Shown of @Total</span>
+            }
+        </MudText>
+
+        <MudSelect T="int" Value="State.DisplayCount" ValueChanged="OnDisplayCountChanged" Dense="true"
+                   Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:120px;"
+                   Label="Display count">
+            <MudSelectItem Value="50">50</MudSelectItem>
+            <MudSelectItem Value="100">100</MudSelectItem>
+            <MudSelectItem Value="500">500</MudSelectItem>
+        </MudSelect>
+    </div>
+</div>
+
+@code {
+    [Parameter] public ResourceFilterState State { get; set; } = default!;
+    [Parameter] public IReadOnlyList<string> TagKeys { get; set; } = new List<string>();
+    [Parameter] public int Total { get; set; }
+    [Parameter] public int Shown { get; set; }
+    [Parameter] public Func<ActiveFilter, Task<ResourceGridFacetResponse?>> FacetLoader { get; set; } = default!;
+    /// <summary>Invoked to reload the grid. Argument = push a browser-history entry (true) vs replace (false).</summary>
+    [Parameter] public EventCallback<bool> OnReload { get; set; }
+
+    private ActiveFilter? _newFilter;
+
+    private async Task OnSearchChanged(string? value)
+    {
+        State.SearchFor = string.IsNullOrWhiteSpace(value) ? null : value;
+        await OnReload.InvokeAsync(false);
+    }
+
+    private void OnFilterAdded(ActiveFilter filter)
+    {
+        // The chip opens its editor automatically; no reload until the user Applies.
+        _newFilter = filter;
+        StateHasChanged();
+    }
+
+    private async Task OnFilterApplied()
+    {
+        _newFilter = null;
+        await OnReload.InvokeAsync(true);
+    }
+
+    private async Task RemoveFilter(ActiveFilter filter)
+    {
+        State.Filters.Remove(filter);
+        if (ReferenceEquals(filter, _newFilter))
+            _newFilter = null;
+        await OnReload.InvokeAsync(true);
+    }
+
+    private async Task OnDisplayCountChanged(int value)
+    {
+        State.DisplayCount = value;
+        await OnReload.InvokeAsync(false);
+    }
+}

@@ -42,5 +42,6 @@
   </Folder>
   <Folder Name="/_Tests/">
     <Project Path="_Tests/Common/Server/ResourceMapper.Common.Server.Tests/ResourceMapper.Common.Server.Tests.csproj" Id="88712550-c467-4d7e-9981-6df973495f58" />
+    <Project Path="_Tests/Common/Shared/ResourceMapper.Common.Shared.Tests/ResourceMapper.Common.Shared.Tests.csproj" />
   </Folder>
 </Solution>

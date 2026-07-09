@@ -1,0 +1,37 @@
+@using ResourceMapper.Common.Shared.HomePage.Filtering
+
+@* Simple contains-text editor for Name / Description filters. *@
+<div class="rm-filter-editor pa-3" style="min-width:260px;" @onclick:stopPropagation="true">
+    <MudText Typo="Typo.subtitle2" Class="mb-2">Filter results</MudText>
+    <MudTextField @bind-Value="_text" Immediate="true" Label="@($"{ResourceFilterState.ColumnDisplay(Filter)} contains")"
+                  Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="Enter text…"
+                  OnKeyDown="OnKeyDown" AutoFocus="true" />
+    <div class="d-flex justify-end mt-3" style="gap:8px;">
+        <MudButton Size="Size.Small" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="Apply">Apply</MudButton>
+    </div>
+</div>
+
+@code {
+    [Parameter] public ActiveFilter Filter { get; set; } = default!;
+    [Parameter] public EventCallback OnApply { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private string? _text;
+
+    protected override void OnInitialized() => _text = Filter.Text;
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Apply();
+        else if (e.Key == "Escape") await Cancel();
+    }
+
+    private async Task Apply()
+    {
+        Filter.Text = string.IsNullOrWhiteSpace(_text) ? null : _text.Trim();
+        await OnApply.InvokeAsync();
+    }
+
+    private async Task Cancel() => await OnCancel.InvokeAsync();
+}

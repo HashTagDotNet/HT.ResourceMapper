@@ -4,54 +4,61 @@ CREATE PROCEDURE [HTResourceMapper].[Resource_GetItems]
     @OrderDirection NVARCHAR(4) = NULL,
     @Skip INT = 0,
     @Take INT = 50,
+    @TagLimit INT = 5,
+    @Filters [HTResourceMapper].[ResourceFilterList] READONLY,
     @TotalRecords INT OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;
-    
+
     -- Validate and set defaults for pagination parameters
     SET @Skip = ISNULL(@Skip, 0);
     SET @Take = ISNULL(@Take, 50);
-    
+
     -- Ensure Skip is not negative
     IF @Skip < 0 SET @Skip = 0;
-    
+
     -- Ensure Take is within reasonable bounds
     IF @Take <= 0 SET @Take = 50;
     IF @Take > 1000 SET @Take = 1000; -- Prevent excessive data retrieval
-    
+
+    -- Clamp the per-resource tag limit (applied in SQL so a large page never returns an
+    -- unbounded denormalized rowset).
+    SET @TagLimit = ISNULL(@TagLimit, 5);
+    IF @TagLimit < 1 SET @TagLimit = 1;
+
     -- Validate and set defaults for ordering
     SET @OrderDirection = ISNULL(@OrderDirection, 'ASC');
     IF @OrderDirection NOT IN ('ASC', 'DESC')
         SET @OrderDirection = 'ASC';
-    
+
     -- Escape LIKE special characters and prepare search parameter
     DECLARE @SafeSearchFor NVARCHAR(255) = NULL;
     IF @SearchFor IS NOT NULL AND LTRIM(RTRIM(@SearchFor)) <> ''
     BEGIN
         -- Escape LIKE special characters: %, _, [, ]
-        SET @SafeSearchFor = '%' + 
+        SET @SafeSearchFor = '%' +
             REPLACE(
                 REPLACE(
                     REPLACE(
-                        REPLACE(@SearchFor, '[', '[[]'), 
-                    ']', '[]]'), 
-                '_', '[_]'), 
+                        REPLACE(@SearchFor, '[', '[[]'),
+                    ']', '[]]'),
+                '_', '[_]'),
             '%', '[%]') + '%';
     END
-    
+
     -- Build the main query for resources with tags
     DECLARE @sql NVARCHAR(MAX);
-    DECLARE @whereClause NVARCHAR(MAX) = '';
+    DECLARE @whereClause NVARCHAR(MAX) = N'WHERE 1 = 1';
     DECLARE @orderClause NVARCHAR(MAX) = '';
     DECLARE @priorityLogic NVARCHAR(MAX) = '';
     DECLARE @orderByLogic NVARCHAR(MAX) = '';
-    
-    -- Build WHERE clause for search - using parameterized approach
+
+    -- Free-text search block (contains across key/name/description/tags) - parameterized
     IF @SafeSearchFor IS NOT NULL
     BEGIN
-        SET @whereClause = '
-        WHERE (
+        SET @whereClause = @whereClause + '
+        AND (
             r.ResourceKey LIKE @SafeSearchForParam ESCAPE '']''
             OR r.ResourceName LIKE @SafeSearchForParam ESCAPE '']''
             OR r.Description LIKE @SafeSearchForParam ESCAPE '']''
@@ -62,23 +69,23 @@ BEGIN
                 AND (rt2.TagValue LIKE @SafeSearchForParam ESCAPE '']'' OR td2.TagDefinitionKey LIKE @SafeSearchForParam ESCAPE '']'')
             )
         )';
-        
+
         SET @priorityLogic = '
-            CASE 
+            CASE
                 WHEN @SafeSearchForParam IS NOT NULL AND (
                     rt.TagValue LIKE @SafeSearchForParam ESCAPE '']''
                     OR td.TagDefinitionKey LIKE @SafeSearchForParam ESCAPE '']'')
                 THEN 0  -- Matching tags get priority 0 (highest)
                 ELSE 1  -- Non-matching tags get priority 1
             END';
-            
+
         SET @orderByLogic = '
-                    CASE 
+                    CASE
                         WHEN @SafeSearchForParam IS NOT NULL AND (
                             rt.TagValue LIKE @SafeSearchForParam ESCAPE '']''
                             OR td.TagDefinitionKey LIKE @SafeSearchForParam ESCAPE '']'')
-                        THEN 0 
-                        ELSE 1 
+                        THEN 0
+                        ELSE 1
                     END,
                     td.TagDefinitionKey,
                     rt.TagValue';
@@ -88,7 +95,39 @@ BEGIN
         SET @priorityLogic = '1'; -- All tags have same priority when no search
         SET @orderByLogic = 'td.TagDefinitionKey, rt.TagValue';
     END
-    
+
+    -- Structured filter block (AND across filters; OR within an enumerable filter).
+    -- Every predicate is CONSTANT text that only references the @FiltersParam TVP - no user
+    -- value or identifier is concatenated, so there is no injection surface.
+    DECLARE @filterClause NVARCHAR(MAX) = N'
+        AND ( NOT EXISTS (SELECT 1 FROM @FiltersParam f WHERE f.FilterColumn = N''ResourceType'' AND f.Operator = N''Equals'')
+              OR rt_type.TypeName IN (SELECT f.FilterValue FROM @FiltersParam f WHERE f.FilterColumn = N''ResourceType'' AND f.Operator = N''Equals'' AND f.IsBlank = 0)
+              OR (EXISTS (SELECT 1 FROM @FiltersParam f WHERE f.FilterColumn = N''ResourceType'' AND f.Operator = N''Equals'' AND f.IsBlank = 1) AND r.ResourceTypeId IS NULL) )
+        AND NOT EXISTS (SELECT 1 FROM @FiltersParam f WHERE f.FilterColumn = N''ResourceType'' AND f.Operator = N''NotEquals''
+                        AND ( f.FilterValue = rt_type.TypeName OR (f.IsBlank = 1 AND r.ResourceTypeId IS NULL) ))
+        AND NOT EXISTS (
+            SELECT 1 FROM (SELECT DISTINCT TagKey FROM @FiltersParam WHERE FilterColumn = N''Tag'' AND Operator = N''Equals'') g
+            WHERE NOT EXISTS (
+                SELECT 1 FROM [HTResourceMapper].[ResourceTag] rte
+                INNER JOIN [HTResourceMapper].[TagDefinition] tde ON rte.TagDefinitionId = tde.TagDefinitionId
+                INNER JOIN @FiltersParam f ON f.FilterColumn = N''Tag'' AND f.Operator = N''Equals'' AND f.TagKey = g.TagKey
+                            AND ( f.FilterValue = rte.TagValue OR (f.IsBlank = 1 AND rte.TagValue IS NULL) )
+                WHERE rte.ResourceId = r.ResourceId AND tde.TagDefinitionKey = g.TagKey ) )
+        AND NOT EXISTS (
+            SELECT 1 FROM [HTResourceMapper].[ResourceTag] rtn
+            INNER JOIN [HTResourceMapper].[TagDefinition] tdn ON rtn.TagDefinitionId = tdn.TagDefinitionId
+            INNER JOIN @FiltersParam f ON f.FilterColumn = N''Tag'' AND f.Operator = N''NotEquals'' AND f.TagKey = tdn.TagDefinitionKey
+                        AND ( f.FilterValue = rtn.TagValue OR (f.IsBlank = 1 AND rtn.TagValue IS NULL) )
+            WHERE rtn.ResourceId = r.ResourceId )
+        AND ( NOT EXISTS (SELECT 1 FROM @FiltersParam f WHERE f.FilterColumn = N''ResourceName'' AND f.Operator = N''Contains'')
+              OR EXISTS (SELECT 1 FROM @FiltersParam f WHERE f.FilterColumn = N''ResourceName'' AND f.Operator = N''Contains''
+                         AND r.ResourceName LIKE N''%'' + REPLACE(REPLACE(REPLACE(REPLACE(f.FilterValue, ''['', ''[[]''), '']'', ''[]]''), ''_'', ''[_]''), ''%'', ''[%]'') + N''%'' ESCAPE '']'') )
+        AND ( NOT EXISTS (SELECT 1 FROM @FiltersParam f WHERE f.FilterColumn = N''Description'' AND f.Operator = N''Contains'')
+              OR EXISTS (SELECT 1 FROM @FiltersParam f WHERE f.FilterColumn = N''Description'' AND f.Operator = N''Contains''
+                         AND r.Description LIKE N''%'' + REPLACE(REPLACE(REPLACE(REPLACE(f.FilterValue, ''['', ''[[]''), '']'', ''[]]''), ''_'', ''[_]''), ''%'', ''[%]'') + N''%'' ESCAPE '']'') )';
+
+    SET @whereClause = @whereClause + @filterClause;
+
     -- Build ORDER BY clause with whitelist validation
     IF @OrderBy IS NOT NULL AND LTRIM(RTRIM(@OrderBy)) <> ''
     BEGIN
@@ -105,28 +144,26 @@ BEGIN
     END
     ELSE
         SET @orderClause = 'ORDER BY r.ResourceName ASC'; -- Default order
-    
-    -- Get total count of distinct resources
+
+    -- Shared parameter definition for the (possibly NULL) search value and the filter TVP.
+    DECLARE @countParamDef NVARCHAR(MAX) =
+        N'@SafeSearchForParam NVARCHAR(255), @FiltersParam [HTResourceMapper].[ResourceFilterList] READONLY, @TotalRecordsParam INT OUTPUT';
+    DECLARE @pageParamDef NVARCHAR(MAX) =
+        N'@SafeSearchForParam NVARCHAR(255), @SkipParam INT, @TakeParam INT, @TagLimitParam INT, @FiltersParam [HTResourceMapper].[ResourceFilterList] READONLY';
+
+    -- Get total count of distinct resources (same @whereClause as the page query)
     SET @sql = '
     SELECT @TotalRecordsParam = COUNT(DISTINCT r.ResourceId)
     FROM [HTResourceMapper].[Resource] r WITH(NOLOCK)
     LEFT JOIN [HTResourceMapper].[ResourceType] rt_type WITH(NOLOCK) ON r.ResourceTypeId = rt_type.ResourceTypeId
     ' + @whereClause;
-    
-    IF @SafeSearchFor IS NOT NULL
-    BEGIN
-        EXEC sp_executesql @sql, 
-            N'@SafeSearchForParam NVARCHAR(255), @TotalRecordsParam INT OUTPUT', 
-            @SafeSearchFor, @TotalRecords OUTPUT;
-    END
-    ELSE
-    BEGIN
-        EXEC sp_executesql @sql, 
-            N'@TotalRecordsParam INT OUTPUT', 
-            @TotalRecords OUTPUT;
-    END
-    
-    -- Get paged resources with all their tags in single resultset
+
+    EXEC sp_executesql @sql, @countParamDef,
+        @SafeSearchForParam = @SafeSearchFor,
+        @FiltersParam = @Filters,
+        @TotalRecordsParam = @TotalRecords OUTPUT;
+
+    -- Get paged resources with their tags (capped at @TagLimit per resource in SQL) in a single resultset
     SET @sql = '
     ;WITH PagedResources AS (
         SELECT DISTINCT r.ResourceId, r.ResourceUid, r.ResourceName, rt_type.TypeName as ResourceType,
@@ -139,7 +176,7 @@ BEGIN
         FETCH NEXT @TakeParam ROWS ONLY
     ),
     TagsWithPriority AS (
-        SELECT 
+        SELECT
             pr.ResourceUid,
             pr.ResourceName,
             pr.ResourceType,
@@ -151,8 +188,8 @@ BEGIN
             rt.TagValue,
             ' + @priorityLogic + ' as Priority,
             ROW_NUMBER() OVER (
-                PARTITION BY pr.ResourceUid 
-                ORDER BY 
+                PARTITION BY pr.ResourceUid
+                ORDER BY
                     ' + @orderByLogic + '
             ) as TagRank
         FROM PagedResources pr
@@ -160,7 +197,7 @@ BEGIN
         LEFT JOIN [HTResourceMapper].[TagDefinition] td WITH(NOLOCK) ON rt.TagDefinitionId = td.TagDefinitionId
         LEFT JOIN [HTResourceMapper].[TagContentType] tct WITH(NOLOCK) ON td.TagContentTypeId = tct.TagContentTypeId
     )
-    SELECT 
+    SELECT
         ResourceUid,
         ResourceName,
         ResourceType,
@@ -173,19 +210,14 @@ BEGIN
         Priority,
         TagRank
     FROM TagsWithPriority
+    WHERE TagRank <= @TagLimitParam
     ORDER BY ResourceUid, Priority, TagRank';
-    
-    IF @SafeSearchFor IS NOT NULL
-    BEGIN
-        EXEC sp_executesql @sql, 
-            N'@SafeSearchForParam NVARCHAR(255), @SkipParam INT, @TakeParam INT', 
-            @SafeSearchFor, @Skip, @Take;
-    END
-    ELSE
-    BEGIN
-        EXEC sp_executesql @sql, 
-            N'@SkipParam INT, @TakeParam INT', 
-            @Skip, @Take;
-    END
-        
+
+    EXEC sp_executesql @sql, @pageParamDef,
+        @SafeSearchForParam = @SafeSearchFor,
+        @SkipParam = @Skip,
+        @TakeParam = @Take,
+        @TagLimitParam = @TagLimit,
+        @FiltersParam = @Filters;
+
 END

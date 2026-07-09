@@ -4,12 +4,15 @@ using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces;
 using Microsoft.Data.SqlClient;
 using ResourceMapper.Common.Server.Resources.Interfaces;
 using ResourceMapper.Common.Server.Resources.Models;
+using ResourceMapper.Common.Shared.HomePage.Contracts;
 using System.Data;
 
 namespace ResourceMapper.Common.Server.Resources
 {
     public class ResourceSqlRepository : IResourceRepository
     {
+        private const string ResourceFilterListType = "[HTResourceMapper].[ResourceFilterList]";
+
         private readonly IDbConnector _db;
 
         public ResourceSqlRepository(IDbConnector db)
@@ -46,12 +49,12 @@ namespace ResourceMapper.Common.Server.Resources
             int takeRecords,
             CancellationToken cancellationToken)
         {
-            // Call the new method with default tag limit of 5
+            // Call the filter-aware method with default tag limit of 5 and no structured filters
             return await GetResourceGridItemsAsync(requestSearchFor, requestOrderBy, requestOrderDirection,
-                skipRecords, takeRecords, 5, cancellationToken);
+                skipRecords, takeRecords, 5, null, cancellationToken);
         }
 
-        // New method signature with tag limit
+        // Overload with tag limit (no structured filters)
         public async Task<(int TotalCount, List<ResourceGridItem> GridItems)> GetResourceGridItemsAsync(
             string? requestSearchFor,
             string? requestOrderBy,
@@ -61,25 +64,43 @@ namespace ResourceMapper.Common.Server.Resources
             int tagLimit,
             CancellationToken cancellationToken)
         {
+            return await GetResourceGridItemsAsync(requestSearchFor, requestOrderBy, requestOrderDirection,
+                skipRecords, takeRecords, tagLimit, null, cancellationToken);
+        }
+
+        // Overload with structured filters
+        public async Task<(int TotalCount, List<ResourceGridItem> GridItems)> GetResourceGridItemsAsync(
+            string? requestSearchFor,
+            string? requestOrderBy,
+            string? requestOrderDirection,
+            int skipRecords,
+            int takeRecords,
+            int tagLimit,
+            IReadOnlyList<ResourceGridFilterDefinition>? filters,
+            CancellationToken cancellationToken)
+        {
+            using var filterTable = BuildFilterTable(filters);
+
             using var cmd = _db.RO.SprocCommand("HTResourceMapper.Resource_GetItems")
                 .AddNVarchar("@SearchFor", requestSearchFor)
                 .AddNVarchar("@OrderBy", requestOrderBy)
                 .AddVarchar("@OrderDirection", requestOrderDirection)
                 .AddInteger("@Skip", skipRecords)
                 .AddInteger("@Take", takeRecords)
+                .AddInteger("@TagLimit", tagLimit)
+                .AddTvp("@Filters", ResourceFilterListType, filterTable)
                 .AddInteger("@TotalRecords", 0, ParameterDirection.Output);
 
-            // Execute and get the denormalized result set
+            // Execute and get the denormalized result set. Tags are already capped at @TagLimit per
+            // resource in SQL, so the C# side only groups the flattened rows back up.
             var rawResults = await _db.Execute.ExecuteQueryAsync(cmd, MapDenormalizedRow, cancellationToken: cancellationToken);
 
-            // Group by ResourceUid and apply tag limit
             var groupedResults = new Dictionary<string, ResourceGridItem>();
 
             foreach (var row in rawResults)
             {
                 if (row.ResourceUid != null && !groupedResults.ContainsKey(row.ResourceUid))
                 {
-                    // First occurrence of this resource
                     groupedResults[row.ResourceUid] = new ResourceGridItem
                     {
                         ResourceUid = row.ResourceUid,
@@ -91,10 +112,7 @@ namespace ResourceMapper.Common.Server.Resources
                     };
                 }
 
-                // Add tag if we have tag data and haven't exceeded limit
-                if (row.ResourceUid != null &&
-                    !string.IsNullOrEmpty(row.TagUid) &&
-                    groupedResults[row.ResourceUid].Tags!.Count < tagLimit)
+                if (row.ResourceUid != null && !string.IsNullOrEmpty(row.TagUid))
                 {
                     groupedResults[row.ResourceUid].Tags!.Add(new ResourceGridTag
                     {
@@ -108,6 +126,89 @@ namespace ResourceMapper.Common.Server.Resources
 
             var totalCount = cmd.ReadInt("@TotalRecords");
             return (totalCount, groupedResults.Values.ToList());
+        }
+
+        public async Task<List<ResourceGridFacetItem>> GetFilterValuesAsync(
+            string column,
+            string? tagKey,
+            string? searchFor,
+            IReadOnlyList<ResourceGridFilterDefinition>? filters,
+            CancellationToken cancellationToken)
+        {
+            using var filterTable = BuildFilterTable(filters);
+
+            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].Resource_GetFilterValues")
+                .AddNVarchar("@FacetColumn", column)
+                .AddNVarchar("@FacetTagKey", tagKey)
+                .AddNVarchar("@SearchFor", searchFor)
+                .AddTvp("@Filters", ResourceFilterListType, filterTable);
+
+            return await _db.Execute.ExecuteQueryAsync(cmd, reader => new ResourceGridFacetItem
+            {
+                IsBlank = reader.GetBoolean(reader.GetOrdinal("IsBlank")),
+                Value = GetStringOrNull(reader, "Value"),
+                ItemCount = reader.GetInt32(reader.GetOrdinal("ItemCount"))
+            }, cancellationToken: cancellationToken);
+        }
+
+        public async Task<List<string>> GetAllTagKeysAsync(CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].TagDefinition_GetAll");
+            var keys = await _db.Execute.ExecuteQueryAsync(
+                cmd,
+                reader => GetStringOrNull(reader, "TagDefinitionKey"),
+                cancellationToken: cancellationToken);
+
+            return keys.Where(k => !string.IsNullOrEmpty(k)).Select(k => k!).ToList();
+        }
+
+        // Builds the [HTResourceMapper].[ResourceFilterList] TVP rows: one per selected enumerable
+        // value / tag value / text filter. Column order MUST match the TVP definition.
+        private static DataTable BuildFilterTable(IReadOnlyList<ResourceGridFilterDefinition>? filters)
+        {
+            var table = new DataTable();
+            table.Columns.Add("FilterIndex", typeof(byte));
+            table.Columns.Add("FilterColumn", typeof(string));
+            table.Columns.Add("TagKey", typeof(string));
+            table.Columns.Add("Operator", typeof(string));
+            table.Columns.Add("FilterValue", typeof(string));
+            table.Columns.Add("IsBlank", typeof(bool));
+
+            if (filters == null)
+                return table;
+
+            byte index = 0;
+            foreach (var f in filters)
+            {
+                if (index >= byte.MaxValue) break;
+                index++;
+
+                var column = f.Column ?? string.Empty;
+                object tagKey = string.IsNullOrEmpty(f.TagKey) ? DBNull.Value : f.TagKey!;
+
+                if (f.Kind == ResourceGridFilterKind.Text)
+                {
+                    if (!string.IsNullOrWhiteSpace(f.Text))
+                        table.Rows.Add(index, column, tagKey, "Contains", f.Text!.Trim(), false);
+                    continue;
+                }
+
+                var op = f.Operator == ResourceGridFilterOperator.NotEquals ? "NotEquals" : "Equals";
+
+                if (f.Values != null)
+                {
+                    foreach (var value in f.Values)
+                    {
+                        if (value == null) continue;
+                        table.Rows.Add(index, column, tagKey, op, value, false);
+                    }
+                }
+
+                if (f.IncludeBlank)
+                    table.Rows.Add(index, column, tagKey, op, DBNull.Value, true);
+            }
+
+            return table;
         }
 
         private DenormalizedRow MapDenormalizedRow(SqlDataReader reader)

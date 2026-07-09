@@ -1,0 +1,56 @@
+@using ResourceMapper.Common.Shared.HomePage.Contracts
+@using ResourceMapper.Common.Shared.HomePage.Filtering
+
+<MudMenu Label="Add filter" StartIcon="@Icons.Material.Outlined.Add" Variant="Variant.Outlined"
+         Color="Color.Default" Size="Size.Small" Disabled="@(!CanAdd)"
+         AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft"
+         title="@(CanAdd ? "Add filter" : $"Maximum of {ResourceFilterState.MaxFilters} filters")">
+    @foreach (var opt in AvailableOptions())
+    {
+        <MudMenuItem OnClick="@(() => Select(opt))">@opt.Display</MudMenuItem>
+    }
+</MudMenu>
+
+@code {
+    [Parameter] public ResourceFilterState State { get; set; } = default!;
+    [Parameter] public IReadOnlyList<string> TagKeys { get; set; } = new List<string>();
+    [Parameter] public EventCallback<ActiveFilter> OnAdd { get; set; }
+
+    private bool CanAdd => State.Filters.Count < ResourceFilterState.MaxFilters && AvailableOptions().Any();
+
+    private sealed record Option(string Display, string Column, string? TagKey, ResourceGridFilterKind Kind);
+
+    private IEnumerable<Option> AvailableOptions()
+    {
+        var options = new List<Option>
+        {
+            new("Name", "ResourceName", null, ResourceGridFilterKind.Text),
+            new("Type", "ResourceType", null, ResourceGridFilterKind.Enumerable),
+            new("Description", "Description", null, ResourceGridFilterKind.Text),
+        };
+        foreach (var key in TagKeys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase))
+            options.Add(new Option(key, "Tag", key, ResourceGridFilterKind.Enumerable));
+
+        // Exclude columns / tag keys already present (each may be added once).
+        return options.Where(o => !State.Filters.Any(f =>
+            string.Equals(f.Column, o.Column, StringComparison.Ordinal)
+            && string.Equals(f.TagKey, o.TagKey, StringComparison.Ordinal)));
+    }
+
+    private async Task Select(Option opt)
+    {
+        if (State.Filters.Count >= ResourceFilterState.MaxFilters) return;
+
+        var filter = new ActiveFilter
+        {
+            Column = opt.Column,
+            TagKey = opt.TagKey,
+            Kind = opt.Kind,
+            Operator = opt.Kind == ResourceGridFilterKind.Text
+                ? ResourceGridFilterOperator.Contains
+                : ResourceGridFilterOperator.Equals
+        };
+        State.Filters.Add(filter);
+        await OnAdd.InvokeAsync(filter);
+    }
+}

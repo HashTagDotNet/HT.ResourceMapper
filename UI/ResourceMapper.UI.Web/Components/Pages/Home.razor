@@ -1,126 +1,188 @@
 @page "/"
 @using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Routing
 @using ResourceMapper.Common.Server.Resources.Interfaces
+@using ResourceMapper.Common.Shared.HomePage.Contracts
+@using ResourceMapper.Common.Shared.HomePage.Filtering
+@using ResourceMapper.UI.Web.Components.Home
 @implements IDisposable
 @inject IResourceService ResourceService
-@inject PersistentComponentState AppState
+@inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
 
 <PageTitle>Resources — Hashtag Resource Mapper</PageTitle>
 
-<div class="d-flex align-center mb-1">
-    <MudText Typo="Typo.h5" Style="font-weight:600;">Resources</MudText>
-    <MudSpacer />
-    @if (_items is not null && _loadError is null)
-    {
-        <MudText Typo="Typo.caption" Color="Color.Secondary">@_items.Count resources</MudText>
-    }
-</div>
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
-    Searchable catalog of cloud resources across environments.
-</MudText>
+<ResourceFilterBar State="_state" TagKeys="_tagKeys" Total="_total" Shown="@(_items?.Count ?? 0)"
+                   FacetLoader="LoadFacet" OnReload="HandleReload" />
 
 @if (_loadError is not null)
 {
-    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">@_loadError</MudAlert>
-}
-else
-{
-    <MudDataGrid T="ResourceGridItemModel" Items="@(_items ?? new())" Loading="@(_items is null)"
-                 Dense="true" Hover="true" Elevation="0" SortMode="SortMode.Single"
-                 Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
-        <Columns>
-            <PropertyColumn Property="x => x.ResourceName" Title="Name" />
-            <PropertyColumn Property="x => x.ResourceType" Title="Type" />
-            <PropertyColumn Property="x => x.Description" Title="Description" />
-            <TemplateColumn Title="Tags" Sortable="false">
-                <CellTemplate>
-                    @if (context.Item.Tags is null || context.Item.Tags.Count == 0)
-                    {
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">—</MudText>
-                    }
-                    else
-                    {
-                        <div class="d-flex flex-wrap rm-tags">
-                            @foreach (var tag in context.Item.Tags)
-                            {
-                                @if (string.Equals(tag.ContentType, "Link", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    <span class="rm-tag">
-                                        <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" Class="rm-tagicon" />
-                                        <MudLink Href="@tag.TagValue" Target="_blank" Typo="Typo.body2">@tag.TagKey</MudLink>
-                                        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
-                                                       Class="rm-copy" aria-label="Copy link"
-                                                       OnClick="@(() => CopyAsync(tag.TagValue))" />
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span class="rm-tagtext"><span class="rm-tagkey">@tag.TagKey:</span> @tag.TagValue</span>
-                                }
-                            }
-                        </div>
-                    }
-                </CellTemplate>
-            </TemplateColumn>
-        </Columns>
-        <NoRecordsContent>
-            <div class="pa-10 d-flex justify-center">
-                <MudText Color="Color.Secondary">No resources yet — use the menu's&nbsp;<strong>Import…</strong>&nbsp;to load data.</MudText>
-            </div>
-        </NoRecordsContent>
-    </MudDataGrid>
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mb-3">@_loadError</MudAlert>
 }
 
+<MudDataGrid @ref="_grid" T="ResourceGridItemModel" ServerData="LoadGridData"
+             Dense="true" Hover="true" Elevation="0" SortMode="SortMode.Single"
+             Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
+    <Columns>
+        <PropertyColumn Property="x => x.ResourceName" Title="Name" />
+        <PropertyColumn Property="x => x.ResourceType" Title="Type" />
+        <PropertyColumn Property="x => x.Description" Title="Description" />
+        <TemplateColumn Title="Tags" Sortable="false">
+            <CellTemplate>
+                @if (context.Item.Tags is null || context.Item.Tags.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">—</MudText>
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap rm-tags">
+                        @foreach (var tag in context.Item.Tags)
+                        {
+                            @if (string.Equals(tag.ContentType, "Link", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <span class="rm-tag">
+                                    <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" Class="rm-tagicon" />
+                                    <MudLink Href="@tag.TagValue" Target="_blank" Typo="Typo.body2">@tag.TagKey</MudLink>
+                                    <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
+                                                   Class="rm-copy" aria-label="Copy link"
+                                                   OnClick="@(() => CopyAsync(tag.TagValue))" />
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="rm-tagtext"><span class="rm-tagkey">@tag.TagKey:</span> @tag.TagValue</span>
+                            }
+                        }
+                    </div>
+                }
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <NoRecordsContent>
+        <div class="pa-10 d-flex justify-center">
+            <MudText Color="Color.Secondary">No matches — adjust your filters, or use the menu's&nbsp;<strong>Import…</strong>&nbsp;to load data.</MudText>
+        </div>
+    </NoRecordsContent>
+</MudDataGrid>
+
 @code {
+    private ResourceFilterState _state = new();
     private List<ResourceGridItemModel>? _items;
     private int _total;
     private string? _loadError;
-    private PersistingComponentStateSubscription _persistSub;
+    private IReadOnlyList<string> _tagKeys = new List<string>();
+
+    private MudDataGrid<ResourceGridItemModel>? _grid;
+    private bool _pushNext;
+    private string _lastQuery = "";
 
     protected override async Task OnInitializedAsync()
     {
-        _persistSub = AppState.RegisterOnPersisting(PersistState);
+        // Restore state from the URL (safe on both prerender and interactive passes).
+        _state = ResourceFilterState.FromQueryString(Navigation.Uri);
+        _lastQuery = _state.ToQueryString();
+        Navigation.LocationChanged += OnLocationChanged;
 
-        // Reuse the prerender result on the interactive pass instead of querying the DB twice.
-        if (AppState.TryTakeFromJson<GridSnapshot>("grid", out var snap) && snap is not null)
+        try
         {
-            _items = snap.Items ?? new();
-            _total = snap.Total;
-            _loadError = snap.Error;
-            return;
+            var keys = await ResourceService.GetTagFilterKeys(CancellationToken.None);
+            if (keys.IsSuccess() && keys.ApiResponse.Data is not null)
+                _tagKeys = keys.ApiResponse.Data;
+        }
+        catch
+        {
+            // Tag-key list is non-critical; the bar simply won't offer tag filters.
+        }
+    }
+
+    // The grid's server-side data source: returns the top-N (DisplayCount) of the filtered/sorted set.
+    private async Task<GridData<ResourceGridItemModel>> LoadGridData(GridState<ResourceGridItemModel> gridState, CancellationToken cancellationToken)
+    {
+        var sort = gridState.SortDefinitions.FirstOrDefault();
+        if (sort is not null)
+        {
+            _state.OrderBy = MapSortColumn(sort.SortBy);
+            _state.OrderDirection = sort.Descending ? "Desc" : "Asc";
         }
 
         try
         {
-            var request = new ResourceGridRequest { Skip = 0, Take = 100, OrderBy = "ResourceName", OrderDirection = "Asc" };
-            var response = await ResourceService.GetResourceGridItems(request, CancellationToken.None);
+            var response = await ResourceService.GetResourceGridItems(_state.ToGridRequest(), cancellationToken);
             if (response.IsSuccess() && response.ApiResponse.Data is not null)
             {
                 _items = response.ApiResponse.Data.Items ?? new();
                 _total = response.ApiResponse.Data.TotalItems;
+                _loadError = null;
             }
             else
             {
                 _items = new();
+                _total = 0;
                 _loadError = "Unable to load resources.";
             }
         }
         catch
         {
             _items = new();
+            _total = 0;
             _loadError = "Unable to load resources — the database may not be available yet.";
         }
+
+        UpdateUrl(_pushNext);
+        _pushNext = false;
+
+        return new GridData<ResourceGridItemModel> { Items = _items, TotalItems = _total };
     }
 
-    private Task PersistState()
+    private async Task<ResourceGridFacetResponse?> LoadFacet(ActiveFilter filter)
     {
-        AppState.PersistAsJson("grid", new GridSnapshot { Items = _items, Total = _total, Error = _loadError });
-        return Task.CompletedTask;
+        var request = new ResourceGridFacetRequest
+        {
+            Column = filter.Column,
+            TagKey = filter.TagKey,
+            SearchFor = _state.SearchFor,
+            Filters = _state.ToGridRequest().Filters
+        };
+        var response = await ResourceService.GetResourceGridFacet(request, CancellationToken.None);
+        return response.IsSuccess() ? response.ApiResponse.Data : null;
     }
 
-    public void Dispose() => _persistSub.Dispose();
+    private async Task HandleReload(bool pushHistory)
+    {
+        _pushNext = pushHistory;
+        if (_grid is not null)
+            await _grid.ReloadServerData();
+    }
+
+    private void UpdateUrl(bool push)
+    {
+        _lastQuery = _state.ToQueryString();
+        var path = new Uri(Navigation.Uri).AbsolutePath;
+        Navigation.NavigateTo(path + _lastQuery, forceLoad: false, replace: !push);
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        var incoming = ResourceFilterState.FromQueryString(e.Location);
+        if (string.Equals(incoming.ToQueryString(), _lastQuery, StringComparison.Ordinal))
+            return; // a navigation we initiated — ignore
+
+        // Browser Back/Forward (or an external link): adopt the state and reload without re-navigating.
+        _state = incoming;
+        _lastQuery = incoming.ToQueryString();
+        if (_grid is not null)
+            await InvokeAsync(() => _grid.ReloadServerData());
+    }
+
+    private static string MapSortColumn(string? sortBy) => sortBy switch
+    {
+        "ResourceType" => "TypeName",
+        "Description" => "Description",
+        _ => "ResourceName"
+    };
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
 
     private async Task CopyAsync(string url)
     {
@@ -133,12 +195,5 @@ else
         {
             Snackbar.Add("Couldn't copy link", Severity.Warning);
         }
-    }
-
-    private sealed class GridSnapshot
-    {
-        public List<ResourceGridItemModel>? Items { get; set; }
-        public int Total { get; set; }
-        public string? Error { get; set; }
     }
 }

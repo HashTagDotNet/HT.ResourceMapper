@@ -1,0 +1,148 @@
+@using ResourceMapper.Common.Shared.HomePage.Contracts
+@using ResourceMapper.Common.Shared.HomePage.Filtering
+
+@* "Filter results" popover body for an enumerable filter (Type or a tag key). *@
+<div class="rm-filter-editor pa-3" style="min-width:280px;max-width:340px;" @onclick:stopPropagation="true">
+    <MudText Typo="Typo.subtitle2" Class="mb-2">Filter results</MudText>
+
+    <MudSelect T="ResourceGridFilterOperator" @bind-Value="_operator" Dense="true" Margin="Margin.Dense"
+               Variant="Variant.Outlined" Label="Operator" Class="mb-2">
+        <MudSelectItem Value="ResourceGridFilterOperator.Equals">Equals</MudSelectItem>
+        <MudSelectItem Value="ResourceGridFilterOperator.NotEquals">Not equals</MudSelectItem>
+    </MudSelect>
+
+    <MudTextField @bind-Value="_valueSearch" Immediate="true" DebounceInterval="200"
+                  Placeholder="Search values" Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Outlined.Search" Margin="Margin.Dense"
+                  Variant="Variant.Outlined" Class="mb-2" aria-label="Search values" />
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-center pa-4"><MudProgressCircular Size="Size.Small" Indeterminate="true" /></div>
+    }
+    else if (_values.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-2">No values</MudText>
+    }
+    else
+    {
+        <div style="max-height:280px;overflow:auto;">
+            <MudCheckBox T="bool?" Value="_allState" TriState="true" ValueChanged="OnToggleAll"
+                         Dense="true" Label="All" Class="rm-filter-all" />
+            @foreach (var item in FilteredValues())
+            {
+                <MudCheckBox T="bool" Value="@IsChecked(item)" Dense="true"
+                             ValueChanged="@(v => OnToggle(item, v))">
+                    @item.Display <span class="rm-facet-count">(@item.Count)</span>
+                </MudCheckBox>
+            }
+        </div>
+    }
+
+    <div class="d-flex justify-end mt-3" style="gap:8px;">
+        <MudButton Size="Size.Small" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="Apply">Apply</MudButton>
+    </div>
+</div>
+
+@code {
+    [Parameter] public ActiveFilter Filter { get; set; } = default!;
+    [Parameter] public Func<ActiveFilter, Task<ResourceGridFacetResponse?>> FacetLoader { get; set; } = default!;
+    [Parameter] public EventCallback OnApply { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private bool _loading = true;
+    private string _valueSearch = "";
+    private ResourceGridFilterOperator _operator;
+    private readonly HashSet<string> _selected = new(StringComparer.Ordinal);
+    private bool _includeBlank;
+    private List<ResourceGridFacetValue> _values = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Working copy of the current selection (committed on Apply, discarded on Cancel).
+        _operator = Filter.Operator;
+        _includeBlank = Filter.IncludeBlank;
+        foreach (var v in Filter.SelectedValues) _selected.Add(v);
+
+        try
+        {
+            var resp = await FacetLoader(Filter);
+            _values = resp?.Values ?? new();
+        }
+        catch
+        {
+            _values = new();
+        }
+        _loading = false;
+    }
+
+    // The values currently shown given the "Search values" text. "All" and its tri-state operate on
+    // THIS subset (matching Azure), so typing "ser" then clicking All selects only the matches.
+    private List<ResourceGridFacetValue> FilteredValues()
+    {
+        if (string.IsNullOrWhiteSpace(_valueSearch))
+            return _values;
+        return _values.Where(v => v.Display.Contains(_valueSearch, StringComparison.OrdinalIgnoreCase)).ToList();
+    }
+
+    private bool IsChecked(ResourceGridFacetValue item)
+        => item.IsBlank ? _includeBlank : (item.Value is not null && _selected.Contains(item.Value));
+
+    private void OnToggle(ResourceGridFacetValue item, bool value)
+    {
+        if (item.IsBlank)
+        {
+            _includeBlank = value;
+        }
+        else if (item.Value is not null)
+        {
+            if (value) _selected.Add(item.Value);
+            else _selected.Remove(item.Value);
+        }
+    }
+
+    // Tri-state reflects the FILTERED subset: all-of-filtered selected => checked, none => unchecked,
+    // some => indeterminate.
+    private bool? _allState
+    {
+        get
+        {
+            var filtered = FilteredValues();
+            var nonBlank = filtered.Where(v => !v.IsBlank).ToList();
+            var hasBlank = filtered.Any(v => v.IsBlank);
+            var selectedInView = nonBlank.Count(v => v.Value is not null && _selected.Contains(v.Value));
+            return ResourceFilterState.AllCheckboxState(selectedInView, nonBlank.Count, _includeBlank && hasBlank, hasBlank);
+        }
+    }
+
+    private void OnToggleAll(bool? value)
+    {
+        // Select / clear only the values currently in view (respecting the value-search), leaving any
+        // selections outside the current filter untouched.
+        var selectAll = value == true;
+        foreach (var v in FilteredValues())
+        {
+            if (v.IsBlank)
+            {
+                _includeBlank = selectAll;
+            }
+            else if (v.Value is not null)
+            {
+                if (selectAll) _selected.Add(v.Value);
+                else _selected.Remove(v.Value);
+            }
+        }
+    }
+
+    private async Task Apply()
+    {
+        Filter.Operator = _operator;
+        Filter.SelectedValues.Clear();
+        foreach (var v in _selected) Filter.SelectedValues.Add(v);
+        Filter.IncludeBlank = _includeBlank;
+        await OnApply.InvokeAsync();
+    }
+
+    private async Task Cancel() => await OnCancel.InvokeAsync();
+}
