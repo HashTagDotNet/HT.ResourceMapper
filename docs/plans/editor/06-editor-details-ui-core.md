@@ -182,6 +182,67 @@ line, help text) consistent with existing `rm-` conventions — no new styleshee
 Then: flip slice #6 → Done and slice #7 → Planning in `00-implementation-plan-list.md`, and
 commit. Per our pattern, planning is on the stronger model; execution switches to the cheaper one.
 
+## Execution notes
+
+- **All steps completed and verified — including actually driving the app in a real browser**
+  (no project run-skill existed; used `playwright-core` against system Chrome, headless, since
+  `chromium-cli` wasn't available). `dotnet build` — zero `error CS` across both the plain
+  solution build and the DB project's full-MSBuild rebuild (only the documented non-SDK sqlproj
+  failure under `dotnet build`, unrelated). `dotnet test` — 66/66 (65 prior + the new
+  `ResourceTypeOption` id-carrying test).
+- **Contract fix landed as planned:** `OpenEditorResponse.ResourceTypes` is now
+  `List<ResourceTypeOption>` (`{ResourceTypeId, TypeName, ResourceTypeUid}`); `GeneralTab`'s Type
+  `MudSelect<int?>` binds to it directly and keeps `Model.ResourceType.EditedValue` (the name) in
+  sync on change.
+- **Real bug found and fixed while driving the app — a permanently-stuck loading spinner.**
+  `LoadAsync`'s "avoid redundant reload" guard compared `ResourceUid` (null in Create mode, no
+  route param) to `_lastLoadedUid` (also null, the field's default) — `string.Equals(null, null)`
+  is `true`, so the very **first** load on `/resources` returned immediately, before the
+  `finally` block ever set `_loading = false`. The page never rendered past the progress bar.
+  Fixed with an explicit `_hasLoadedOnce` flag so the guard can't fire before any load has
+  actually happened.
+- **A second, more consequential bug found the same way — a genuine latent defect from slice #4,
+  only now exposed.** After the loading-spinner fix, Save reported failure with no visible field
+  errors. Reproduced directly against the service (bypassing the browser) to get the real
+  exception: `Resource_GetByResourceUid` was still the *pre-slice-5* definition — its `Domain`
+  column addition had been edited in the repo during slice #5 but **never republished** to this
+  localdb (the identical class of mistake slice #4 already hit once and documented as a lesson).
+  Republishing surfaced a **second, previously-undetected bug**: `ResourceTag_GetForResource.sql`
+  (added in slice #4) computes `IsPrimary` as `CASE WHEN … THEN 1 ELSE 0 END` with no cast — SQL
+  Server infers that as `INT`, but the C# reader calls `dr.ReadBoolean("IsPrimary")`, throwing
+  `Unable to cast … Int32 … to … Boolean`. This was invisible in every prior slice because it only
+  fires when `ResourceTag_GetForResource` returns a **non-empty** result set — and slice #5's
+  domain-tag-on-create is the **first** code path that ever gives a freshly-created resource a
+  tag row (its own domain tag) before any read of it. Fixed with an explicit
+  `CAST(... AS BIT)`, matching the one other place in the codebase that already did this
+  correctly (`Resource_GetFilterValues.sql`'s `IsBlank`). **Lesson reinforced a second time:
+  republish the dacpac after *every* sproc edit, not just at the end of a slice** — and a bug that
+  never triggers because a code path is only ever exercised with an empty result set can hide for
+  multiple slices.
+- **Cosmetic fix:** the Resource Type `MudSelect` initially bound `int` with a `?? 0` fallback,
+  which rendered a literal "0" before any type was picked (no `MudSelectItem` has `Value=0`).
+  Switched to `MudSelect<int?>` bound directly to `Model.ResourceTypeId` with a `Placeholder`.
+- **Full manual walkthrough, screenshotted at each step, confirmed correct:** Create → General tab
+  (Type/Domain selects populated from seeded data; picking both plus typing a Name correctly
+  auto-slugs Key; identity preview live-updates to `"non-prod / {Type} / {key}"`) → Save (success
+  snackbar named the resource; URL changed to `/resources/{uid}`; landed in View mode) → **Edit**
+  (Type and Domain selects visually disabled/greyed; Name/Key/Description remained editable) →
+  edited Description → **Save** again (stayed on the same URL, dropped back to View mode) → Home
+  grid (showed the new row with its Description edit and a `Domain: non-prod` tag chip) → the
+  row's "Open details" icon correctly navigated to `/resources/{uid}` — confirming the
+  `Home.razor` `/resource`→`/resources` route fix. One console `404` appeared during the run but
+  did not reproduce in isolation on either page — a pre-existing, non-blocking artifact, not a
+  regression from this slice.
+- **Simplification vs. the plan:** did not attempt to gate/disable the Review `MudTabPanel` during
+  Create (the "linear wizard… blocking" nicety) — MudBlazor 9.5's exact API for disabling one tab
+  panel wasn't independently confirmed, and the load-bearing rule ("not saved until Save
+  succeeds") is already enforced at the Save button regardless of which tab is active. Both tabs
+  are freely switchable in all three modes; only General's fields react to `ReadOnly`/frozen
+  state. Revisit if a later slice wants the stricter wizard gating.
+- **All temporary test artifacts removed:** the seeded `Slice6SmokeType` resource type and every
+  resource/tag row created while driving the app were deleted from `(localdb)`; the dev server was
+  stopped; the debug reproduction test (`Slice6DebugTest.cs`) was created, used, and deleted.
+
 ## Rubber-duck note
 
 This plan was adversarially reviewed before writing. Findings folded in: the **type-id contract

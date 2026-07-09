@@ -156,3 +156,38 @@ html, body {
     border-bottom: 1px solid var(--mud-palette-divider);
     margin-bottom: .25rem;
 }
+
+/* Editor/details: compact tabbed shell (General/Review), consistent with the home page. */
+.rm-editor-paper {
+    border: 1px solid var(--mud-palette-divider);
+    max-width: 960px;
+}
+
+.rm-editor-tabs .mud-tabs-panels {
+    padding: 1rem .25rem 0;
+}
+
+.rm-editor-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .75rem 1rem;
+}
+
+.rm-editor-fullwidth {
+    grid-column: 1 / -1;
+}
+
+.rm-identity-preview {
+    border: 1px solid var(--mud-palette-divider);
+    background: var(--mud-palette-background-grey);
+}
+
+.rm-editor-footer {
+    border-top: 1px solid var(--mud-palette-divider);
+    padding-top: 1rem;
+}
+
+.rm-review-label {
+    color: var(--mud-palette-text-secondary);
+    width: 40%;
+}

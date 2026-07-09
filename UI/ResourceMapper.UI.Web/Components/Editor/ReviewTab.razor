@@ -1,0 +1,58 @@
+@using ResourceMapper.Common.Shared.Editor
+
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+    Review before saving. The record isn't saved until Save succeeds.
+</MudText>
+
+<MudSimpleTable Dense="true" Elevation="0" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
+    <tbody>
+        <tr><td class="rm-review-label">Resource Type</td><td>@(string.IsNullOrEmpty(Model.ResourceType.EditedValue) ? "—" : Model.ResourceType.EditedValue)</td></tr>
+        <tr><td class="rm-review-label">Domain</td><td>@(string.IsNullOrEmpty(Model.Domain.EditedValue) ? "—" : Model.Domain.EditedValue)</td></tr>
+        <tr><td class="rm-review-label">Name</td><td>@(string.IsNullOrEmpty(Model.Name.EditedValue) ? "—" : Model.Name.EditedValue)</td></tr>
+        <tr><td class="rm-review-label">Key</td><td>@(string.IsNullOrEmpty(Model.Key.EditedValue) ? "—" : Model.Key.EditedValue)</td></tr>
+        <tr><td class="rm-review-label">Description</td><td>@(string.IsNullOrEmpty(Model.Description.EditedValue) ? "—" : Model.Description.EditedValue)</td></tr>
+        <tr><td class="rm-review-label">Identity</td><td>@(string.IsNullOrEmpty(Model.IdentityPreview.Display) ? "—" : Model.IdentityPreview.Display)</td></tr>
+    </tbody>
+</MudSimpleTable>
+
+@{
+    var messages = CollectMessages();
+}
+@if (messages.Count > 0)
+{
+    <div class="mt-3">
+        @foreach (var message in messages)
+        {
+            <MudAlert Severity="@(message.Level == EditorFieldLevel.Error ? Severity.Error : Severity.Warning)"
+                      Variant="Variant.Outlined" Dense="true" Class="mb-2">
+                @message.Field: @message.Text
+            </MudAlert>
+        }
+    </div>
+}
+else
+{
+    <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+        Ready to save.
+    </MudAlert>
+}
+
+@code {
+    [Parameter] public ResourceEditorModel Model { get; set; } = default!;
+
+    private List<(string Field, string Text, EditorFieldLevel Level)> CollectMessages()
+    {
+        var result = new List<(string, string, EditorFieldLevel)>();
+        AddFieldMessages("Resource Type", Model.ResourceType, result);
+        AddFieldMessages("Domain", Model.Domain, result);
+        AddFieldMessages("Name", Model.Name, result);
+        AddFieldMessages("Key", Model.Key, result);
+        return result;
+    }
+
+    private static void AddFieldMessages(string field, SingleValueEditor editor, List<(string, string, EditorFieldLevel)> result)
+    {
+        foreach (var m in editor.Messages)
+            result.Add((field, m.Message ?? string.Empty, m.Level));
+    }
+}

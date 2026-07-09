@@ -326,8 +326,7 @@
 
     public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
 
-    // Future detail route: @page "/resource/{ResourceUid}" (not built yet).
-    private const string DetailRoute = "/resource";
+    private const string DetailRoute = "/resources";
 
     private void OpenDetails(string uid) =>
         Navigation.NavigateTo($"{DetailRoute}/{uid}");

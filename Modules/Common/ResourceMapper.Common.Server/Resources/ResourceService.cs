@@ -191,7 +191,12 @@ namespace ResourceMapper.Common.Server.Resources
                 builder.Data.Set(new OpenEditorResponse
                 {
                     EditorModel = editorModel,
-                    ResourceTypes = allResourceTypes.Select(r => new KeyValuePair<string, string>(r.ResourceTypeUid, r.TypeName)).ToList(),
+                    ResourceTypes = allResourceTypes.Select(r => new ResourceTypeOption
+                    {
+                        ResourceTypeId = r.ResourceTypeId,
+                        TypeName = r.TypeName,
+                        ResourceTypeUid = r.ResourceTypeUid
+                    }).ToList(),
                     TagDictionary = tagDictionaryModels,
                     EntryPointTemplates = new List<ResourceTypeEntryPointModel>(), // populated in #7
                     DomainAllowedValues = domainAllowedValues

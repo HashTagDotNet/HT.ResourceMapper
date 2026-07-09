@@ -267,6 +267,30 @@ namespace ResourceMapper.Common.Server.Tests.Resources
 
         #endregion
 
+        #region GetResourceEditorModelAsync
+
+        [Fact]
+        public async Task GetResourceEditorModelAsync_Create_ResourceTypesCarryTheIntId()
+        {
+            _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceType>
+                {
+                    new() { ResourceTypeId = 5, TypeName = "AppService", ResourceTypeUid = "rt-uid-5" }
+                });
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>());
+
+            var response = await _sut.GetResourceEditorModelAsync(new OpenEditorRequest { Mode = "Create" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because a Create request always succeeds");
+            var option = response.ApiResponse.Data!.ResourceTypes.Should().ContainSingle().Subject;
+            option.ResourceTypeId.Should().Be(5, "because SaveResourceRequest/ResourceUniquenessRequest need the int id, not just the uid");
+            option.TypeName.Should().Be("AppService");
+            option.ResourceTypeUid.Should().Be("rt-uid-5");
+        }
+
+        #endregion
+
         #region GetResourceDetailAsync
 
         [Fact]

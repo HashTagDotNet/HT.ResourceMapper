@@ -15,7 +15,7 @@ BEGIN
         rt.TagValue,
         td.IsSystemTag,
         td.IsMultiValued,
-        CASE WHEN r.PrimaryTagDefinitionId = td.TagDefinitionId THEN 1 ELSE 0 END AS IsPrimary
+        CAST(CASE WHEN r.PrimaryTagDefinitionId = td.TagDefinitionId THEN 1 ELSE 0 END AS BIT) AS IsPrimary
     FROM [HTResourceMapper].[ResourceTag] rt
     INNER JOIN [HTResourceMapper].[TagDefinition] td ON td.TagDefinitionId = rt.TagDefinitionId
     INNER JOIN [HTResourceMapper].[TagContentType] tc ON tc.TagContentTypeId = td.TagContentTypeId

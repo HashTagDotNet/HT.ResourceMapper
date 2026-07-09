@@ -8,7 +8,7 @@
     public class OpenEditorResponse
     {
         public ResourceEditorModel EditorModel { get; set; } = new();
-        public List<KeyValuePair<string, string>> ResourceTypes { get; set; } = new();
+        public List<ResourceTypeOption> ResourceTypes { get; set; } = new();
 
         /// <summary>Full tag dictionary — drives "Add tag" search + render rules.</summary>
         public List<TagDefinitionModel> TagDictionary { get; set; } = new();

@@ -1,0 +1,145 @@
+@using ResourceMapper.Common.Shared.Editor
+
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+    Identity is set by Resource Type, @DomainLabel, and Key together — once saved, Resource Type
+    and @DomainLabel can't be changed.
+</MudText>
+
+<div class="rm-editor-fields">
+    <MudSelect T="int?" Value="@Model.ResourceTypeId" ValueChanged="OnTypeChanged"
+               Label="Resource Type" Required="true" Disabled="@(ReadOnly || Model.IsPersisted)"
+               Placeholder="Select…" Variant="Variant.Outlined" Margin="Margin.Dense"
+               Error="@(Model.ResourceType.Level == EditorFieldLevel.Error)"
+               ErrorText="@Model.ResourceType.Messages.FirstOrDefault()?.Message">
+        @foreach (var option in ResourceTypes)
+        {
+            <MudSelectItem Value="@((int?)option.ResourceTypeId)">@option.TypeName</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" Value="@Model.Domain.EditedValue" ValueChanged="OnDomainChanged"
+               Label="@DomainLabel" Required="true" Disabled="@(ReadOnly || Model.IsPersisted)"
+               Variant="Variant.Outlined" Margin="Margin.Dense"
+               Error="@(Model.Domain.Level == EditorFieldLevel.Error)"
+               ErrorText="@Model.Domain.Messages.FirstOrDefault()?.Message">
+        @foreach (var value in DomainAllowedValues)
+        {
+            <MudSelectItem Value="@value">@value</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudTextField T="string" Value="@Model.Name.EditedValue" ValueChanged="OnNameChanged"
+                  Label="Name" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense"
+                  Error="@(Model.Name.Level == EditorFieldLevel.Error)"
+                  ErrorText="@Model.Name.Messages.FirstOrDefault()?.Message" />
+
+    <MudTextField T="string" Value="@Model.Key.EditedValue" ValueChanged="OnKeyChanged" OnBlur="OnKeyBlurred"
+                  Label="Key" Required="true" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense"
+                  HelperText="@(Model.IsPersisted ? null : "Auto-filled from Name — edit to override")"
+                  Error="@(Model.Key.Level == EditorFieldLevel.Error)"
+                  ErrorText="@Model.Key.Messages.FirstOrDefault()?.Message" />
+
+    <MudTextField T="string" Value="@Model.Description.EditedValue" ValueChanged="OnDescriptionChanged"
+                  Label="Description" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense"
+                  Lines="3" Class="rm-editor-fullwidth" />
+</div>
+
+<MudPaper Elevation="0" Class="pa-3 mt-3 rm-identity-preview">
+    <MudText Typo="Typo.caption" Color="Color.Secondary">Identity</MudText>
+    <MudText Typo="Typo.body2">@(string.IsNullOrEmpty(Model.IdentityPreview.Display) ? "—" : Model.IdentityPreview.Display)</MudText>
+</MudPaper>
+
+@if (Model.IsPersisted)
+{
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+        Created @Model.CreatedOn?.ToString("g")
+        @if (Model.UpdatedOn is not null)
+        {
+            <span>&nbsp;·&nbsp;Updated @Model.UpdatedOn?.ToString("g")</span>
+        }
+    </MudText>
+}
+
+@code {
+    [Parameter] public ResourceEditorModel Model { get; set; } = default!;
+    [Parameter] public List<ResourceTypeOption> ResourceTypes { get; set; } = new();
+    [Parameter] public List<string> DomainAllowedValues { get; set; } = new();
+    [Parameter] public List<TagDefinitionModel> TagDictionary { get; set; } = new();
+    [Parameter] public bool ReadOnly { get; set; }
+
+    /// <summary>Parent performs the uniqueness-check service call and updates Model.IdentityPreview.</summary>
+    [Parameter] public EventCallback OnCheckUniqueness { get; set; }
+    [Parameter] public EventCallback OnFieldChanged { get; set; }
+
+    private bool _keyManuallyEdited;
+
+    private string DomainLabel =>
+        TagDictionary.FirstOrDefault(t => t.IsDomainTag)?.DisplayName ?? "Domain";
+
+    private async Task OnTypeChanged(int? value)
+    {
+        Model.ResourceTypeId = value;
+        Model.ResourceType.EditedValue = ResourceTypes.FirstOrDefault(o => o.ResourceTypeId == value)?.TypeName ?? string.Empty;
+        await NotifyChangedAndCheckUniqueness();
+    }
+
+    private async Task OnDomainChanged(string value)
+    {
+        Model.Domain.EditedValue = value;
+        await NotifyChangedAndCheckUniqueness();
+    }
+
+    private async Task OnNameChanged(string value)
+    {
+        Model.Name.EditedValue = value;
+        if (!Model.IsPersisted && !_keyManuallyEdited)
+            Model.Key.EditedValue = Slugify(value);
+        await NotifyChangedAndCheckUniqueness();
+    }
+
+    private async Task OnKeyChanged(string value)
+    {
+        Model.Key.EditedValue = value;
+        _keyManuallyEdited = true;
+        await OnFieldChanged.InvokeAsync();
+    }
+
+    private async Task OnKeyBlurred(Microsoft.AspNetCore.Components.Web.FocusEventArgs args) =>
+        await NotifyChangedAndCheckUniqueness();
+
+    private async Task OnDescriptionChanged(string value)
+    {
+        Model.Description.EditedValue = value;
+        await OnFieldChanged.InvokeAsync();
+    }
+
+    private async Task NotifyChangedAndCheckUniqueness()
+    {
+        await OnFieldChanged.InvokeAsync();
+        if (EditorValidation.IsIdentityComplete(Model))
+            await OnCheckUniqueness.InvokeAsync();
+        StateHasChanged();
+    }
+
+    private static string Slugify(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return string.Empty;
+        var sb = new System.Text.StringBuilder();
+        var lastWasDash = false;
+        foreach (var c in name.Trim().ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                sb.Append(c);
+                lastWasDash = false;
+            }
+            else if (!lastWasDash && sb.Length > 0)
+            {
+                sb.Append('-');
+                lastWasDash = true;
+            }
+        }
+        if (sb.Length > 0 && sb[^1] == '-') sb.Length--;
+        return sb.ToString();
+    }
+}

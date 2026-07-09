@@ -1,0 +1,253 @@
+@page "/resources"
+@page "/resources/{ResourceUid}"
+@using HT.Api.Client.Contracts.Models
+@using HT.Api.Service.Contracts
+@using ResourceMapper.Common.Server.Resources.Interfaces
+@using ResourceMapper.Common.Shared.Editor
+@using ResourceMapper.Common.Shared.Editor.Contracts
+@using ResourceMapper.UI.Web.Components.Editor
+@inject IResourceService ResourceService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>@PageTitleText — Hashtag Resource Mapper</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+else if (_loadError is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-3">@_loadError</MudAlert>
+}
+else if (_model is not null && _response is not null)
+{
+    <div class="d-flex align-center mb-3">
+        <MudText Typo="Typo.h5" Style="font-weight:600;">@PageTitleText</MudText>
+        <MudSpacer />
+        @if (_mode == "View")
+        {
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Edit" OnClick="EnterEditMode">Edit</MudButton>
+        }
+    </div>
+
+    <MudPaper Elevation="0" Class="pa-4 rm-editor-paper">
+        <MudTabs Class="rm-editor-tabs">
+            <MudTabPanel Text="General">
+                <GeneralTab Model="_model" ResourceTypes="_response.ResourceTypes" DomainAllowedValues="_response.DomainAllowedValues"
+                            TagDictionary="_response.TagDictionary" ReadOnly="@(_mode == "View")"
+                            OnFieldChanged="OnGeneralFieldChanged" OnCheckUniqueness="CheckUniquenessAsync" />
+            </MudTabPanel>
+            <MudTabPanel Text="Review">
+                <ReviewTab Model="_model" />
+            </MudTabPanel>
+            @* History tab: scaffolded per design §12, not built — commented out until audit/versioning lands.
+            <MudTabPanel Text="History">
+                <HistoryTab Model="_model" />
+            </MudTabPanel>
+            *@
+        </MudTabs>
+
+        @if (_mode != "View")
+        {
+            <div class="d-flex justify-end mt-4 rm-editor-footer">
+                <MudButton Variant="Variant.Text" OnClick="Cancel" Class="mr-2" Disabled="@_saving">Cancel</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@_saving" OnClick="SaveAsync">
+                    @(_saving ? "Saving…" : "Save")
+                </MudButton>
+            </div>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public string? ResourceUid { get; set; }
+
+    private OpenEditorResponse? _response;
+    private ResourceEditorModel? _model => _response?.EditorModel;
+    private string _mode = "Create";
+    private bool _loading = true;
+    private string? _loadError;
+    private bool _saving;
+    private bool _hasLoadedOnce;
+    private string? _lastLoadedUid;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private string PageTitleText => _mode switch
+    {
+        "Create" => "Create Resource",
+        _ => string.IsNullOrWhiteSpace(_model?.Name.EditedValue) ? "Resource" : _model!.Name.EditedValue
+    };
+
+    private async Task LoadAsync(bool forceReload = false)
+    {
+        if (!forceReload && _hasLoadedOnce && string.Equals(ResourceUid, _lastLoadedUid, StringComparison.Ordinal))
+            return;
+
+        _hasLoadedOnce = true;
+        _lastLoadedUid = ResourceUid;
+        _loading = true;
+        _loadError = null;
+        try
+        {
+            var isNew = string.IsNullOrWhiteSpace(ResourceUid);
+            _mode = isNew ? "Create" : "View";
+
+            var request = new OpenEditorRequest { Mode = isNew ? "Create" : "Edit", ResourceUid = ResourceUid };
+            var response = await ResourceService.GetResourceEditorModelAsync(request, CancellationToken.None);
+
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+            {
+                _response = response.ApiResponse.Data;
+            }
+            else
+            {
+                _response = null;
+                _loadError = "Resource not found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _response = null;
+            _loadError = $"Could not load: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void EnterEditMode() => _mode = "Edit";
+
+    private void Cancel()
+    {
+        if (_model?.IsPersisted == true)
+        {
+            _mode = "View";
+            _ = LoadAsync(forceReload: true); // discard in-memory edits, reload the persisted values
+        }
+        else
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private void OnGeneralFieldChanged()
+    {
+        if (_model is null) return;
+
+        _model.IdentityPreview.Domain = _model.Domain.EditedValue;
+        _model.IdentityPreview.ResourceType = _model.ResourceType.EditedValue;
+        _model.IdentityPreview.Key = _model.Key.EditedValue;
+
+        // Any identity-bearing field change invalidates the last uniqueness result.
+        _model.IdentityPreview.IsUnique = null;
+        _model.IdentityPreview.UniquenessMessage = null;
+
+        StateHasChanged();
+    }
+
+    private async Task CheckUniquenessAsync()
+    {
+        if (_model is null) return;
+        try
+        {
+            var request = new ResourceUniquenessRequest
+            {
+                ResourceTypeId = _model.ResourceTypeId ?? 0,
+                Domain = _model.Domain.EditedValue,
+                ResourceKey = _model.Key.EditedValue,
+                ExcludeResourceUid = _model.IsPersisted ? _model.ResourceUid : null
+            };
+
+            var response = await ResourceService.CheckUniquenessAsync(request, CancellationToken.None);
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+            {
+                _model.IdentityPreview.IsUnique = response.ApiResponse.Data.IsUnique;
+                _model.IdentityPreview.UniquenessMessage = response.ApiResponse.Data.Message;
+            }
+        }
+        catch
+        {
+            // Non-critical — the server re-validates on Save regardless.
+        }
+        StateHasChanged();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_model is null) return;
+
+        if (!EditorValidation.ValidateGeneral(_model))
+        {
+            Snackbar.Add("Fix the highlighted fields before saving.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var request = new SaveResourceRequest
+            {
+                Mode = _model.IsPersisted ? "Edit" : "Create",
+                ResourceUid = _model.ResourceUid,
+                ResourceTypeId = _model.ResourceTypeId ?? 0,
+                Domain = _model.Domain.EditedValue,
+                ResourceName = _model.Name.EditedValue,
+                ResourceKey = _model.Key.EditedValue,
+                Description = _model.Description.EditedValue,
+                PrimaryTagDefinitionId = _model.PrimaryTagDefinitionId
+            };
+
+            var response = await ResourceService.SaveResourceAsync(request, CancellationToken.None);
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+            {
+                var savedUid = response.ApiResponse.Data.ResourceUid;
+                Snackbar.Add(response.ApiResponse.Data.Message, Severity.Success);
+
+                if (string.Equals(ResourceUid, savedUid, StringComparison.Ordinal))
+                {
+                    // Edit-mode save on the same route — reload fresh and drop back to View.
+                    _mode = "View";
+                    await LoadAsync(forceReload: true);
+                }
+                else
+                {
+                    // Create-mode save — move to the resource's permalink; OnParametersSetAsync loads it.
+                    Navigation.NavigateTo($"/resources/{savedUid}", replace: true);
+                }
+            }
+            else
+            {
+                ApplyServerErrors(response);
+                Snackbar.Add("Could not save — see the highlighted fields.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Save failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void ApplyServerErrors(ApiServiceResponse<SaveResourceResponse> response)
+    {
+        if (_model is null) return;
+        foreach (var error in response.ApiResponse.Errors ?? new List<Message>())
+        {
+            var target = error.PropertyName switch
+            {
+                "request.ResourceTypeId" => _model.ResourceType,
+                "request.Domain" => _model.Domain,
+                "request.ResourceName" => _model.Name,
+                "request.ResourceKey" => _model.Key,
+                _ => null
+            };
+            target?.Messages.Add(new EditorMessage { Message = error.Details ?? error.Title ?? "Invalid", Level = EditorFieldLevel.Error });
+        }
+    }
+}
