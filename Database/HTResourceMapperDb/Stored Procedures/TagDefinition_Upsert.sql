@@ -11,6 +11,7 @@ CREATE PROCEDURE [HTResourceMapper].TagDefinition_Upsert
     @IsSystemTag       BIT = 0,
     @DisplayOrder      INT = 1000,
     @OnConflict        VARCHAR(10),       -- 'upsert' | 'skip'
+    @TagDefinitionId   INT = NULL OUTPUT, -- the definition's id, in all non-error cases (optional: import doesn't pass it)
     @Result            VARCHAR(10) OUTPUT -- 'created' | 'updated' | 'skipped' | 'error'
 AS
 BEGIN
@@ -25,6 +26,7 @@ BEGIN
     IF @ContentTypeId IS NULL
     BEGIN
         SET @Result = 'error';
+        SET @TagDefinitionId = NULL;
         RETURN;
     END
 
@@ -51,6 +53,7 @@ BEGIN
         VALUES
             (@TagDefinitionUid, @TagDefinitionKey, @DisplayName, @ContentTypeId, @AllowCustomValue,
              @IsMultiValued, @AllowedValues, @RequirementLevel, @IsDomainTag, @IsSystemTag, @DisplayOrder);
+        SET @TagDefinitionId = SCOPE_IDENTITY();
         SET @Result = 'created';
     END
     ELSE IF @OnConflict = 'upsert'
@@ -67,8 +70,12 @@ BEGIN
             DisplayOrder      = @DisplayOrder,
             UpdatedOn         = SYSUTCDATETIME()
         WHERE TagDefinitionId = @Id;
+        SET @TagDefinitionId = @Id;
         SET @Result = 'updated';
     END
     ELSE
+    BEGIN
+        SET @TagDefinitionId = @Id;
         SET @Result = 'skipped';
+    END
 END

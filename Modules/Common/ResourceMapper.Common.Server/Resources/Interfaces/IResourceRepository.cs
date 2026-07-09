@@ -65,5 +65,28 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
 
         // Deletes the resource and cascades its relationship edges (both directions) and tags.
         Task DeleteResourceAsync(int resourceId, CancellationToken cancellationToken);
+
+        // Editor create/update, keyed by the immutable ResourceUid (not (type+key) — the editor
+        // allows Key rename). Result is 'created' | 'updated' | 'error' (Type changed post-save).
+        Task<(string Result, int ResourceId)> SaveResourceAsync(string resourceUid, int resourceTypeId,
+            string resourceKey, string resourceName, string? description, int? primaryTagDefinitionId,
+            CancellationToken cancellationToken);
+
+        // Every applied tag value for the resource, joined to its definition.
+        Task<List<ResourceTagRead>> GetTagsForResourceAsync(int resourceId, CancellationToken cancellationToken);
+
+        // True iff (resourceTypeId, resourceKey) is not already used by another resource
+        // (excluding the one identified by excludeResourceUid, for edit-mode self-exclusion).
+        Task<bool> CheckResourceUniqueAsync(int resourceTypeId, string resourceKey,
+            string? excludeResourceUid, CancellationToken cancellationToken);
+
+        // Full tag dictionary (all TagDefinition rows), for the editor's "Add tag" picker.
+        Task<List<TagDefinition>> GetAllTagDefinitionsAsync(CancellationToken cancellationToken);
+
+        // Inline tag-definition create/upsert (Domain/System flags forced off by the caller).
+        // Result is 'created' | 'updated' | 'skipped' | 'error' (bad content type).
+        Task<(string Result, int TagDefinitionId)> CreateTagDefinitionAsync(string tagKey, string tagDefinitionUid,
+            string contentType, bool allowCustomValue, bool isMultiValued, string? allowedValuesJson,
+            string? displayName, string requirementLevel, int displayOrder, CancellationToken cancellationToken);
     }
 }

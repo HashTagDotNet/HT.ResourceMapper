@@ -24,6 +24,9 @@ namespace ResourceMapper.Common.Server.Resources.Models
         [Required]
         public int TagContentTypeId { get; set; }
 
+        /// <summary>Denormalized TagContentType.TagCode ("Text"|"Link"), from TagDefinition_GetAll.</summary>
+        public string? ContentType { get; set; }
+
         [Required]
         public bool AllowCustomValue { get; set; } = true;
 

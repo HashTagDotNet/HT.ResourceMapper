@@ -210,6 +210,42 @@ Add `ResourceService` unit tests (xUnit + Moq 4.18.4 + FluentAssertions 7.1.0, `
    `DeleteResourceAsync` (gone; edges cascade). Confirms the full in-process surface the editor
    UI (#6–9) will bind to, ahead of those slices.
 
+## Execution notes
+
+- **All steps completed and verified.** DB dacpac built via full MSBuild + published via
+  `sqlpackage /p:DropObjectsNotInSource=True`; all four sprocs (`Resource_Save`,
+  `ResourceTag_GetForResource`, `Resource_CheckUnique`, `TagDefinition_Upsert`'s new output)
+  exercised via `sqlcmd` — create/update/type-frozen-error, `IsPrimary` projection, unique/
+  collision/self-exclude, and stable-id-on-reupsert all confirmed. `dotnet build` on the C#
+  projects — zero `error CS` (the only build failure anywhere is the pre-existing, documented
+  `HTResourceMapperDb.sqlproj` SSDT limitation under `dotnet build`, unrelated). `dotnet test` —
+  37 existing + 14 new `ResourceService` tests, 51/51 passing. The in-process smoke test (a
+  throwaway xUnit test against the live `(localdb)` DB, deleted before commit) ran the full
+  save → detail → uniqueness → inline-tag-create → relationship add/remove → delete flow
+  end-to-end successfully.
+- **One addition beyond the original plan, made to close a real gap it left open:**
+  `TagDefinitionModel.ContentType` needs the actual `"Text"`/`"Link"` code, but
+  `TagDefinition_GetAll` only returned `TagContentTypeId` — there was no denormalized code to map
+  from without either a SQL join or hardcoding the two seeded ids. Extended `TagDefinition_GetAll`
+  with the same `INNER JOIN TagContentType` pattern `ResourceTag_GetForResource` already uses (an
+  additive column; the existing `ImportSqlRepository` reader is unaffected since it selects
+  columns by name) and added a plain `ContentType` property to the `TagDefinition` server model
+  (safe — there is no EF Core `DbContext` anywhere in this codebase; the `[Table]`/`[Key]`
+  attributes on these POCOs are vestigial, so adding a property has no ORM-mapping risk).
+- **Found and fixed live during verification:** this exact sequencing bug — the dacpac was first
+  published *before* the `TagDefinition_GetAll` extension was added, so the smoke test failed with
+  `IndexOutOfRangeException: ContentType` until the dacpac was rebuilt and republished. Left as a
+  reminder for slice #5+: **always republish after every sproc edit**, not just once at the end.
+- **Scoping call:** the plan's "Key format (slug-safe)" validation was **not** implemented as a
+  regex. No precedent for a slug-format check exists anywhere in the codebase (import validates
+  only non-empty), and enforcing one now would risk rejecting legitimately-imported keys that
+  don't happen to match a slug pattern. `SaveResourceAsync`/`CreateTagDefinitionAsync` validate
+  required + max-length (matching column width) only; a stricter format check, if wanted, belongs
+  in the UI (#6) as instant feedback, not a server-side hard rule.
+- The dead "example" method `ResourceService.GetResourceByUid` (not part of `IResourceService`,
+  referenced by nothing) was removed while expanding this file — it predated the real
+  `GetResourceDetailAsync` this slice adds.
+
 Then: flip slice #4 → Done and slice #5 → Planning in `00-implementation-plan-list.md`, and
 commit (schema-consistent service/API layer). Per our pattern, planning is on the stronger model;
 execution switches to the cheaper one.

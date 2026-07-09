@@ -72,13 +72,16 @@
     <Build Include="Stored Procedures\ResourceTag_SetForResource.sql" />
     <Build Include="Stored Procedures\ResourceType_GetAll.sql" />
     <Build Include="Stored Procedures\ResourceType_Upsert.sql" />
+    <Build Include="Stored Procedures\Resource_CheckUnique.sql" />
     <Build Include="Stored Procedures\Resource_Delete.sql" />
     <Build Include="Stored Procedures\Resource_GetAllKeys.sql" />
     <Build Include="Stored Procedures\Resource_GetByResourceUid.sql" />
     <Build Include="Stored Procedures\Resource_GetDaysAgo.sql" />
     <Build Include="Stored Procedures\Resource_GetFilterValues.sql" />
     <Build Include="Stored Procedures\Resource_GetItems.sql" />
+    <Build Include="Stored Procedures\Resource_Save.sql" />
     <Build Include="Stored Procedures\Resource_Upsert.sql" />
+    <Build Include="Stored Procedures\ResourceTag_GetForResource.sql" />
     <Build Include="Stored Procedures\TagDefinition_GetAll.sql" />
     <Build Include="Stored Procedures\TagDefinition_Upsert.sql" />
     <Build Include="Tables\Resource.sql" />

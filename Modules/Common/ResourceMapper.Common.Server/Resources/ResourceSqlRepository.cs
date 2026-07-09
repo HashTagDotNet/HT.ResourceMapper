@@ -224,6 +224,111 @@ namespace ResourceMapper.Common.Server.Resources
             await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
         }
 
+        public async Task<(string Result, int ResourceId)> SaveResourceAsync(string resourceUid, int resourceTypeId,
+            string resourceKey, string resourceName, string? description, int? primaryTagDefinitionId,
+            CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].Resource_Save")
+                .AddVarchar("@ResourceUid", resourceUid)
+                .AddInteger("@ResourceTypeId", resourceTypeId)
+                .AddNVarchar("@ResourceKey", resourceKey)
+                .AddNVarchar("@ResourceName", resourceName)
+                .AddNVarchar("@Description", description)
+                .AddInteger("@PrimaryTagDefinitionId", primaryTagDefinitionId)
+                .AddInteger("@ResourceId", 0, ParameterDirection.Output)
+                .AddVarchar("@Result", null, 10, ParameterDirection.Output);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+            return (cmd.ReadString("@Result") ?? "error", cmd.ReadInt("@ResourceId"));
+        }
+
+        public async Task<List<ResourceTagRead>> GetTagsForResourceAsync(int resourceId, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].ResourceTag_GetForResource")
+                .AddInteger("@ResourceId", resourceId);
+
+            return await _db.Execute.ExecuteQueryAsync(cmd, dr => new ResourceTagRead
+            {
+                TagDefinitionId = dr.ReadInt("TagDefinitionId"),
+                TagDefinitionKey = dr.ReadString("TagDefinitionKey"),
+                DisplayName = dr.ReadString("DisplayName"),
+                ContentType = dr.ReadString("ContentType"),
+                TagValue = dr.ReadString("TagValue"),
+                IsSystemTag = dr.ReadBoolean("IsSystemTag"),
+                IsMultiValued = dr.ReadBoolean("IsMultiValued"),
+                IsPrimary = dr.ReadBoolean("IsPrimary")
+            }, cancellationToken: cancellationToken);
+        }
+
+        public async Task<bool> CheckResourceUniqueAsync(int resourceTypeId, string resourceKey,
+            string? excludeResourceUid, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].Resource_CheckUnique")
+                .AddInteger("@ResourceTypeId", resourceTypeId)
+                .AddNVarchar("@ResourceKey", resourceKey)
+                .AddVarchar("@ExcludeResourceUid", excludeResourceUid);
+
+            cmd.Parameters.Add(new SqlParameter
+            {
+                ParameterName = "@IsUnique",
+                SqlDbType = SqlDbType.Bit,
+                Direction = ParameterDirection.Output
+            });
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+
+            var value = cmd.Parameters["@IsUnique"].Value;
+            return value != DBNull.Value && (bool)value;
+        }
+
+        public async Task<List<TagDefinition>> GetAllTagDefinitionsAsync(CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].TagDefinition_GetAll");
+            return await _db.Execute.ExecuteQueryAsync(cmd, dr => new TagDefinition
+            {
+                TagDefinitionId = dr.ReadInt("TagDefinitionId"),
+                TagDefinitionUid = dr.ReadString("TagDefinitionUid"),
+                TagDefinitionKey = dr.ReadString("TagDefinitionKey"),
+                DisplayName = dr.ReadString("DisplayName"),
+                TagContentTypeId = dr.ReadInt("TagContentTypeId"),
+                ContentType = dr.ReadString("ContentType"),
+                AllowCustomValue = dr.ReadBoolean("AllowCustomValue"),
+                IsMultiValued = dr.ReadBoolean("IsMultiValued"),
+                AllowedValues = dr.ReadString("AllowedValues"),
+                RequirementLevel = dr.ReadString("RequirementLevel") ?? "Optional",
+                IsDomainTag = dr.ReadBoolean("IsDomainTag"),
+                IsSystemTag = dr.ReadBoolean("IsSystemTag"),
+                DisplayOrder = dr.ReadInt("DisplayOrder"),
+                CreatedOn = dr.ReadDateTime("CreatedOn"),
+                UpdatedOn = dr.ReadNullableDateTime("UpdatedOn")
+            }, cancellationToken: cancellationToken);
+        }
+
+        public async Task<(string Result, int TagDefinitionId)> CreateTagDefinitionAsync(string tagKey,
+            string tagDefinitionUid, string contentType, bool allowCustomValue, bool isMultiValued,
+            string? allowedValuesJson, string? displayName, string requirementLevel, int displayOrder,
+            CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].TagDefinition_Upsert")
+                .AddNVarchar("@TagDefinitionKey", tagKey)
+                .AddVarchar("@TagDefinitionUid", tagDefinitionUid)
+                .AddVarchar("@ContentType", contentType)
+                .AddBit("@AllowCustomValue", allowCustomValue)
+                .AddBit("@IsMultiValued", isMultiValued)
+                .AddNVarchar("@AllowedValues", allowedValuesJson)
+                .AddNVarchar("@DisplayName", displayName)
+                .AddVarchar("@RequirementLevel", requirementLevel)
+                .AddBit("@IsDomainTag", false)
+                .AddBit("@IsSystemTag", false)
+                .AddInteger("@DisplayOrder", displayOrder)
+                .AddVarchar("@OnConflict", "skip")
+                .AddInteger("@TagDefinitionId", 0, ParameterDirection.Output)
+                .AddVarchar("@Result", null, 10, ParameterDirection.Output);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+            return (cmd.ReadString("@Result") ?? "error", cmd.ReadInt("@TagDefinitionId"));
+        }
+
         // Builds the [HTResourceMapper].[ResourceFilterList] TVP rows: one per selected enumerable
         // value / tag value / text filter. Column order MUST match the TVP definition.
         private static DataTable BuildFilterTable(IReadOnlyList<ResourceGridFilterDefinition>? filters)

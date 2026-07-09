@@ -1,6 +1,8 @@
 using ResourceMapper.Common.Server.Resources;
 using ResourceMapper.Common.Server.Resources.Interfaces;
 using ResourceMapper.Common.Server.Resources.Models;
+using ResourceMapper.Common.Shared.Editor;
+using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
 
 // ReSharper disable InconsistentNaming
@@ -265,7 +267,261 @@ namespace ResourceMapper.Common.Server.Tests.Resources
 
         #endregion
 
+        #region GetResourceDetailAsync
+
+        [Fact]
+        public async Task GetResourceDetailAsync_ResourceNotFound_ReturnsNotFound()
+        {
+            _repo.Setup(r => r.GetResourceByUidAsync("missing-uid", It.IsAny<CancellationToken>()))
+                .ReturnsAsync((ResourceDetail?)null);
+
+            var response = await _sut.GetResourceDetailAsync("missing-uid", CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because a resource that doesn't exist cannot be retrieved");
+        }
+
+        [Fact]
+        public async Task GetResourceDetailAsync_HappyPath_ProjectsTagsRelationshipsAndComputesPrimaryLinkAndIdentity()
+        {
+            var detail = new ResourceDetail
+            {
+                ResourceId = 10,
+                ResourceUid = "uid-10",
+                ResourceKey = "orders-api",
+                ResourceTypeId = 5,
+                ResourceName = "Orders API",
+                Description = "desc",
+                PrimaryTagDefinitionId = 100,
+                CreatedOn = new DateTime(2026, 1, 1)
+            };
+
+            _repo.Setup(r => r.GetResourceByUidAsync("uid-10", It.IsAny<CancellationToken>())).ReturnsAsync(detail);
+            _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceType> { new() { ResourceTypeId = 5, TypeName = "AppService" } });
+            _repo.Setup(r => r.GetTagsForResourceAsync(10, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceTagRead>
+                {
+                    new() { TagDefinitionId = 100, TagDefinitionKey = "Overview", ContentType = "Link", TagValue = "https://example.com", IsPrimary = true },
+                    new() { TagDefinitionId = 101, TagDefinitionKey = "Environment", ContentType = "Text", TagValue = "dev", IsPrimary = false }
+                });
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceRelationshipItem>
+                {
+                    new() { RelationshipId = 1, Direction = "DependsOn", OtherResourceUid = "uid-20", OtherResourceName = "Redis", OtherResourceType = "Cache" }
+                });
+
+            var response = await _sut.GetResourceDetailAsync("uid-10", CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the resource exists");
+            var model = response.ApiResponse.Data!;
+            model.Tags.Should().HaveCount(2, "because both applied tags must be projected");
+            model.PrimaryLinkUrl.Should().Be("https://example.com", "because the primary tag's value is the resource's primary link");
+            model.IdentityDisplay.Should().Be("AppService / orders-api", "because Domain is not yet resolved (deferred to slice #5)");
+            model.Relationships.Should().ContainSingle("because the one relationship edge must be projected");
+        }
+
+        #endregion
+
+        #region SaveResourceAsync
+
+        [Fact]
+        public async Task SaveResourceAsync_MissingRequiredFields_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var request = new SaveResourceRequest { Mode = "Create", ResourceUid = "", ResourceTypeId = 0, ResourceName = "", ResourceKey = "" };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because type/name/key/uid are all missing");
+            VerifySaveRepoNeverCalled();
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_KeyCollision_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+
+            var request = new SaveResourceRequest { Mode = "Create", ResourceUid = Guid.NewGuid().ToString(), ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api" };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because the (type, key) pair collides with another resource");
+            VerifySaveRepoNeverCalled();
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_HappyPath_CallsRepoAndReturnsSavedToastMessage()
+        {
+            var uid = Guid.NewGuid().ToString();
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            _repo.Setup(r => r.SaveResourceAsync(uid, 5, "orders-api", "Orders API", It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("created", 10));
+            _repo.Setup(r => r.GetResourceByUidAsync(uid, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 10, ResourceUid = uid, ResourceKey = "orders-api", ResourceTypeId = 5, ResourceName = "Orders API" });
+            _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceType>());
+            _repo.Setup(r => r.GetTagsForResourceAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceTagRead>());
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceRelationshipItem>());
+
+            var request = new SaveResourceRequest { Mode = "Create", ResourceUid = uid, ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api" };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because a valid, non-colliding save should succeed");
+            response.ApiResponse.Data!.Message.Should().Be("Saved Orders API", "because the toast message names the saved resource");
+            response.ApiResponse.Data!.ResourceUid.Should().Be(uid, "because the response echoes the resource's uid");
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_EditWithChangedType_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var uid = Guid.NewGuid().ToString();
+            _repo.Setup(r => r.GetResourceByUidAsync(uid, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 10, ResourceUid = uid, ResourceKey = "orders-api", ResourceTypeId = 5, ResourceName = "Orders API" });
+
+            var request = new SaveResourceRequest { Mode = "Edit", ResourceUid = uid, ResourceTypeId = 6, ResourceName = "Orders API", ResourceKey = "orders-api" };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because Type is read-only after save");
+            VerifySaveRepoNeverCalled();
+        }
+
+        #endregion
+
+        #region CheckUniquenessAsync
+
+        [Fact]
+        public async Task CheckUniquenessAsync_Unique_ReturnsIsUniqueTrue()
+        {
+            _repo.Setup(r => r.CheckResourceUniqueAsync(5, "orders-api", null, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+            _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceType> { new() { ResourceTypeId = 5, TypeName = "AppService" } });
+
+            var response = await _sut.CheckUniquenessAsync(new ResourceUniquenessRequest { ResourceTypeId = 5, ResourceKey = "orders-api" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because a valid uniqueness check always succeeds, unique or not");
+            response.ApiResponse.Data!.IsUnique.Should().BeTrue("because no other resource uses this (type, key)");
+        }
+
+        [Fact]
+        public async Task CheckUniquenessAsync_Collision_ReturnsIsUniqueFalseWithMessage()
+        {
+            _repo.Setup(r => r.CheckResourceUniqueAsync(5, "orders-api", null, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+            _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceType> { new() { ResourceTypeId = 5, TypeName = "AppService" } });
+
+            var response = await _sut.CheckUniquenessAsync(new ResourceUniquenessRequest { ResourceTypeId = 5, ResourceKey = "orders-api" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because a collision is a normal (not erroneous) uniqueness result");
+            response.ApiResponse.Data!.IsUnique.Should().BeFalse("because another resource of this type already uses this key");
+            response.ApiResponse.Data!.Message.Should().NotBeNullOrEmpty("because a collision must surface an inline message");
+        }
+
+        #endregion
+
+        #region CreateTagDefinitionAsync
+
+        [Fact]
+        public async Task CreateTagDefinitionAsync_BadContentType_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var request = new CreateTagDefinitionRequest { TagDefinitionKey = "Foo", ContentType = "Bogus" };
+
+            var response = await _sut.CreateTagDefinitionAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because ContentType must be 'Text' or 'Link'");
+            _repo.Verify(r => r.CreateTagDefinitionAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<bool>(),
+                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+                Times.Never, "because validation must short-circuit before the repository is called");
+        }
+
+        [Fact]
+        public async Task CreateTagDefinitionAsync_ExistingKey_ReturnsExistingDefinitionWithDomainAndSystemOff()
+        {
+            _repo.Setup(r => r.CreateTagDefinitionAsync("Overview", It.IsAny<string>(), "Link", It.IsAny<bool>(), It.IsAny<bool>(),
+                    It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("skipped", 42));
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition> { new() { TagDefinitionId = 42, TagDefinitionKey = "Overview", ContentType = "Link", IsDomainTag = false, IsSystemTag = false } });
+
+            var request = new CreateTagDefinitionRequest { TagDefinitionKey = "Overview", ContentType = "Link" };
+
+            var response = await _sut.CreateTagDefinitionAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because a duplicate-key create resolves to the existing definition, not an error");
+            response.ApiResponse.Data!.TagDefinitionId.Should().Be(42, "because the existing definition's id must be returned, search-existing-first");
+            response.ApiResponse.Data!.IsDomainTag.Should().BeFalse("because inline create can never produce a domain tag");
+            response.ApiResponse.Data!.IsSystemTag.Should().BeFalse("because inline create can never produce a system tag");
+        }
+
+        [Fact]
+        public async Task CreateTagDefinitionAsync_NewKey_ReturnsCreatedDefinition()
+        {
+            _repo.Setup(r => r.CreateTagDefinitionAsync("Kusto", It.IsAny<string>(), "Link", It.IsAny<bool>(), It.IsAny<bool>(),
+                    It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("created", 43));
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition> { new() { TagDefinitionId = 43, TagDefinitionKey = "Kusto", ContentType = "Link" } });
+
+            var request = new CreateTagDefinitionRequest { TagDefinitionKey = "Kusto", ContentType = "Link" };
+
+            var response = await _sut.CreateTagDefinitionAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because a new key creates a new definition");
+            response.ApiResponse.Data!.TagDefinitionId.Should().Be(43, "because the newly created definition's id must be returned");
+        }
+
+        #endregion
+
+        #region AddRelationshipAsync
+
+        [Fact]
+        public async Task AddRelationshipAsync_MissingEndpoint_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var response = await _sut.AddRelationshipAsync("", "uid-2", CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because both endpoints are required");
+            _repo.Verify(r => r.AddRelationshipAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never,
+                "because validation must short-circuit before the repository is called");
+        }
+
+        [Fact]
+        public async Task AddRelationshipAsync_SelfLoop_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var response = await _sut.AddRelationshipAsync("uid-1", "uid-1", CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because a resource cannot depend on itself");
+            _repo.Verify(r => r.AddRelationshipAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never,
+                "because a self-loop must be rejected before the repository is called");
+        }
+
+        [Fact]
+        public async Task AddRelationshipAsync_HappyPath_ResolvesUidsAndCallsRepo()
+        {
+            _repo.Setup(r => r.GetResourceByUidAsync("uid-1", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 1, ResourceUid = "uid-1" });
+            _repo.Setup(r => r.GetResourceByUidAsync("uid-2", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 2, ResourceUid = "uid-2" });
+
+            var response = await _sut.AddRelationshipAsync("uid-1", "uid-2", CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because both endpoints exist and are distinct");
+            _repo.Verify(r => r.AddRelationshipAsync(1, 2, It.IsAny<CancellationToken>()), Times.Once,
+                "because the resolved resource ids must reach the repository");
+        }
+
+        #endregion
+
         #region helpers
+
+        private void VerifySaveRepoNeverCalled()
+        {
+            _repo.Verify(r => r.SaveResourceAsync(
+                It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Never,
+                "because validation must short-circuit before the repository is called");
+        }
 
         private void SetupCapture(Action<IReadOnlyList<ResourceGridFilterDefinition>?> capture)
         {

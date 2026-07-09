@@ -1,10 +1,12 @@
-﻿using HT.Api.Client.Contracts.Models;
+﻿using System.Text.Json;
+using HT.Api.Client.Contracts.Models;
 using HT.Api.Service.Contracts;
 using HT.Api.Service.Contracts.BuildersOfT;
 using ResourceMapper.Common.Server.Resources.Interfaces;
 using ResourceMapper.Common.Server.Resources.Models;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
 using ResourceMapper.Common.Shared.HomePage;
+using ResourceMapper.Common.Shared.Editor;
 using ResourceMapper.Common.Shared.Editor.Contracts;
 
 namespace ResourceMapper.Common.Server.Resources
@@ -149,38 +151,63 @@ namespace ResourceMapper.Common.Server.Resources
             }
         }
 
-        public async Task<ApiServiceResponse<OpenEditorResponse>> GetResourceEditorModelAsync(OpenEditorRequest request,CancellationToken cancellationToken=default)
+        public async Task<ApiServiceResponse<OpenEditorResponse>> GetResourceEditorModelAsync(OpenEditorRequest request, CancellationToken cancellationToken = default)
         {
-            var response = new ApiServiceResponse<OpenEditorResponse>();
-
-            var allResourceTypes = await _repo.GetAllResourceTypesAsync(cancellationToken);
-
-            // new response
-            response.ApiResponse.Data ??= new()
+            var builder = new ServiceResponseBuilder<OpenEditorResponse>();
+            try
             {
-                ResourceTypes = allResourceTypes.Select(r => new KeyValuePair<string, string>(r.ResourceTypeUid, r.TypeName)).ToList()
-            };
-            response.ApiResponse.Data.EditorModel = new Shared.Editor.ResourceEditorModel()
+                var allResourceTypes = await _repo.GetAllResourceTypesAsync(cancellationToken);
+                var tagDictionary = await _repo.GetAllTagDefinitionsAsync(cancellationToken);
+                var tagDictionaryModels = tagDictionary.Select(MapToTagDefinitionModel).ToList();
+                var domainDef = tagDictionary.FirstOrDefault(t => t.IsDomainTag);
+                var domainAllowedValues = ParseAllowedValues(domainDef?.AllowedValues) ?? new List<string>();
+
+                var isEditOrView = string.Equals(request.Mode, "Edit", StringComparison.OrdinalIgnoreCase)
+                                    || string.Equals(request.Mode, "View", StringComparison.OrdinalIgnoreCase);
+
+                ResourceEditorModel editorModel;
+
+                if (isEditOrView && !string.IsNullOrWhiteSpace(request.ResourceUid))
+                {
+                    var detail = await _repo.GetResourceByUidAsync(request.ResourceUid, cancellationToken);
+                    if (detail == null)
+                    {
+                        builder.Errors.AddError(CallStatusCode.NotFound, "Resource Not Found",
+                            $"Resource with UID '{request.ResourceUid}' was not found.", "resourceUid");
+                        return builder.BuildResponse();
+                    }
+
+                    var typeName = allResourceTypes.FirstOrDefault(t => t.ResourceTypeId == detail.ResourceTypeId)?.TypeName ?? string.Empty;
+                    var tagReads = await _repo.GetTagsForResourceAsync(detail.ResourceId, cancellationToken);
+                    var relationshipItems = await _repo.GetRelationshipsForResourceAsync(detail.ResourceId, cancellationToken);
+
+                    editorModel = BuildEditEditorModel(detail, typeName, tagReads, relationshipItems, tagDictionaryModels, request.Mode);
+                }
+                else
+                {
+                    editorModel = BuildCreateEditorModel();
+                }
+
+                builder.Data.Set(new OpenEditorResponse
+                {
+                    EditorModel = editorModel,
+                    ResourceTypes = allResourceTypes.Select(r => new KeyValuePair<string, string>(r.ResourceTypeUid, r.TypeName)).ToList(),
+                    TagDictionary = tagDictionaryModels,
+                    EntryPointTemplates = new List<ResourceTypeEntryPointModel>(), // populated in #7
+                    DomainAllowedValues = domainAllowedValues
+                });
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
             {
-                Key = new(),
-                Name = new(),
-                Description = new(),
-                ResourceType = new(),
-                Domain = new(),
-                ResourceUid = Guid.NewGuid().ToString(),
-                Mode = string.Equals(request.Mode, "Edit", StringComparison.OrdinalIgnoreCase) ? "Edit" : "Create",
-            };
-
-            return response;
-
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
         }
-        /// <summary>
-        /// Example method showing how to handle resource not found vs endpoint not found
-        /// </summary>
-        public async Task<ApiServiceResponse<ResourceGridItemModel>> GetResourceByUid(string resourceUid, CancellationToken cancellationToken)
+
+        public async Task<ApiServiceResponse<ResourceDetailModel>> GetResourceDetailAsync(string resourceUid, CancellationToken cancellationToken = default)
         {
-            var builder = new ServiceResponseBuilder<ResourceGridItemModel>();
-            
+            var builder = new ServiceResponseBuilder<ResourceDetailModel>();
             try
             {
                 if (string.IsNullOrWhiteSpace(resourceUid))
@@ -189,38 +216,518 @@ namespace ResourceMapper.Common.Server.Resources
                     return builder.BuildResponse();
                 }
 
-                // This would be your repository call to find a specific resource
-                // var resource = await _repo.GetResourceByUidAsync(resourceUid, cancellationToken);
-                
-                // Simulating resource not found scenario
-                ResourceGridItem? resource = null; // Replace with actual repository call
-                
-                if (resource == null)
+                var detail = await _repo.GetResourceByUidAsync(resourceUid, cancellationToken);
+                if (detail == null)
                 {
-                    // This creates a RESOURCE NOT FOUND error (HTTP 422)
-                    // which is different from endpoint not found (HTTP 404)
-                    builder.Errors.AddError(
-                        CallStatusCode.NotFound, 
-                        $"Resource with UID '{resourceUid}' was not found in the database.",
-                        "resourceUid");
-                    
-                    // You can also add additional context
-                    builder.Meta.AddTag("ResourceType", "Resource");
-                    builder.Meta.AddTag("SearchCriteria", resourceUid);
-                    
+                    builder.Errors.AddError(CallStatusCode.NotFound, "Resource Not Found",
+                        $"Resource with UID '{resourceUid}' was not found.", "resourceUid");
                     return builder.BuildResponse();
                 }
 
-                var responseItem = MapToResourceGridItemModel(resource);
-                builder.Data.Set(new ResourceGridItemModel { /* ... map your single item ... */ });
-                
+                builder.Data.Set(await ProjectResourceDetailAsync(detail, cancellationToken));
                 return builder.BuildResponse();
             }
             catch (Exception ex)
             {
-                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message);
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
                 return builder.BuildResponse();
             }
+        }
+
+        public async Task<ApiServiceResponse<SaveResourceResponse>> SaveResourceAsync(SaveResourceRequest request, CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<SaveResourceResponse>();
+            try
+            {
+                if (request == null)
+                {
+                    builder.Validation.AddValidation("request", "Is required");
+                    return builder.BuildResponse();
+                }
+
+                if (request.ResourceTypeId <= 0)
+                    builder.Validation.AddValidation("request.ResourceTypeId", "Resource type is required");
+
+                if (string.IsNullOrWhiteSpace(request.ResourceUid))
+                    builder.Validation.AddValidation("request.ResourceUid", "Resource UID is required");
+
+                if (string.IsNullOrWhiteSpace(request.ResourceName))
+                    builder.Validation.AddValidation("request.ResourceName", "Name is required");
+                else if (request.ResourceName.Length > MaxResourceNameLength)
+                    builder.Validation.AddValidation("request.ResourceName", $"Must be {MaxResourceNameLength} characters or fewer");
+
+                if (string.IsNullOrWhiteSpace(request.ResourceKey))
+                    builder.Validation.AddValidation("request.ResourceKey", "Key is required");
+                else if (request.ResourceKey.Length > MaxResourceKeyLength)
+                    builder.Validation.AddValidation("request.ResourceKey", $"Must be {MaxResourceKeyLength} characters or fewer");
+
+                if (!builder.IsOk)
+                    return builder.BuildResponse();
+
+                var isEdit = string.Equals(request.Mode, "Edit", StringComparison.OrdinalIgnoreCase);
+                if (isEdit)
+                {
+                    var existing = await _repo.GetResourceByUidAsync(request.ResourceUid, cancellationToken);
+                    if (existing == null)
+                    {
+                        builder.Errors.AddError(CallStatusCode.NotFound, "Resource Not Found",
+                            $"Resource with UID '{request.ResourceUid}' was not found.", "resourceUid");
+                        return builder.BuildResponse();
+                    }
+
+                    if (existing.ResourceTypeId != request.ResourceTypeId)
+                    {
+                        builder.Validation.AddValidation("request.ResourceTypeId", "Resource type cannot be changed after save");
+                        return builder.BuildResponse();
+                    }
+                }
+
+                var isUnique = await _repo.CheckResourceUniqueAsync(request.ResourceTypeId, request.ResourceKey, request.ResourceUid, cancellationToken);
+                if (!isUnique)
+                {
+                    builder.Validation.AddValidation("request.ResourceKey", "Another resource of this type already uses this key");
+                    return builder.BuildResponse();
+                }
+
+                var (result, _) = await _repo.SaveResourceAsync(
+                    request.ResourceUid, request.ResourceTypeId, request.ResourceKey, request.ResourceName,
+                    request.Description, request.PrimaryTagDefinitionId, cancellationToken);
+
+                if (string.Equals(result, "error", StringComparison.Ordinal))
+                {
+                    builder.Validation.AddValidation("request.ResourceTypeId", "Resource type cannot be changed after save");
+                    return builder.BuildResponse();
+                }
+
+                var saved = await _repo.GetResourceByUidAsync(request.ResourceUid, cancellationToken);
+                builder.Data.Set(new SaveResourceResponse
+                {
+                    ResourceUid = request.ResourceUid,
+                    Message = $"Saved {request.ResourceName}",
+                    Saved = saved != null ? await ProjectResourceDetailAsync(saved, cancellationToken) : null
+                });
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<ResourceUniquenessResponse>> CheckUniquenessAsync(ResourceUniquenessRequest request, CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<ResourceUniquenessResponse>();
+            try
+            {
+                if (request == null)
+                {
+                    builder.Validation.AddValidation("request", "Is required");
+                    return builder.BuildResponse();
+                }
+
+                if (request.ResourceTypeId <= 0)
+                    builder.Validation.AddValidation("request.ResourceTypeId", "Resource type is required");
+                if (string.IsNullOrWhiteSpace(request.ResourceKey))
+                    builder.Validation.AddValidation("request.ResourceKey", "Key is required");
+
+                if (!builder.IsOk)
+                    return builder.BuildResponse();
+
+                var isUnique = await _repo.CheckResourceUniqueAsync(request.ResourceTypeId, request.ResourceKey, request.ExcludeResourceUid, cancellationToken);
+
+                var typeName = (await _repo.GetAllResourceTypesAsync(cancellationToken))
+                    .FirstOrDefault(t => t.ResourceTypeId == request.ResourceTypeId)?.TypeName ?? string.Empty;
+
+                builder.Data.Set(new ResourceUniquenessResponse
+                {
+                    IsUnique = isUnique,
+                    Message = isUnique ? null : "Another resource of this type already uses this key",
+                    IdentityDisplay = BuildIdentityDisplay(null, typeName, request.ResourceKey)
+                });
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<object>> DeleteResourceAsync(string resourceUid, CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<object>();
+            try
+            {
+                if (string.IsNullOrWhiteSpace(resourceUid))
+                {
+                    builder.Validation.AddValidation("resourceUid", "Resource UID is required");
+                    return builder.BuildResponse();
+                }
+
+                var detail = await _repo.GetResourceByUidAsync(resourceUid, cancellationToken);
+                if (detail == null)
+                {
+                    builder.Errors.AddError(CallStatusCode.NotFound, "Resource Not Found",
+                        $"Resource with UID '{resourceUid}' was not found.", "resourceUid");
+                    return builder.BuildResponse();
+                }
+
+                await _repo.DeleteResourceAsync(detail.ResourceId, cancellationToken);
+                builder.Data.Set(new object());
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<TagDefinitionModel>> CreateTagDefinitionAsync(CreateTagDefinitionRequest request, CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<TagDefinitionModel>();
+            try
+            {
+                if (request == null)
+                {
+                    builder.Validation.AddValidation("request", "Is required");
+                    return builder.BuildResponse();
+                }
+
+                if (string.IsNullOrWhiteSpace(request.TagDefinitionKey))
+                    builder.Validation.AddValidation("request.TagDefinitionKey", "Key is required");
+                else if (request.TagDefinitionKey.Length > MaxTagDefinitionKeyLength)
+                    builder.Validation.AddValidation("request.TagDefinitionKey", $"Must be {MaxTagDefinitionKeyLength} characters or fewer");
+
+                if (!AllowedContentTypes.Contains(request.ContentType))
+                    builder.Validation.AddValidation("request.ContentType", "Must be 'Text' or 'Link'");
+
+                string? allowedValuesJson = null;
+                if (request.AllowedValues is { Count: > 0 })
+                {
+                    allowedValuesJson = JsonSerializer.Serialize(request.AllowedValues);
+                    if (allowedValuesJson.Length > MaxAllowedValuesLength)
+                        builder.Validation.AddValidation("request.AllowedValues", $"Must be {MaxAllowedValuesLength} characters or fewer when serialized");
+                }
+
+                if (!builder.IsOk)
+                    return builder.BuildResponse();
+
+                var uid = Guid.NewGuid().ToString();
+                var (result, tagDefinitionId) = await _repo.CreateTagDefinitionAsync(
+                    request.TagDefinitionKey, uid, request.ContentType, request.AllowCustomValue, request.IsMultiValued,
+                    allowedValuesJson, request.DisplayName, request.RequirementLevel, request.DisplayOrder, cancellationToken);
+
+                if (string.Equals(result, "error", StringComparison.Ordinal))
+                {
+                    builder.Validation.AddValidation("request.ContentType", "Must be 'Text' or 'Link'");
+                    return builder.BuildResponse();
+                }
+
+                // 'skipped' = an existing definition with this key (search-existing-first duplicate);
+                // 'created' = a new definition. Either way, return the resulting definition.
+                var dictionary = await _repo.GetAllTagDefinitionsAsync(cancellationToken);
+                var created = dictionary.FirstOrDefault(d => d.TagDefinitionId == tagDefinitionId);
+                if (created == null)
+                {
+                    builder.Errors.AddError(CallStatusCode.InternalError, "Tag definition could not be loaded after create.");
+                    return builder.BuildResponse();
+                }
+
+                builder.Data.Set(MapToTagDefinitionModel(created));
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<List<TagDefinitionModel>>> GetTagDictionaryAsync(CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<List<TagDefinitionModel>>();
+            try
+            {
+                var dictionary = await _repo.GetAllTagDefinitionsAsync(cancellationToken);
+                builder.Data.Set(dictionary.Select(MapToTagDefinitionModel).ToList());
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<object>> AddRelationshipAsync(string fromResourceUid, string toResourceUid, CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<object>();
+            try
+            {
+                var (isValid, fromId, toId) = await ValidateRelationshipEndpointsAsync(fromResourceUid, toResourceUid, builder, cancellationToken);
+                if (!isValid)
+                    return builder.BuildResponse();
+
+                await _repo.AddRelationshipAsync(fromId, toId, cancellationToken);
+                builder.Data.Set(new object());
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<object>> RemoveRelationshipAsync(string fromResourceUid, string toResourceUid, CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<object>();
+            try
+            {
+                var (isValid, fromId, toId) = await ValidateRelationshipEndpointsAsync(fromResourceUid, toResourceUid, builder, cancellationToken);
+                if (!isValid)
+                    return builder.BuildResponse();
+
+                await _repo.RemoveRelationshipAsync(fromId, toId, cancellationToken);
+                builder.Data.Set(new object());
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        // ---------------- editor / detail helpers ----------------
+
+        private async Task<ResourceDetailModel> ProjectResourceDetailAsync(ResourceDetail detail, CancellationToken cancellationToken)
+        {
+            var tags = await _repo.GetTagsForResourceAsync(detail.ResourceId, cancellationToken);
+            var relationships = await _repo.GetRelationshipsForResourceAsync(detail.ResourceId, cancellationToken);
+            var types = await _repo.GetAllResourceTypesAsync(cancellationToken);
+
+            var typeName = types.FirstOrDefault(t => t.ResourceTypeId == detail.ResourceTypeId)?.TypeName ?? string.Empty;
+
+            var tagModels = tags.Select(t => new ResourceTagModel
+            {
+                TagDefinitionId = t.TagDefinitionId,
+                TagDefinitionKey = t.TagDefinitionKey,
+                DisplayName = t.DisplayName,
+                ContentType = t.ContentType,
+                Value = t.TagValue,
+                IsPrimary = t.IsPrimary
+            }).ToList();
+
+            var relationshipModels = relationships.Select(r => new ResourceRelationshipModel
+            {
+                RelationshipId = r.RelationshipId,
+                Direction = r.Direction,
+                OtherResourceUid = r.OtherResourceUid,
+                OtherResourceKey = r.OtherResourceKey,
+                OtherResourceName = r.OtherResourceName,
+                OtherResourceType = r.OtherResourceType
+            }).ToList();
+
+            var primaryLinkUrl = tagModels.FirstOrDefault(t => t.IsPrimary)?.Value;
+
+            return new ResourceDetailModel
+            {
+                ResourceId = detail.ResourceId,
+                ResourceUid = detail.ResourceUid,
+                ResourceKey = detail.ResourceKey,
+                ResourceName = detail.ResourceName,
+                Description = detail.Description,
+                ResourceTypeId = detail.ResourceTypeId,
+                ResourceTypeName = typeName,
+                Domain = null, // #5
+                PrimaryTagDefinitionId = detail.PrimaryTagDefinitionId,
+                PrimaryLinkUrl = primaryLinkUrl,
+                IdentityDisplay = BuildIdentityDisplay(null, typeName, detail.ResourceKey),
+                Tags = tagModels,
+                Relationships = relationshipModels,
+                CreatedOn = detail.CreatedOn,
+                UpdatedOn = detail.UpdatedOn
+            };
+        }
+
+        private static string BuildIdentityDisplay(string? domain, string? typeName, string? key)
+        {
+            var parts = new[] { domain, typeName, key }.Where(p => !string.IsNullOrWhiteSpace(p));
+            return string.Join(" / ", parts);
+        }
+
+        private static TagDefinitionModel MapToTagDefinitionModel(TagDefinition def)
+        {
+            return new TagDefinitionModel
+            {
+                TagDefinitionId = def.TagDefinitionId,
+                TagDefinitionUid = def.TagDefinitionUid,
+                TagDefinitionKey = def.TagDefinitionKey,
+                DisplayName = def.DisplayName,
+                TagContentTypeId = def.TagContentTypeId,
+                ContentType = def.ContentType ?? string.Empty,
+                RequirementLevel = def.RequirementLevel,
+                IsMultiValued = def.IsMultiValued,
+                AllowCustomValue = def.AllowCustomValue,
+                AllowedValues = ParseAllowedValues(def.AllowedValues),
+                IsDomainTag = def.IsDomainTag,
+                IsSystemTag = def.IsSystemTag,
+                DisplayOrder = def.DisplayOrder
+            };
+        }
+
+        private static List<string>? ParseAllowedValues(string? allowedValuesJson)
+        {
+            if (string.IsNullOrWhiteSpace(allowedValuesJson)) return null;
+            try
+            {
+                return JsonSerializer.Deserialize<List<string>>(allowedValuesJson);
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        private static ResourceEditorModel BuildCreateEditorModel()
+        {
+            return new ResourceEditorModel
+            {
+                ResourceUid = Guid.NewGuid().ToString(),
+                ResourceType = new SingleValueEditor(),
+                Domain = new SingleValueEditor(),
+                Name = new SingleValueEditor(),
+                Key = new SingleValueEditor(),
+                Description = new SingleValueEditor(),
+                Mode = "Create",
+                IsPersisted = false
+            };
+        }
+
+        private static ResourceEditorModel BuildEditEditorModel(
+            ResourceDetail detail,
+            string typeName,
+            List<ResourceTagRead> tagReads,
+            List<ResourceRelationshipItem> relationshipItems,
+            List<TagDefinitionModel> tagDictionary,
+            string mode)
+        {
+            var model = new ResourceEditorModel
+            {
+                ResourceUid = detail.ResourceUid,
+                ResourceType = MakeUnchangedEditor(typeName),
+                Domain = MakeUnchangedEditor(null), // #5
+                Name = MakeUnchangedEditor(detail.ResourceName),
+                Key = MakeUnchangedEditor(detail.ResourceKey),
+                Description = MakeUnchangedEditor(detail.Description),
+                Mode = string.Equals(mode, "View", StringComparison.OrdinalIgnoreCase) ? "View" : "Edit",
+                IsPersisted = true,
+                ResourceTypeId = detail.ResourceTypeId,
+                PrimaryTagDefinitionId = detail.PrimaryTagDefinitionId,
+                CreatedOn = detail.CreatedOn,
+                UpdatedOn = detail.UpdatedOn,
+                IdentityPreview = new IdentityPreview
+                {
+                    Domain = null, // #5
+                    ResourceType = typeName,
+                    Key = detail.ResourceKey
+                }
+            };
+
+            model.Tags = tagReads
+                .GroupBy(t => t.TagDefinitionId)
+                .Select(g => BuildTagRowEditor(g, tagDictionary))
+                .ToList();
+
+            model.DependsOn = relationshipItems
+                .Where(r => string.Equals(r.Direction, "DependsOn", StringComparison.Ordinal))
+                .Select(BuildDependencyRowEditor)
+                .ToList();
+
+            model.DependentOn = relationshipItems
+                .Where(r => string.Equals(r.Direction, "DependentOn", StringComparison.Ordinal))
+                .Select(BuildDependencyRowEditor)
+                .ToList();
+
+            return model;
+        }
+
+        private static SingleValueEditor MakeUnchangedEditor(string? value)
+        {
+            return new SingleValueEditor { OriginalValue = value ?? string.Empty, EditedValue = value ?? string.Empty };
+        }
+
+        private static TagRowEditor BuildTagRowEditor(IGrouping<int, ResourceTagRead> group, List<TagDefinitionModel> dictionary)
+        {
+            var first = group.First();
+            var definition = dictionary.FirstOrDefault(d => d.TagDefinitionId == first.TagDefinitionId) ?? new TagDefinitionModel
+            {
+                TagDefinitionId = first.TagDefinitionId,
+                TagDefinitionKey = first.TagDefinitionKey,
+                DisplayName = first.DisplayName,
+                ContentType = first.ContentType,
+                IsSystemTag = first.IsSystemTag,
+                IsMultiValued = first.IsMultiValued
+            };
+
+            return new TagRowEditor
+            {
+                Definition = definition,
+                TagDefinitionId = first.TagDefinitionId,
+                Values = group.Select(t => MakeUnchangedEditor(t.TagValue)).ToList(),
+                IsPrimary = group.Any(t => t.IsPrimary),
+                IsPreSeeded = false
+            };
+        }
+
+        private static DependencyRowEditor BuildDependencyRowEditor(ResourceRelationshipItem item)
+        {
+            return new DependencyRowEditor
+            {
+                RelationshipId = item.RelationshipId,
+                Direction = item.Direction,
+                OtherResourceUid = item.OtherResourceUid,
+                OtherResourceName = item.OtherResourceName,
+                OtherResourceType = item.OtherResourceType,
+                OtherDomain = null // #5
+            };
+        }
+
+        private async Task<(bool IsValid, int FromId, int ToId)> ValidateRelationshipEndpointsAsync(
+            string fromResourceUid, string toResourceUid, ServiceResponseBuilder<object> builder, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(fromResourceUid) || string.IsNullOrWhiteSpace(toResourceUid))
+            {
+                builder.Validation.AddValidation("resourceUid", "Both a from and to resource UID are required");
+                return (false, 0, 0);
+            }
+
+            if (string.Equals(fromResourceUid, toResourceUid, StringComparison.Ordinal))
+            {
+                builder.Validation.AddValidation("toResourceUid", "A resource cannot depend on itself");
+                return (false, 0, 0);
+            }
+
+            var from = await _repo.GetResourceByUidAsync(fromResourceUid, cancellationToken);
+            if (from == null)
+            {
+                builder.Errors.AddError(CallStatusCode.NotFound, "Resource Not Found",
+                    $"Resource with UID '{fromResourceUid}' was not found.", "fromResourceUid");
+                return (false, 0, 0);
+            }
+
+            var to = await _repo.GetResourceByUidAsync(toResourceUid, cancellationToken);
+            if (to == null)
+            {
+                builder.Errors.AddError(CallStatusCode.NotFound, "Resource Not Found",
+                    $"Resource with UID '{toResourceUid}' was not found.", "toResourceUid");
+                return (false, 0, 0);
+            }
+
+            return (true, from.ResourceId, to.ResourceId);
         }
 
         // ---------------- filter validation / sanitization (§5b) ----------------
@@ -236,6 +743,12 @@ namespace ResourceMapper.Common.Server.Resources
         private const int MaxValueLength = 2000;
         private const int MaxTextLength = 255;
         private const int MaxSearchLength = 255;
+        private const int MaxResourceNameLength = 250;
+        private const int MaxResourceKeyLength = 250;
+        private const int MaxTagDefinitionKeyLength = 50;
+        private const int MaxAllowedValuesLength = 2000;
+
+        private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.Ordinal) { "Text", "Link" };
 
         private static readonly HashSet<string> FilterColumns = new(StringComparer.Ordinal)
             { ColumnResourceType, ColumnResourceName, ColumnDescription, ColumnTag };
