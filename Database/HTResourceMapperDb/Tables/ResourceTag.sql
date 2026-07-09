@@ -5,7 +5,7 @@
     ,[ResourceId] INT NOT NULL
         CONSTRAINT [FK_ResourceTag_ResourceId] FOREIGN KEY (ResourceId) REFERENCES [HTResourceMapper].[Resource](ResourceId)
     ,[TagDefinitionId] INT NOT NULL
-        CONSTRAINT [FK_ResourceTag_TagDefintionId] FOREIGN KEY ([TagDefinitionId]) REFERENCES [HTResourceMapper].[TagDefinition]([TagDefinitionId])
+        CONSTRAINT [FK_ResourceTag_TagDefinitionId] FOREIGN KEY ([TagDefinitionId]) REFERENCES [HTResourceMapper].[TagDefinition]([TagDefinitionId])
     ,[TagValue] NVARCHAR(2000) NULL
     ,[CreatedOn] DateTime2(0) NOT NULL
         CONSTRAINT [DF_ResourceTag_CreatedOn] DEFAULT  (SYSUTCDATETIME())

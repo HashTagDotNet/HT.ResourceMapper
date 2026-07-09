@@ -29,7 +29,7 @@ dotnet test --filter "FullyQualifiedName~ResourceMapper.Common.Server.Tests.Reso
 dotnet test --filter "FullyQualifiedName=Namespace.ClassName.MethodName"
 ```
 
-> **Note**: The SQL database project uses `Microsoft.Build.Sql/2.2.0` SDK format and builds with `dotnet build` to produce a `.dacpac`. It also builds in VS 2026 with SSDT installed. `TargetFramework=net472` is pinned explicitly so `dotnet restore` and VS full-MSBuild both produce matching assets — do not remove this property.
+> **Note**: The SQL database project (`Database/HTResourceMapperDb/HTResourceMapperDb.sqlproj`) is an **old-style SSDT / DACPAC** project (`TargetFrameworkVersion v4.7.2`; imports `Microsoft.Data.Tools.Schema.SqlTasks.targets`). It builds in **Visual Studio 2026** or **full MSBuild** — **not** `dotnet build` — to produce a `.dacpac`, and is published to `(localdb)\MSSQLLocalDB\ResourceMapper` via **SqlPackage** or VS Publish using `localhost.publish.xml`. It is **declarative**: edit the `.sql` files (desired state) and the publish engine diffs against the target. Reference/system seed lives in `Scripts/Script.PostDeployment1.sql` (a `PostDeploy` item; idempotent `MERGE`). Because it is not SDK-style, a solution-wide `dotnet build` does not build the DB project — build/publish it separately.
 
 ## Solution Structure
 
@@ -37,7 +37,7 @@ dotnet test --filter "FullyQualifiedName=Namespace.ClassName.MethodName"
 Libraries/       HT.* shared utility libraries (net8.0/net9.0)
 Modules/         Feature modules as Client/Server/Shared triplets
 UI/              Blazor WASM client + ASP.NET Core server host
-Database/        SQL Server database project (Microsoft.Build.Sql SDK format)
+Database/        SQL Server database project (old-style SSDT / DACPAC; builds in VS / full MSBuild)
 _Tests/          Test projects mirroring source structure
 __ProjectNotes/  Architectural notes and user stories
 ```
