@@ -69,6 +69,47 @@ html, body {
     visibility: visible;
 }
 
+/* Row actions: right-aligned, hidden until the row is hovered or an action is focused. */
+.rm-actions-cell {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+}
+
+.rm-actions {
+    display: inline-flex;
+    gap: .1rem;
+    justify-content: flex-end;
+    visibility: hidden;
+}
+
+.rm-grid .mud-table-row:hover .rm-actions,
+.rm-actions:focus-within {
+    visibility: visible;
+}
+
+.rm-actions .mud-icon-button,
+.rm-actions .mud-icon-button .mud-icon-root {
+    padding: 3px;
+    color: var(--mud-palette-text-disabled);
+}
+
+.rm-actions .mud-icon-button .mud-icon-root {
+    padding: 0;
+    font-size: 1.05rem;
+}
+
+.rm-linkitem {
+    min-width: 12rem;
+}
+
+/* Open/copy controls inside the external-links menu: match the "environment" label gray. */
+.rm-linkitem .mud-icon-root,
+.rm-linkitem .mud-icon-button,
+.rm-linkitem .mud-icon-button .mud-icon-root {
+    color: var(--mud-palette-text-secondary);
+}
+
 /* Filter bar: compact, secondary controls above the data. Static row — it stays
    put because the grid below it (not the bar) owns the scroll region. */
 .rm-filterbar {

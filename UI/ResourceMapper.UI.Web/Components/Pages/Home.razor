@@ -60,6 +60,53 @@
                 }
             </CellTemplate>
         </TemplateColumn>
+        <TemplateColumn Title="" Sortable="false" CellClass="rm-actions-cell">
+            <CellTemplate>
+                @{
+                    var links = context.Item.Tags?
+                        .Where(t => string.Equals(t.ContentType, "Link", StringComparison.OrdinalIgnoreCase))
+                        .ToList() ?? new List<ResourceGridTagModel>();
+                }
+                <div class="rm-actions">
+                    @if (links.Count == 0)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Outlined.Link" Size="Size.Small"
+                                       Disabled="true" aria-label="No external links" />
+                    }
+                    else
+                    {
+                        <MudMenu Icon="@Icons.Material.Outlined.Link" Size="Size.Small"
+                                 AriaLabel="External links" Dense="true"
+                                 ActivationEvent="MouseEvent.MouseOver">
+                            @foreach (var link in links)
+                            {
+                                <MudMenuItem>
+                                    <div class="d-flex align-center rm-linkitem">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.OpenInNew" Size="Size.Small"
+                                                       aria-label="Open link" Class="mr-1"
+                                                       OnClick="@(() => OpenExternal(link.TagValue))" />
+                                        <span class="flex-grow-1">@link.TagKey</span>
+                                        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
+                                                       aria-label="Copy link"
+                                                       OnClick="@(() => CopyAsync(link.TagValue))" />
+                                    </div>
+                                </MudMenuItem>
+                            }
+                        </MudMenu>
+                    }
+                    <MudTooltip Text="Open details">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
+                                       aria-label="Open details"
+                                       OnClick="@(() => OpenDetails(context.Item.ResourceUid))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Copy details link">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Share" Size="Size.Small"
+                                       aria-label="Copy details link"
+                                       OnClick="@(() => CopyDetailsLink(context.Item.ResourceUid))" />
+                    </MudTooltip>
+                </div>
+            </CellTemplate>
+        </TemplateColumn>
     </Columns>
     <NoRecordsContent>
         <div class="pa-10 d-flex justify-center">
@@ -279,6 +326,21 @@
 
     public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
 
+    // Future detail route: @page "/resource/{ResourceUid}" (not built yet).
+    private const string DetailRoute = "/resource";
+
+    private void OpenDetails(string uid) =>
+        Navigation.NavigateTo($"{DetailRoute}/{uid}");
+
+    private async Task CopyDetailsLink(string uid)
+    {
+        var abs = Navigation.ToAbsoluteUri($"{DetailRoute}/{uid}").ToString();
+        await CopyAsync(abs);
+    }
+
+    private async Task OpenExternal(string url) =>
+        await JS.InvokeVoidAsync("open", url, "_blank");
+
     private async Task CopyAsync(string url)
     {
         try
@@ -286,6 +348,7 @@
             await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
             Snackbar.Add("Link copied", Severity.Normal, config =>
             {
+                config.Icon = Icons.Material.Outlined.ContentCopy;   // match the copy-button icon
                 config.VisibleStateDuration = 500;   // brief confirmation — 0.5s is enough
                 config.ShowTransitionDuration = 100;
                 config.HideTransitionDuration = 150;
