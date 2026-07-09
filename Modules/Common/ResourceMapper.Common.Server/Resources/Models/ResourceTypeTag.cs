@@ -14,17 +14,19 @@ namespace ResourceMapper.Common.Server.Resources.Models
         public int ResourceTypeId { get; set; }
 
         [Required]
-        [StringLength(40)]
-        public string Tag { get; set; } = string.Empty;
+        public int TagDefinitionId { get; set; }
 
         [Required]
-        public int TagValueTypeId { get; set; }
+        public bool IsDefaultPrimary { get; set; } = false;
+
+        [StringLength(20)]
+        public string? RequirementLevel { get; set; }
 
         // Navigation properties
         [ForeignKey("ResourceTypeId")]
         public virtual ResourceType ResourceType { get; set; } = null!;
 
-        [ForeignKey("TagValueTypeId")]
-        public virtual TagValueType TagValueType { get; set; } = null!;
+        [ForeignKey("TagDefinitionId")]
+        public virtual TagDefinition TagDefinition { get; set; } = null!;
     }
 }

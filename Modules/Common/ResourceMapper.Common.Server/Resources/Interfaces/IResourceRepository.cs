@@ -51,5 +51,19 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
 
         // Distinct tag keys (for the "Add filter" column picker).
         Task<List<string>> GetAllTagKeysAsync(CancellationToken cancellationToken);
+
+        // Single-resource read by external uid; null if not found.
+        Task<ResourceDetail?> GetResourceByUidAsync(string resourceUid, CancellationToken cancellationToken);
+
+        // Every relationship edge touching this resource, from both directions.
+        Task<List<ResourceRelationshipItem>> GetRelationshipsForResourceAsync(int resourceId, CancellationToken cancellationToken);
+
+        // Idempotent: adding an edge that already exists is a no-op.
+        Task AddRelationshipAsync(int fromResourceId, int toResourceId, CancellationToken cancellationToken);
+
+        Task RemoveRelationshipAsync(int fromResourceId, int toResourceId, CancellationToken cancellationToken);
+
+        // Deletes the resource and cascades its relationship edges (both directions) and tags.
+        Task DeleteResourceAsync(int resourceId, CancellationToken cancellationToken);
     }
 }

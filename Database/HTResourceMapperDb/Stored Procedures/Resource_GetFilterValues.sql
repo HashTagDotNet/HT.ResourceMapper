@@ -26,12 +26,14 @@ BEGIN
 
     IF @FacetColumn = N'ResourceType'
     BEGIN
+        -- ResourceTypeId is NOT NULL, so there is no "blank ResourceType" bucket; IsBlank is
+        -- always 0 here (kept in the result shape for the caller's convenience).
         SELECT
-            CAST(CASE WHEN r.ResourceTypeId IS NULL THEN 1 ELSE 0 END AS BIT) AS IsBlank,
+            CAST(0 AS BIT) AS IsBlank,
             MAX(rt_type.TypeName) AS Value,
             COUNT(DISTINCT r.ResourceId) AS ItemCount
         FROM [HTResourceMapper].[Resource] r WITH(NOLOCK)
-        LEFT JOIN [HTResourceMapper].[ResourceType] rt_type WITH(NOLOCK) ON r.ResourceTypeId = rt_type.ResourceTypeId
+        INNER JOIN [HTResourceMapper].[ResourceType] rt_type WITH(NOLOCK) ON r.ResourceTypeId = rt_type.ResourceTypeId
         WHERE 1 = 1
             AND (
                 @SafeSearchFor IS NULL
@@ -75,7 +77,7 @@ BEGIN
             rtf0.TagValue AS Value,
             COUNT(DISTINCT r.ResourceId) AS ItemCount
         FROM [HTResourceMapper].[Resource] r WITH(NOLOCK)
-        LEFT JOIN [HTResourceMapper].[ResourceType] rt_type WITH(NOLOCK) ON r.ResourceTypeId = rt_type.ResourceTypeId
+        INNER JOIN [HTResourceMapper].[ResourceType] rt_type WITH(NOLOCK) ON r.ResourceTypeId = rt_type.ResourceTypeId
         INNER JOIN [HTResourceMapper].[ResourceTag] rtf0 WITH(NOLOCK) ON rtf0.ResourceId = r.ResourceId
         INNER JOIN [HTResourceMapper].[TagDefinition] tdf0 WITH(NOLOCK) ON rtf0.TagDefinitionId = tdf0.TagDefinitionId
         WHERE tdf0.TagDefinitionKey = @FacetTagKey
@@ -89,12 +91,11 @@ BEGIN
                            WHERE rts.ResourceId = r.ResourceId
                            AND (rts.TagValue LIKE @SafeSearchFor ESCAPE ']' OR tds.TagDefinitionKey LIKE @SafeSearchFor ESCAPE ']'))
             )
-            -- ResourceType filters
+            -- ResourceType filters (ResourceTypeId is NOT NULL, so no "blank" bucket here)
             AND (NOT EXISTS (SELECT 1 FROM @F f WHERE f.FilterColumn = N'ResourceType' AND f.Operator = N'Equals')
-                 OR rt_type.TypeName IN (SELECT f.FilterValue FROM @F f WHERE f.FilterColumn = N'ResourceType' AND f.Operator = N'Equals' AND f.IsBlank = 0)
-                 OR (EXISTS (SELECT 1 FROM @F f WHERE f.FilterColumn = N'ResourceType' AND f.Operator = N'Equals' AND f.IsBlank = 1) AND r.ResourceTypeId IS NULL))
+                 OR rt_type.TypeName IN (SELECT f.FilterValue FROM @F f WHERE f.FilterColumn = N'ResourceType' AND f.Operator = N'Equals'))
             AND NOT EXISTS (SELECT 1 FROM @F f WHERE f.FilterColumn = N'ResourceType' AND f.Operator = N'NotEquals'
-                            AND (f.FilterValue = rt_type.TypeName OR (f.IsBlank = 1 AND r.ResourceTypeId IS NULL)))
+                            AND f.FilterValue = rt_type.TypeName)
             -- Other tag-key filters (per-key AND, value OR)
             AND NOT EXISTS (
                 SELECT 1 FROM (SELECT DISTINCT TagKey FROM @F WHERE FilterColumn = N'Tag' AND Operator = N'Equals') g

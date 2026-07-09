@@ -99,12 +99,14 @@ BEGIN
     -- Structured filter block (AND across filters; OR within an enumerable filter).
     -- Every predicate is CONSTANT text that only references the @FiltersParam TVP - no user
     -- value or identifier is concatenated, so there is no injection surface.
+    -- ResourceTypeId is NOT NULL (Resource.ResourceType is required), so there is no "blank
+    -- ResourceType" bucket - the IsBlank branches that used to test r.ResourceTypeId IS NULL
+    -- have been removed.
     DECLARE @filterClause NVARCHAR(MAX) = N'
         AND ( NOT EXISTS (SELECT 1 FROM @FiltersParam f WHERE f.FilterColumn = N''ResourceType'' AND f.Operator = N''Equals'')
-              OR rt_type.TypeName IN (SELECT f.FilterValue FROM @FiltersParam f WHERE f.FilterColumn = N''ResourceType'' AND f.Operator = N''Equals'' AND f.IsBlank = 0)
-              OR (EXISTS (SELECT 1 FROM @FiltersParam f WHERE f.FilterColumn = N''ResourceType'' AND f.Operator = N''Equals'' AND f.IsBlank = 1) AND r.ResourceTypeId IS NULL) )
+              OR rt_type.TypeName IN (SELECT f.FilterValue FROM @FiltersParam f WHERE f.FilterColumn = N''ResourceType'' AND f.Operator = N''Equals'') )
         AND NOT EXISTS (SELECT 1 FROM @FiltersParam f WHERE f.FilterColumn = N''ResourceType'' AND f.Operator = N''NotEquals''
-                        AND ( f.FilterValue = rt_type.TypeName OR (f.IsBlank = 1 AND r.ResourceTypeId IS NULL) ))
+                        AND f.FilterValue = rt_type.TypeName)
         AND NOT EXISTS (
             SELECT 1 FROM (SELECT DISTINCT TagKey FROM @FiltersParam WHERE FilterColumn = N''Tag'' AND Operator = N''Equals'') g
             WHERE NOT EXISTS (
@@ -159,7 +161,7 @@ BEGIN
     SET @sql = '
     SELECT @TotalRecordsParam = COUNT(DISTINCT r.ResourceId)
     FROM [HTResourceMapper].[Resource] r WITH(NOLOCK)
-    LEFT JOIN [HTResourceMapper].[ResourceType] rt_type WITH(NOLOCK) ON r.ResourceTypeId = rt_type.ResourceTypeId
+    INNER JOIN [HTResourceMapper].[ResourceType] rt_type WITH(NOLOCK) ON r.ResourceTypeId = rt_type.ResourceTypeId
     ' + @whereClause;
 
     EXEC sp_executesql @sql, @countParamDef,
@@ -174,7 +176,7 @@ BEGIN
                rt_type.TypeName as ResourceType, r.Description,
                r.CreatedOn, r.UpdatedOn, COALESCE(r.UpdatedOn, r.CreatedOn) as LastUpdatedOn
         FROM [HTResourceMapper].[Resource] r WITH(NOLOCK)
-        LEFT JOIN [HTResourceMapper].[ResourceType] rt_type WITH(NOLOCK) ON r.ResourceTypeId = rt_type.ResourceTypeId
+        INNER JOIN [HTResourceMapper].[ResourceType] rt_type WITH(NOLOCK) ON r.ResourceTypeId = rt_type.ResourceTypeId
         ' + @whereClause + '
     ),
     PagedResources AS (

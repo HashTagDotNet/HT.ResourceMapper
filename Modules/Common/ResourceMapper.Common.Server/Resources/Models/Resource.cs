@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -23,7 +23,8 @@ namespace ResourceMapper.Common.Server.Resources.Models
         [StringLength(250)]
         public string ResourceKey { get; set; } = string.Empty;
 
-        public int? ResourceTypeId { get; set; }
+        [Required]
+        public int ResourceTypeId { get; set; }
 
         [Required]
         [StringLength(250)]
@@ -32,6 +33,8 @@ namespace ResourceMapper.Common.Server.Resources.Models
         [Required]
         [StringLength(2000)]
         public string Description { get; set; } = string.Empty;
+
+        public int? PrimaryTagDefinitionId { get; set; }
 
         [Required]
         public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
@@ -42,10 +45,13 @@ namespace ResourceMapper.Common.Server.Resources.Models
         [ForeignKey("ResourceTypeId")]
         public virtual ResourceType? ResourceType { get; set; }
 
+        [ForeignKey("PrimaryTagDefinitionId")]
+        public virtual TagDefinition? PrimaryTagDefinition { get; set; }
+
         public virtual ICollection<ResourceTag> ResourceTags { get; set; } = new List<ResourceTag>();
 
-        public virtual ICollection<ResourceDependency> Dependencies { get; set; } = new List<ResourceDependency>();
+        public virtual ICollection<ResourceRelationship> Dependencies { get; set; } = new List<ResourceRelationship>();
 
-        public virtual ICollection<ResourceDependency> Dependents { get; set; } = new List<ResourceDependency>();
+        public virtual ICollection<ResourceRelationship> Dependents { get; set; } = new List<ResourceRelationship>();
     }
 }

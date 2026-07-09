@@ -162,6 +162,68 @@ namespace ResourceMapper.Common.Server.Resources
             return keys.Where(k => !string.IsNullOrEmpty(k)).Select(k => k!).ToList();
         }
 
+        public async Task<ResourceDetail?> GetResourceByUidAsync(string resourceUid, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].Resource_GetByResourceUid")
+                .AddVarchar("@ResourceUid", resourceUid);
+
+            return await _db.Execute.ExecuteRowAsync(cmd, dr => new ResourceDetail
+            {
+                ResourceId = dr.ReadInt("ResourceId"),
+                ResourceUid = dr.ReadString("ResourceUid"),
+                ResourceKey = dr.ReadString("ResourceKey"),
+                ResourceTypeId = dr.ReadInt("ResourceTypeId"),
+                ResourceName = dr.ReadString("ResourceName"),
+                Description = dr.ReadString("Description"),
+                PrimaryTagDefinitionId = dr.ReadNullableInt("PrimaryTagDefinitionId"),
+                CreatedOn = dr.ReadDateTime("CreatedOn"),
+                UpdatedOn = dr.ReadNullableDateTime("UpdatedOn")
+            }, cancellationToken: cancellationToken);
+        }
+
+        public async Task<List<ResourceRelationshipItem>> GetRelationshipsForResourceAsync(int resourceId, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].ResourceRelationship_GetForResource")
+                .AddInteger("@ResourceId", resourceId);
+
+            return await _db.Execute.ExecuteQueryAsync(cmd, dr => new ResourceRelationshipItem
+            {
+                RelationshipId = dr.ReadInt("RelationshipId"),
+                Direction = dr.ReadString("Direction"),
+                OtherResourceId = dr.ReadInt("OtherResourceId"),
+                OtherResourceUid = dr.ReadString("OtherResourceUid"),
+                OtherResourceKey = dr.ReadString("OtherResourceKey"),
+                OtherResourceName = dr.ReadString("OtherResourceName"),
+                OtherResourceType = dr.ReadString("OtherResourceType")
+            }, cancellationToken: cancellationToken);
+        }
+
+        public async Task AddRelationshipAsync(int fromResourceId, int toResourceId, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].ResourceRelationship_Add")
+                .AddInteger("@FromResourceId", fromResourceId)
+                .AddInteger("@ToResourceId", toResourceId);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+        }
+
+        public async Task RemoveRelationshipAsync(int fromResourceId, int toResourceId, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].ResourceRelationship_Remove")
+                .AddInteger("@FromResourceId", fromResourceId)
+                .AddInteger("@ToResourceId", toResourceId);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+        }
+
+        public async Task DeleteResourceAsync(int resourceId, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].Resource_Delete")
+                .AddInteger("@ResourceId", resourceId);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+        }
+
         // Builds the [HTResourceMapper].[ResourceFilterList] TVP rows: one per selected enumerable
         // value / tag value / text filter. Column order MUST match the TVP definition.
         private static DataTable BuildFilterTable(IReadOnlyList<ResourceGridFilterDefinition>? filters)

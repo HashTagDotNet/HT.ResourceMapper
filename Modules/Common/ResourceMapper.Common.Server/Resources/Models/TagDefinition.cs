@@ -18,6 +18,9 @@ namespace ResourceMapper.Common.Server.Resources.Models
         [StringLength(50)]
         public string TagDefinitionKey { get; set; } = string.Empty;
 
+        [StringLength(100)]
+        public string? DisplayName { get; set; }
+
         [Required]
         public int TagContentTypeId { get; set; }
 
@@ -31,7 +34,17 @@ namespace ResourceMapper.Common.Server.Resources.Models
         public string? AllowedValues { get; set; }
 
         [Required]
-        public int IsSystemTag { get; set; } = 0;
+        [StringLength(20)]
+        public string RequirementLevel { get; set; } = "Optional";
+
+        [Required]
+        public bool IsDomainTag { get; set; } = false;
+
+        [Required]
+        public bool IsSystemTag { get; set; } = false;
+
+        [Required]
+        public int DisplayOrder { get; set; } = 1000;
 
         [Required]
         public DateTime CreatedOn { get; set; } = DateTime.UtcNow;

@@ -66,10 +66,13 @@
   <ItemGroup>
     <Build Include="Security\HTResourceMapper.sql" />
     <Build Include="Stored Procedures\PlaceholderStoredProcedure.sql" />
+    <Build Include="Stored Procedures\ResourceRelationship_Add.sql" />
+    <Build Include="Stored Procedures\ResourceRelationship_GetForResource.sql" />
+    <Build Include="Stored Procedures\ResourceRelationship_Remove.sql" />
     <Build Include="Stored Procedures\ResourceTag_SetForResource.sql" />
     <Build Include="Stored Procedures\ResourceType_GetAll.sql" />
     <Build Include="Stored Procedures\ResourceType_Upsert.sql" />
-    <Build Include="Stored Procedures\Resource_Create.sql" />
+    <Build Include="Stored Procedures\Resource_Delete.sql" />
     <Build Include="Stored Procedures\Resource_GetAllKeys.sql" />
     <Build Include="Stored Procedures\Resource_GetByResourceUid.sql" />
     <Build Include="Stored Procedures\Resource_GetDaysAgo.sql" />

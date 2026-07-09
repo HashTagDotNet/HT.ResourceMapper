@@ -6,7 +6,7 @@ CREATE PROCEDURE [HTResourceMapper].Resource_Upsert
     @Description   NVARCHAR(2000) = NULL,
     @OnConflict    VARCHAR(10),        -- 'upsert' | 'skip'
     @ResourceId    INT OUTPUT,         -- returned in all cases, including skip
-    @Result        VARCHAR(10) OUTPUT
+    @Result        VARCHAR(10) OUTPUT  -- 'created' | 'updated' | 'skipped' | 'error'
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -14,9 +14,21 @@ BEGIN
     DECLARE @ResourceTypeId INT =
         (SELECT ResourceTypeId FROM [HTResourceMapper].[ResourceType] WHERE TypeName = @TypeName);
 
+    -- Resource.ResourceTypeId is NOT NULL: a resource type is mandatory. Fail explicitly
+    -- rather than attempt an insert/update that would violate the NOT NULL constraint.
+    IF @ResourceTypeId IS NULL
+    BEGIN
+        SET @Result = 'error';
+        SET @ResourceId = NULL;
+        RETURN;
+    END
+
+    -- Identity is (ResourceType + ResourceKey) here; Domain is added to this predicate in
+    -- slice #5 once Domain is written/read as a tag value (IsDomainTag = 1).
     SELECT @ResourceId = ResourceId
     FROM [HTResourceMapper].[Resource]
-    WHERE ResourceKey = @ResourceKey;
+    WHERE ResourceKey = @ResourceKey
+      AND ResourceTypeId = @ResourceTypeId;
 
     IF @ResourceId IS NULL
     BEGIN

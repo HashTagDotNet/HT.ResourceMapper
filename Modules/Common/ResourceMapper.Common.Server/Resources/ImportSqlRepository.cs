@@ -27,11 +27,15 @@ namespace ResourceMapper.Common.Server.Resources
                 TagDefinitionId = dr.ReadInt("TagDefinitionId"),
                 TagDefinitionUid = dr.ReadString("TagDefinitionUid"),
                 TagDefinitionKey = dr.ReadString("TagDefinitionKey"),
+                DisplayName = dr.ReadString("DisplayName"),
                 TagContentTypeId = dr.ReadInt("TagContentTypeId"),
                 AllowCustomValue = dr.ReadBoolean("AllowCustomValue"),
                 IsMultiValued = dr.ReadBoolean("IsMultiValued"),
                 AllowedValues = dr.ReadString("AllowedValues"),
-                IsSystemTag = dr.ReadInt("IsSystemTag"),
+                RequirementLevel = dr.ReadString("RequirementLevel") ?? "Optional",
+                IsDomainTag = dr.ReadBoolean("IsDomainTag"),
+                IsSystemTag = dr.ReadBoolean("IsSystemTag"),
+                DisplayOrder = dr.ReadInt("DisplayOrder"),
                 CreatedOn = dr.ReadDateTime("CreatedOn"),
                 UpdatedOn = dr.ReadNullableDateTime("UpdatedOn")
             }, cancellationToken: cancellationToken);
