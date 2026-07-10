@@ -161,6 +161,7 @@ namespace ResourceMapper.Common.Server.Resources
                 var tagDictionaryModels = tagDictionary.Select(MapToTagDefinitionModel).ToList();
                 var domainDef = tagDictionary.FirstOrDefault(t => t.IsDomainTag);
                 var domainAllowedValues = ParseAllowedValues(domainDef?.AllowedValues) ?? new List<string>();
+                var entryPointTemplates = await _repo.GetAllEntryPointTemplatesAsync(cancellationToken);
 
                 var isEditOrView = string.Equals(request.Mode, "Edit", StringComparison.OrdinalIgnoreCase)
                                     || string.Equals(request.Mode, "View", StringComparison.OrdinalIgnoreCase);
@@ -181,7 +182,7 @@ namespace ResourceMapper.Common.Server.Resources
                     var tagReads = await _repo.GetTagsForResourceAsync(detail.ResourceId, cancellationToken);
                     var relationshipItems = await _repo.GetRelationshipsForResourceAsync(detail.ResourceId, cancellationToken);
 
-                    editorModel = BuildEditEditorModel(detail, typeName, tagReads, relationshipItems, tagDictionaryModels, request.Mode);
+                    editorModel = BuildEditEditorModel(detail, typeName, tagReads, relationshipItems, tagDictionaryModels, request.Mode, domainDef?.TagDefinitionId);
                 }
                 else
                 {
@@ -198,7 +199,13 @@ namespace ResourceMapper.Common.Server.Resources
                         ResourceTypeUid = r.ResourceTypeUid
                     }).ToList(),
                     TagDictionary = tagDictionaryModels,
-                    EntryPointTemplates = new List<ResourceTypeEntryPointModel>(), // populated in #7
+                    EntryPointTemplates = entryPointTemplates.Select(t => new ResourceTypeEntryPointModel
+                    {
+                        ResourceTypeId = t.ResourceTypeId,
+                        TagDefinitionId = t.TagDefinitionId,
+                        IsDefaultPrimary = t.IsDefaultPrimary,
+                        RequirementLevel = t.RequirementLevel
+                    }).ToList(),
                     DomainAllowedValues = domainAllowedValues
                 });
                 return builder.BuildResponse();
@@ -301,15 +308,39 @@ namespace ResourceMapper.Common.Server.Resources
                     return builder.BuildResponse();
                 }
 
-                var (result, _) = await _repo.SaveResourceAsync(
+                var tagDictionary = await _repo.GetAllTagDefinitionsAsync(cancellationToken);
+                // Domain is dropped here at the source (not just at the sproc) — a domain-keyed
+                // entry in request.Tags, if the client ever sent one, is never validated, written,
+                // or eligible as primary.
+                var domainDefId = tagDictionary.FirstOrDefault(d => d.IsDomainTag)?.TagDefinitionId;
+                var nonEmptyTags = (request.Tags ?? new List<SaveTagValue>())
+                    .Where(t => !string.IsNullOrWhiteSpace(t.Value))
+                    .Where(t => domainDefId is null || t.TagDefinitionId != domainDefId)
+                    .ToList();
+
+                if (!ValidateTagsForSave(builder, nonEmptyTags, tagDictionary))
+                    return builder.BuildResponse();
+
+                // RD2: only pass a primary through when it's a Link tag with a value that
+                // actually survives this save (the client already filters this; double-safe).
+                var effectivePrimaryId = ResolveEffectivePrimary(request.PrimaryTagDefinitionId, nonEmptyTags, tagDictionary);
+
+                var (result, resourceId) = await _repo.SaveResourceAsync(
                     request.ResourceUid, request.ResourceTypeId, request.ResourceKey, request.ResourceName,
-                    request.Description, request.Domain, request.PrimaryTagDefinitionId, cancellationToken);
+                    request.Description, request.Domain, effectivePrimaryId, cancellationToken);
 
                 if (string.Equals(result, "error", StringComparison.Ordinal))
                 {
                     builder.Validation.AddValidation("request.ResourceTypeId", "Resource type or Domain cannot be changed after save");
                     return builder.BuildResponse();
                 }
+
+                // RD4 (non-atomic): Resource_Save then SetResourceTagsAsync are two sprocs, no
+                // shared transaction — matches the import path. Domain is excluded here (the
+                // client already excludes it; ResourceTag_SetForResource also skips it —
+                // double-safe).
+                await _repo.SetResourceTagsAsync(resourceId,
+                    nonEmptyTags.Select(t => (t.TagDefinitionKey, t.Value!)).ToList(), cancellationToken);
 
                 var saved = await _repo.GetResourceByUidAsync(request.ResourceUid, cancellationToken);
                 builder.Data.Set(new SaveResourceResponse
@@ -565,6 +596,53 @@ namespace ResourceMapper.Common.Server.Resources
             };
         }
 
+        private static bool ValidateTagsForSave(ServiceResponseBuilder<SaveResourceResponse> builder,
+            List<SaveTagValue> nonEmptyTags, List<TagDefinition> tagDictionary)
+        {
+            var isValid = true;
+
+            foreach (var tag in nonEmptyTags)
+            {
+                var def = tagDictionary.FirstOrDefault(d => d.TagDefinitionId == tag.TagDefinitionId);
+                if (def is { ContentType: "Link" } && !IsValidLinkValue(tag.Value))
+                {
+                    builder.Validation.AddValidation("request.Tags", $"'{def.DisplayName ?? def.TagDefinitionKey}' must be a valid http/https URL");
+                    isValid = false;
+                }
+            }
+
+            // Required (Error) tags must have a surviving non-empty value. Domain is excluded —
+            // its requiredness is enforced via request.Domain, not the tag list.
+            foreach (var def in tagDictionary.Where(d => !d.IsDomainTag && string.Equals(d.RequirementLevel, "Error", StringComparison.Ordinal)))
+            {
+                if (!nonEmptyTags.Any(t => t.TagDefinitionId == def.TagDefinitionId))
+                {
+                    builder.Validation.AddValidation("request.Tags", $"'{def.DisplayName ?? def.TagDefinitionKey}' is required");
+                    isValid = false;
+                }
+            }
+
+            return isValid;
+        }
+
+        private static bool IsValidLinkValue(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            return Uri.TryCreate(value, UriKind.Absolute, out var uri)
+                   && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+        }
+
+        private static int? ResolveEffectivePrimary(int? requestedPrimaryId, List<SaveTagValue> nonEmptyTags, List<TagDefinition> tagDictionary)
+        {
+            if (requestedPrimaryId is null) return null;
+
+            var def = tagDictionary.FirstOrDefault(d => d.TagDefinitionId == requestedPrimaryId);
+            if (def is not { ContentType: "Link" }) return null;
+
+            var survives = nonEmptyTags.Any(t => t.TagDefinitionId == requestedPrimaryId);
+            return survives ? requestedPrimaryId : null;
+        }
+
         private static string BuildIdentityDisplay(string? domain, string? typeName, string? key)
         {
             var parts = new[] { domain, typeName, key }.Where(p => !string.IsNullOrWhiteSpace(p));
@@ -625,7 +703,8 @@ namespace ResourceMapper.Common.Server.Resources
             List<ResourceTagRead> tagReads,
             List<ResourceRelationshipItem> relationshipItems,
             List<TagDefinitionModel> tagDictionary,
-            string mode)
+            string mode,
+            int? domainTagDefinitionId)
         {
             var model = new ResourceEditorModel
             {
@@ -649,7 +728,10 @@ namespace ResourceMapper.Common.Server.Resources
                 }
             };
 
+            // RD1: the domain tag is a ResourceTag row like any other applied tag — exclude it
+            // here so it never surfaces as an editable row on the Tags tab.
             model.Tags = tagReads
+                .Where(t => domainTagDefinitionId is null || t.TagDefinitionId != domainTagDefinitionId)
                 .GroupBy(t => t.TagDefinitionId)
                 .Select(g => BuildTagRowEditor(g, tagDictionary))
                 .ToList();

@@ -191,3 +191,60 @@ html, body {
     color: var(--mud-palette-text-secondary);
     width: 40%;
 }
+
+/* Tags tab: compact rows (label / value / primary / remove) + chip layout for multi-valued tags. */
+.rm-tags-editor {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+}
+
+.rm-tag-row {
+    display: grid;
+    grid-template-columns: 160px 1fr 40px 40px;
+    align-items: start;
+    gap: .5rem;
+    padding: .35rem 0;
+    border-bottom: 1px solid var(--mud-palette-divider);
+}
+
+.rm-tag-label {
+    padding-top: .5rem;
+    font-size: .875rem;
+    color: var(--mud-palette-text-secondary);
+    display: flex;
+    align-items: center;
+}
+
+.rm-tag-required {
+    color: var(--mud-palette-error);
+    margin-left: 2px;
+}
+
+.rm-tag-primary,
+.rm-tag-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: .25rem;
+}
+
+.rm-tag-multivalue {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+}
+
+.rm-tag-chipset {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem;
+}
+
+.rm-tag-add-row {
+    gap: .25rem;
+}
+
+.rm-tag-add-search {
+    max-width: 320px;
+}

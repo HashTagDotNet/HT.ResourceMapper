@@ -1,0 +1,113 @@
+@using ResourceMapper.Common.Shared.Editor
+@using ResourceMapper.Common.Shared.Editor.Contracts
+@using ResourceMapper.Common.Server.Resources.Interfaces
+@inject IResourceService ResourceService
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            Create a new tag definition. If a tag with this key already exists, that existing
+            definition is reused instead of creating a duplicate.
+        </MudText>
+
+        <MudTextField T="string" @bind-Value="_key" Label="Key" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      HelperText="@KeyHelperText" Error="@_keyError" ErrorText="Key is required" />
+
+        <MudTextField T="string" @bind-Value="_displayName" Label="Display Name" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" />
+
+        <MudSelect T="string" @bind-Value="_contentType" Label="Content Type" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2">
+            <MudSelectItem Value="@("Text")">Text</MudSelectItem>
+            <MudSelectItem Value="@("Link")">Link</MudSelectItem>
+        </MudSelect>
+
+        <MudSelect T="string" @bind-Value="_requirementLevel" Label="Requirement Level" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2">
+            <MudSelectItem Value="@("Error")">Error (required)</MudSelectItem>
+            <MudSelectItem Value="@("Suggested")">Suggested</MudSelectItem>
+            <MudSelectItem Value="@("Optional")">Optional</MudSelectItem>
+        </MudSelect>
+
+        <MudCheckBox T="bool" @bind-Value="_allowCustomValue" Label="Allow custom value (free text)" Class="mt-2" />
+        <MudCheckBox T="bool" @bind-Value="_isMultiValued" Label="Multi-valued (multiple discrete values)" />
+
+        <MudTextField T="string" @bind-Value="_allowedValuesCsv" Label="Allowed Values (comma-separated)" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" HelperText="Optional — leave blank for unrestricted text" Class="mt-2" />
+
+        <MudNumericField T="int" @bind-Value="_displayOrder" Label="Display Order" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" />
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mt-2">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_saving">
+            @(_saving ? "Creating…" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public List<string> ExistingKeys { get; set; } = new();
+
+    private string _key = string.Empty;
+    private string? _displayName;
+    private string _contentType = "Text";
+    private string _requirementLevel = "Optional";
+    private bool _allowCustomValue = true;
+    private bool _isMultiValued;
+    private string? _allowedValuesCsv;
+    private int _displayOrder = 1000;
+    private bool _saving;
+    private bool _keyError;
+    private string? _error;
+
+    private string? KeyHelperText =>
+        !string.IsNullOrWhiteSpace(_key) && ExistingKeys.Any(k => string.Equals(k, _key, StringComparison.OrdinalIgnoreCase))
+            ? "A tag with this key already exists — that definition will be reused."
+            : null;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        _error = null;
+        _keyError = string.IsNullOrWhiteSpace(_key);
+        if (_keyError) return;
+
+        _saving = true;
+        try
+        {
+            var allowedValues = string.IsNullOrWhiteSpace(_allowedValuesCsv)
+                ? null
+                : _allowedValuesCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+            var request = new CreateTagDefinitionRequest
+            {
+                TagDefinitionKey = _key.Trim(),
+                DisplayName = string.IsNullOrWhiteSpace(_displayName) ? null : _displayName,
+                ContentType = _contentType,
+                AllowCustomValue = _allowCustomValue,
+                IsMultiValued = _isMultiValued,
+                AllowedValues = allowedValues,
+                RequirementLevel = _requirementLevel,
+                DisplayOrder = _displayOrder
+            };
+
+            var response = await ResourceService.CreateTagDefinitionAsync(request, CancellationToken.None);
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+            {
+                MudDialog.Close(DialogResult.Ok(response.ApiResponse.Data));
+            }
+            else
+            {
+                _error = "Could not create tag definition.";
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

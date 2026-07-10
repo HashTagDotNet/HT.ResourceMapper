@@ -53,6 +53,47 @@ namespace ResourceMapper.UI.Web.Components.Editor
             && !string.IsNullOrWhiteSpace(model.Domain.EditedValue)
             && !string.IsNullOrWhiteSpace(model.Key.EditedValue);
 
+        /// <summary>Required (Error) tag with no value → error; Link value not http/https →
+        /// error. An empty Suggested/Optional row is not an error (RD3).</summary>
+        public static bool ValidateTags(ResourceEditorModel model)
+        {
+            var isValid = true;
+
+            foreach (var row in model.Tags.Where(t => !t.IsRemoved))
+            {
+                row.RowMessages.Clear();
+                var hasValue = row.Values.Any(v => !string.IsNullOrWhiteSpace(v.EditedValue));
+                var label = row.Definition.DisplayName ?? row.Definition.TagDefinitionKey;
+
+                if (row.IsRequired && !hasValue)
+                {
+                    row.RowMessages.Add(new EditorMessage { Message = $"{label} is required", Level = EditorFieldLevel.Error });
+                    isValid = false;
+                }
+
+                if (row.IsLink)
+                {
+                    foreach (var v in row.Values.Where(v => !string.IsNullOrWhiteSpace(v.EditedValue)))
+                    {
+                        if (!IsValidLinkValue(v.EditedValue))
+                        {
+                            row.RowMessages.Add(new EditorMessage { Message = $"{label} must be a valid http/https URL", Level = EditorFieldLevel.Error });
+                            isValid = false;
+                        }
+                    }
+                }
+            }
+
+            return isValid;
+        }
+
+        private static bool IsValidLinkValue(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            return Uri.TryCreate(value, UriKind.Absolute, out var uri)
+                   && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+        }
+
         private static void ClearMessages(ResourceEditorModel model)
         {
             model.ResourceType.Messages.Clear();

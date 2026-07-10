@@ -89,5 +89,14 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
         Task<(string Result, int TagDefinitionId)> CreateTagDefinitionAsync(string tagKey, string tagDefinitionUid,
             string contentType, bool allowCustomValue, bool isMultiValued, string? allowedValuesJson,
             string? displayName, string requirementLevel, int displayOrder, CancellationToken cancellationToken);
+
+        // Every ResourceTypeTag row (all types) — drives the Tags tab's pre-seed + client-side
+        // re-seed on type change with no round trip.
+        Task<List<ResourceTypeTag>> GetAllEntryPointTemplatesAsync(CancellationToken cancellationToken);
+
+        // Replaces all non-domain applied tags for the resource (delete-all-then-reinsert via
+        // ResourceTag_SetForResource — domain-safe; a domain-keyed pair is ignored by the sproc).
+        Task SetResourceTagsAsync(int resourceId, IReadOnlyList<(string TagKey, string TagValue)> tags,
+            CancellationToken cancellationToken);
     }
 }

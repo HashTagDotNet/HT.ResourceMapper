@@ -71,6 +71,9 @@
     [Parameter] public EventCallback OnCheckUniqueness { get; set; }
     [Parameter] public EventCallback OnFieldChanged { get; set; }
 
+    /// <summary>Fired (Create mode only, via the Type select) so the parent can re-seed the Tags tab's entry-point rows.</summary>
+    [Parameter] public EventCallback<int?> OnResourceTypeChanged { get; set; }
+
     private bool _keyManuallyEdited;
 
     private string DomainLabel =>
@@ -81,6 +84,7 @@
         Model.ResourceTypeId = value;
         Model.ResourceType.EditedValue = ResourceTypes.FirstOrDefault(o => o.ResourceTypeId == value)?.TypeName ?? string.Empty;
         await NotifyChangedAndCheckUniqueness();
+        await OnResourceTypeChanged.InvokeAsync(value);
     }
 
     private async Task OnDomainChanged(string value)

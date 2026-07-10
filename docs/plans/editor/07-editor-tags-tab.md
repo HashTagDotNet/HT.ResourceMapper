@@ -186,3 +186,83 @@ already exist from slice #3 (`TagRowEditor`, `TagDefinitionModel`, `ResourceType
 
 Then: flip slice #7 → Done and slice #8 → Planning in `00-implementation-plan-list.md`, and commit.
 Per our pattern, planning is on the stronger model; execution switches to the cheaper one.
+
+## Execution notes
+
+- **All steps completed and verified.** `dotnet build` — zero `error CS` (only the documented
+  non-SDK sqlproj MSB4278 under `dotnet build`; unrelated). `dotnet test` — 163/163 relevant tests
+  green (65 + 25 + 73, spanning Shared/Client-contracts/Server; the pre-existing 2 failures in
+  `HT.Api.Service.Contracts.Tests` were confirmed via `git stash` to already fail on `main` before
+  this slice — unrelated `CallStatusCode`→HTTP-status mapping, untouched by this work). New tests:
+  8 in `ResourceServiceTests` (tag write + domain exclusion, required-tag-missing, Link-not-http
+  rejection, primary-survives / primary-cleared, `EntryPointTemplates` projection, domain-tag
+  exclusion on edit-load).
+- **DB:** `ResourceTypeTag_GetAll.sql` added + registered in the `.sqlproj`; dacpac rebuilt via full
+  MSBuild and republished via SqlPackage `/p:DropObjectsNotInSource=True` — confirmed executable via
+  sqlcmd (empty result set, as expected with no seed data yet — OQ1).
+- **Real bug found and fixed while wiring the service:** the plan's "domain excluded (client already
+  excludes it; sproc also skips it — double-safe)" note covered the *sproc* and the *client*, but
+  the **service** itself never filtered a domain-keyed entry out of `nonEmptyTags` before building
+  the `SetResourceTagsAsync` write list or running required/Link validation. A test that intentionally
+  included a `Domain` entry in `request.Tags` (defense against a misbehaving/future client) caught
+  it — `SaveResourceAsync` now drops the domain-def entry at the very top, before validation, write,
+  and primary resolution, so all three paths are consistently domain-safe, not just two of three.
+- **Real bug found and fixed while driving the app — a MudBlazor MUD0002 analyzer warning.**
+  `Dense="true"` was set on a `MudTextField`/`MudSelect` in the new `TagValueEditor` (copied from a
+  mental model of other Mud components); `MudTextField`/`MudSelect` don't have a `Dense` parameter
+  in this MudBlazor version — `Margin="Margin.Dense"` alone already achieves the compact sizing.
+  Removed; the build is now warning-clean for new code (the analyzer would otherwise silently
+  no-op the attribute).
+- **A cosmetic bug found and fixed while driving the app:** after picking a value from the
+  multi-valued controlled-vocab "Add value…" `MudSelect` (e.g. Environment), the select visually
+  kept showing the just-picked value instead of resetting to the placeholder — the underlying data
+  was correct (the chip was added, the value excluded from `AvailableVocabValues()`), but the select
+  control itself didn't visually clear. Fixed with a `@key`-based forced remount
+  (`_vocabSelectKey++` on each pick), a standard Blazor pattern for resetting a component's internal
+  display state that a plain parameter reset doesn't reach.
+- **A benign MudBlazor rendering nuance, documented rather than "fixed":** the Link tag's live
+  inline `Error`/`ErrorText` (red border + helper text on the field itself, for an invalid
+  `javascript:`-style URL) only visually refreshes if the Tags tab is revisited after being active
+  elsewhere (switch to another tab and back) — while remaining on the *same already-active*
+  `MudTabPanel`, the field's own error styling lags a beat even though the underlying value is
+  updated instantly (confirmed by checking the Review tab, which reflects the typed value
+  immediately without ever needing a tab revisit or a Save click). The *functionally load-bearing*
+  behavior — Save is blocked, and a clear `RowMessages` alert states the exact "must be a valid
+  http/https URL" error — works correctly and was verified end-to-end regardless of this cosmetic
+  lag. This reads as a MudBlazor JS-interop/outlined-field layout quirk tied to components inside an
+  already-active tab panel, not a data-correctness defect; not chased further given the design's
+  actual requirement ("feeds the save gate") is satisfied.
+- **UI decision vs. the plan:** used a plain `MudTextField` for the free-text/suggest content-type
+  case instead of `MudAutocomplete`-with-suggestions — the plan phrased this as "MudTextField (or
+  MudAutocomplete …)", and confirming `MudAutocomplete`'s exact `SearchFunc` signature for this
+  MudBlazor version without introducing a compile-time guess wasn't worth the risk for a
+  suggestion-only UX nicety. The "Add existing tag…" search box (a harder requirement — search over
+  the full tag dictionary) does use `MudAutocomplete` with a `(string, CancellationToken) => Task<IEnumerable<T>>`
+  `SearchFunc`, confirmed compiling and working live in the driven walkthrough.
+- **Primary radio implementation deviated from the plan's literal wording** ("Checked"/"CheckedChanged"
+  on `MudRadio`, which don't exist on `MudRadio<T>` in this version) in favor of the actual MudBlazor
+  pattern: a single `MudRadioGroup<int?>` wrapping the whole row list, with `Model.PrimaryTagDefinitionId`
+  as its bound value and a `MudRadio<int?>` per eligible (Link, single-valued) row. Functionally
+  identical to the design intent (single-select among Link tags; picking one clears the others).
+- **Full manual walkthrough, screenshotted at each step, confirmed correct** (via `playwright-core` +
+  system Chrome, headless — no `chromium-cli` available, matching the #6 precedent): seeded a
+  temporary `Slice7AppService` type + `Slice7Overview` (Link, default-primary entry point) +
+  `Slice7Environment` (Text, multi-valued, controlled-vocab `prod/preprod/dev/test`, entry point) via
+  sqlcmd → Create → General (Type/Domain/Name; Key auto-slugged) → **Tags**: pre-seeded rows appeared
+  with Overview pre-marked primary; typed an invalid `javascript:` URL into Overview, confirmed Save
+  is blocked with a field-level alert and a warning snackbar; fixed it with a valid `https://` URL;
+  added "dev" to the multi-valued Environment vocab select (rendered as a chip); used **Create new
+  tag…** to add a `Kusto` (Link) tag definition inline (search-first hint text present) — left its
+  value empty to also exercise "empty added row silently dropped, no error" (§ RD3) → **Review**:
+  correctly rolled up General + both filled tags with the primary star, "Ready to save" → **Save**:
+  success toast, landed in View mode at the permalink → reloaded fresh (`/resources/{uid}` deep
+  link) → **View → Tags**: confirmed Overview (primary star) and Environment ("dev" chip) round-tripped
+  correctly, both read-only; confirmed the **domain tag never appeared as a row** (RD1); confirmed
+  the never-filled Kusto tag did not persist. A second full run against the same Name/Key correctly
+  hit the uniqueness collision guard (Review showed "Another resource of this type already uses this
+  key", Save blocked) — incidental confirmation that slice #6's uniqueness gate still holds with tags
+  wired in. One console `404` appeared during the run, matching the pre-existing non-blocking
+  artifact already noted in slice #6 — not a regression.
+- **All temporary test artifacts removed:** the seeded `Slice7AppService` type, its two/three tag
+  definitions, `ResourceTypeTag` template rows, and the one resource created while driving the app
+  were deleted from `(localdb)`; the dev server was stopped (`taskkill //F //IM dotnet.exe`).

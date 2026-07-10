@@ -36,7 +36,12 @@ else if (_model is not null && _response is not null)
             <MudTabPanel Text="General">
                 <GeneralTab Model="_model" ResourceTypes="_response.ResourceTypes" DomainAllowedValues="_response.DomainAllowedValues"
                             TagDictionary="_response.TagDictionary" ReadOnly="@(_mode == "View")"
-                            OnFieldChanged="OnGeneralFieldChanged" OnCheckUniqueness="CheckUniquenessAsync" />
+                            OnFieldChanged="OnGeneralFieldChanged" OnCheckUniqueness="CheckUniquenessAsync"
+                            OnResourceTypeChanged="OnResourceTypeChanged" />
+            </MudTabPanel>
+            <MudTabPanel Text="Tags">
+                <TagsTab Model="_model" TagDictionary="_response.TagDictionary" ReadOnly="@(_mode == "View")"
+                         OnFieldChanged="OnGeneralFieldChanged" />
             </MudTabPanel>
             <MudTabPanel Text="Review">
                 <ReviewTab Model="_model" />
@@ -148,6 +153,50 @@ else if (_model is not null && _response is not null)
         StateHasChanged();
     }
 
+    private void OnResourceTypeChanged(int? resourceTypeId)
+    {
+        if (_model is null || _response is null || _model.IsPersisted) return;
+
+        // Drop existing pre-seeded rows (a value the user typed before switching type is lost —
+        // accepted, RD6); keep user-added rows.
+        _model.Tags = _model.Tags.Where(t => !t.IsPreSeeded).ToList();
+
+        if (resourceTypeId is null)
+        {
+            StateHasChanged();
+            return;
+        }
+
+        var templates = _response.EntryPointTemplates.Where(t => t.ResourceTypeId == resourceTypeId).ToList();
+        var newDefaultPrimaryId = templates.FirstOrDefault(t => t.IsDefaultPrimary)?.TagDefinitionId;
+
+        foreach (var template in templates)
+        {
+            if (_model.Tags.Any(t => t.TagDefinitionId == template.TagDefinitionId)) continue;
+
+            var definition = _response.TagDictionary.FirstOrDefault(d => d.TagDefinitionId == template.TagDefinitionId);
+            if (definition is null || definition.IsDomainTag) continue;
+
+            _model.Tags.Add(new TagRowEditor
+            {
+                Definition = definition,
+                TagDefinitionId = definition.TagDefinitionId,
+                Values = new List<SingleValueEditor>(),
+                IsPrimary = template.IsDefaultPrimary,
+                IsPreSeeded = true
+            });
+        }
+
+        if (newDefaultPrimaryId is not null)
+        {
+            foreach (var t in _model.Tags)
+                t.IsPrimary = t.TagDefinitionId == newDefaultPrimaryId;
+            _model.PrimaryTagDefinitionId = newDefaultPrimaryId;
+        }
+
+        StateHasChanged();
+    }
+
     private async Task CheckUniquenessAsync()
     {
         if (_model is null) return;
@@ -179,7 +228,9 @@ else if (_model is not null && _response is not null)
     {
         if (_model is null) return;
 
-        if (!EditorValidation.ValidateGeneral(_model))
+        var generalValid = EditorValidation.ValidateGeneral(_model);
+        var tagsValid = EditorValidation.ValidateTags(_model);
+        if (!generalValid || !tagsValid)
         {
             Snackbar.Add("Fix the highlighted fields before saving.", Severity.Warning);
             return;
@@ -188,6 +239,7 @@ else if (_model is not null && _response is not null)
         _saving = true;
         try
         {
+            var flattenedTags = FlattenTags(_model);
             var request = new SaveResourceRequest
             {
                 Mode = _model.IsPersisted ? "Edit" : "Create",
@@ -197,7 +249,8 @@ else if (_model is not null && _response is not null)
                 ResourceName = _model.Name.EditedValue,
                 ResourceKey = _model.Key.EditedValue,
                 Description = _model.Description.EditedValue,
-                PrimaryTagDefinitionId = _model.PrimaryTagDefinitionId
+                PrimaryTagDefinitionId = ResolveEffectivePrimary(_model, flattenedTags),
+                Tags = flattenedTags
             };
 
             var response = await ResourceService.SaveResourceAsync(request, CancellationToken.None);
@@ -234,11 +287,43 @@ else if (_model is not null && _response is not null)
         }
     }
 
+    private static List<SaveTagValue> FlattenTags(ResourceEditorModel model)
+    {
+        var result = new List<SaveTagValue>();
+        foreach (var row in model.Tags.Where(t => !t.IsRemoved))
+        {
+            foreach (var value in row.Values.Where(v => !string.IsNullOrWhiteSpace(v.EditedValue)))
+            {
+                result.Add(new SaveTagValue
+                {
+                    TagDefinitionId = row.TagDefinitionId,
+                    TagDefinitionKey = row.Definition.TagDefinitionKey,
+                    Value = value.EditedValue
+                });
+            }
+        }
+        return result;
+    }
+
+    // RD2: only send a primary when its row is a Link tag with a non-empty value that
+    // survives this save (an emptied/removed primary row must clear the primary).
+    private static int? ResolveEffectivePrimary(ResourceEditorModel model, List<SaveTagValue> flattenedTags)
+    {
+        if (model.PrimaryTagDefinitionId is null) return null;
+
+        var primaryRow = model.Tags.FirstOrDefault(t => !t.IsRemoved && t.TagDefinitionId == model.PrimaryTagDefinitionId);
+        if (primaryRow is null || !primaryRow.IsLink) return null;
+
+        var survives = flattenedTags.Any(t => t.TagDefinitionId == model.PrimaryTagDefinitionId);
+        return survives ? model.PrimaryTagDefinitionId : null;
+    }
+
     private void ApplyServerErrors(ApiServiceResponse<SaveResourceResponse> response)
     {
         if (_model is null) return;
         foreach (var error in response.ApiResponse.Errors ?? new List<Message>())
         {
+            var message = error.Details ?? error.Title ?? "Invalid";
             var target = error.PropertyName switch
             {
                 "request.ResourceTypeId" => _model.ResourceType,
@@ -247,7 +332,17 @@ else if (_model is not null && _response is not null)
                 "request.ResourceKey" => _model.Key,
                 _ => null
             };
-            target?.Messages.Add(new EditorMessage { Message = error.Details ?? error.Title ?? "Invalid", Level = EditorFieldLevel.Error });
+
+            if (target is not null)
+            {
+                target.Messages.Add(new EditorMessage { Message = message, Level = EditorFieldLevel.Error });
+            }
+            else if (string.Equals(error.PropertyName, "request.Tags", StringComparison.Ordinal))
+            {
+                // Server-side tag validation is a defense backstop (the client already
+                // validates), so surface it directly rather than trying to map it to a row.
+                Snackbar.Add(message, Severity.Error);
+            }
         }
     }
 }

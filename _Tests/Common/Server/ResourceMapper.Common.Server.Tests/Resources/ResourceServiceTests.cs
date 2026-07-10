@@ -39,6 +39,11 @@ namespace ResourceMapper.Common.Server.Tests.Resources
                     It.IsAny<IReadOnlyList<ResourceGridFilterDefinition>?>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<ResourceGridFacetItem>());
 
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>());
+            _repo.Setup(r => r.GetAllEntryPointTemplatesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceTypeTag>());
+
             _sut = new ResourceService(_repo.Object);
         }
 
@@ -289,6 +294,58 @@ namespace ResourceMapper.Common.Server.Tests.Resources
             option.ResourceTypeUid.Should().Be("rt-uid-5");
         }
 
+        [Fact]
+        public async Task GetResourceEditorModelAsync_Create_PopulatesEntryPointTemplatesFromRepo()
+        {
+            _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceType> { new() { ResourceTypeId = 5, TypeName = "AppService" } });
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>());
+            _repo.Setup(r => r.GetAllEntryPointTemplatesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceTypeTag>
+                {
+                    new() { ResourceTypeId = 5, TagDefinitionId = 100, IsDefaultPrimary = true, RequirementLevel = "Suggested" }
+                });
+
+            var response = await _sut.GetResourceEditorModelAsync(new OpenEditorRequest { Mode = "Create" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because a Create request always succeeds");
+            var template = response.ApiResponse.Data!.EntryPointTemplates.Should().ContainSingle().Subject;
+            template.ResourceTypeId.Should().Be(5);
+            template.TagDefinitionId.Should().Be(100);
+            template.IsDefaultPrimary.Should().BeTrue("because the template row's default-primary flag must survive the projection");
+        }
+
+        [Fact]
+        public async Task GetResourceEditorModelAsync_EditLoad_ExcludesDomainTagFromEditorModelTags()
+        {
+            _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceType> { new() { ResourceTypeId = 5, TypeName = "AppService" } });
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>
+                {
+                    new() { TagDefinitionId = 1, TagDefinitionKey = "Domain", ContentType = "Text", IsDomainTag = true },
+                    new() { TagDefinitionId = 2, TagDefinitionKey = "Overview", ContentType = "Link", IsDomainTag = false }
+                });
+            _repo.Setup(r => r.GetResourceByUidAsync("uid-10", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 10, ResourceUid = "uid-10", ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api", Domain = "non-prod" });
+            _repo.Setup(r => r.GetTagsForResourceAsync(10, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceTagRead>
+                {
+                    new() { TagDefinitionId = 1, TagDefinitionKey = "Domain", ContentType = "Text", TagValue = "non-prod" },
+                    new() { TagDefinitionId = 2, TagDefinitionKey = "Overview", ContentType = "Link", TagValue = "https://example.com" }
+                });
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceRelationshipItem>());
+
+            var response = await _sut.GetResourceEditorModelAsync(new OpenEditorRequest { Mode = "Edit", ResourceUid = "uid-10" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the resource exists");
+            var tags = response.ApiResponse.Data!.EditorModel.Tags;
+            tags.Should().ContainSingle("because the domain tag row must be excluded from the editable Tags tab (RD1)");
+            tags.Single().TagDefinitionId.Should().Be(2, "because only the non-domain Overview tag should remain");
+        }
+
         #endregion
 
         #region GetResourceDetailAsync
@@ -419,6 +476,165 @@ namespace ResourceMapper.Common.Server.Tests.Resources
             response.IsSuccess().Should().BeTrue("because a valid, non-colliding save should succeed");
             capturedDomain.Should().Be("non-prod", "because the request's Domain must reach the repository");
             response.ApiResponse.Data!.Saved!.Domain.Should().Be("non-prod", "because the saved projection reflects the persisted domain");
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_WithTags_WritesNonEmptyTagsExcludingDomain()
+        {
+            var uid = Guid.NewGuid().ToString();
+            IReadOnlyList<(string TagKey, string TagValue)>? capturedTags = null;
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>
+                {
+                    new() { TagDefinitionId = 1, TagDefinitionKey = "Domain", ContentType = "Text", IsDomainTag = true },
+                    new() { TagDefinitionId = 2, TagDefinitionKey = "Overview", ContentType = "Link" },
+                    new() { TagDefinitionId = 3, TagDefinitionKey = "Environment", ContentType = "Text" }
+                });
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            _repo.Setup(r => r.SaveResourceAsync(uid, 5, "orders-api", "Orders API", It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("created", 10));
+            _repo.Setup(r => r.SetResourceTagsAsync(10, It.IsAny<IReadOnlyList<(string, string)>>(), It.IsAny<CancellationToken>()))
+                .Callback((int _, IReadOnlyList<(string TagKey, string TagValue)> tags, CancellationToken _) => capturedTags = tags)
+                .Returns(Task.CompletedTask);
+            _repo.Setup(r => r.GetResourceByUidAsync(uid, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 10, ResourceUid = uid, ResourceKey = "orders-api", ResourceTypeId = 5, ResourceName = "Orders API" });
+            _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceType>());
+            _repo.Setup(r => r.GetTagsForResourceAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceTagRead>());
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceRelationshipItem>());
+
+            var request = new SaveResourceRequest
+            {
+                Mode = "Create", ResourceUid = uid, ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api",
+                Tags = new List<SaveTagValue>
+                {
+                    new() { TagDefinitionId = 1, TagDefinitionKey = "Domain", Value = "non-prod" }, // dropped even if present
+                    new() { TagDefinitionId = 2, TagDefinitionKey = "Overview", Value = "https://example.com" },
+                    new() { TagDefinitionId = 3, TagDefinitionKey = "Environment", Value = "dev" },
+                    new() { TagDefinitionId = 3, TagDefinitionKey = "Environment", Value = "" } // empty — dropped
+                }
+            };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the tags are all valid");
+            capturedTags.Should().NotBeNull("because SetResourceTagsAsync must be called");
+            capturedTags!.Select(t => t.TagKey).Should().BeEquivalentTo(new[] { "Overview", "Environment" },
+                "because domain is excluded and the empty Environment row is dropped");
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_RequiredTagMissing_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>
+                {
+                    new() { TagDefinitionId = 2, TagDefinitionKey = "Overview", ContentType = "Link", RequirementLevel = "Error" }
+                });
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+
+            var request = new SaveResourceRequest
+            {
+                Mode = "Create", ResourceUid = Guid.NewGuid().ToString(), ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api",
+                Tags = new List<SaveTagValue>()
+            };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because a required (Error) tag has no value");
+            VerifySaveRepoNeverCalled();
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_LinkTagNotHttpOrHttps_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>
+                {
+                    new() { TagDefinitionId = 2, TagDefinitionKey = "Overview", ContentType = "Link" }
+                });
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+
+            var request = new SaveResourceRequest
+            {
+                Mode = "Create", ResourceUid = Guid.NewGuid().ToString(), ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api",
+                Tags = new List<SaveTagValue> { new() { TagDefinitionId = 2, TagDefinitionKey = "Overview", Value = "javascript:alert(1)" } }
+            };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because a Link value must be a well-formed http/https URL");
+            VerifySaveRepoNeverCalled();
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_PrimaryDoesNotSurviveSave_PassesNullPrimaryToRepository()
+        {
+            var uid = Guid.NewGuid().ToString();
+            int? capturedPrimary = -1;
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>
+                {
+                    new() { TagDefinitionId = 2, TagDefinitionKey = "Overview", ContentType = "Link" }
+                });
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            _repo.Setup(r => r.SaveResourceAsync(uid, 5, "orders-api", "Orders API", It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+                .Callback((string _, int _, string _, string _, string? _, string? _, int? primary, CancellationToken _) => capturedPrimary = primary)
+                .ReturnsAsync(("created", 10));
+            _repo.Setup(r => r.GetResourceByUidAsync(uid, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 10, ResourceUid = uid, ResourceKey = "orders-api", ResourceTypeId = 5, ResourceName = "Orders API" });
+            _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceType>());
+            _repo.Setup(r => r.GetTagsForResourceAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceTagRead>());
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceRelationshipItem>());
+
+            var request = new SaveResourceRequest
+            {
+                Mode = "Create", ResourceUid = uid, ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api",
+                PrimaryTagDefinitionId = 2, // primary row was emptied/removed client-side — no matching Tags entry
+                Tags = new List<SaveTagValue>()
+            };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because an unset primary is not itself invalid");
+            capturedPrimary.Should().BeNull("because a primary whose value didn't survive the save must be cleared (RD2)");
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_PrimarySurvives_PassesPrimaryThroughToRepository()
+        {
+            var uid = Guid.NewGuid().ToString();
+            int? capturedPrimary = null;
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>
+                {
+                    new() { TagDefinitionId = 2, TagDefinitionKey = "Overview", ContentType = "Link" }
+                });
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            _repo.Setup(r => r.SaveResourceAsync(uid, 5, "orders-api", "Orders API", It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+                .Callback((string _, int _, string _, string _, string? _, string? _, int? primary, CancellationToken _) => capturedPrimary = primary)
+                .ReturnsAsync(("created", 10));
+            _repo.Setup(r => r.GetResourceByUidAsync(uid, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 10, ResourceUid = uid, ResourceKey = "orders-api", ResourceTypeId = 5, ResourceName = "Orders API" });
+            _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceType>());
+            _repo.Setup(r => r.GetTagsForResourceAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceTagRead>());
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceRelationshipItem>());
+
+            var request = new SaveResourceRequest
+            {
+                Mode = "Create", ResourceUid = uid, ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api",
+                PrimaryTagDefinitionId = 2,
+                Tags = new List<SaveTagValue> { new() { TagDefinitionId = 2, TagDefinitionKey = "Overview", Value = "https://example.com" } }
+            };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the primary tag has a valid surviving value");
+            capturedPrimary.Should().Be(2, "because a Link primary with a surviving non-empty value passes through");
         }
 
         [Fact]

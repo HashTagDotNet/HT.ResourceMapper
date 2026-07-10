@@ -12,6 +12,7 @@ namespace ResourceMapper.Common.Server.Resources
     public class ResourceSqlRepository : IResourceRepository
     {
         private const string ResourceFilterListType = "[HTResourceMapper].[ResourceFilterList]";
+        private const string TagKeyValueListType = "[HTResourceMapper].[TagKeyValueList]";
 
         private readonly IDbConnector _db;
 
@@ -330,6 +331,34 @@ namespace ResourceMapper.Common.Server.Resources
 
             await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
             return (cmd.ReadString("@Result") ?? "error", cmd.ReadInt("@TagDefinitionId"));
+        }
+
+        public async Task<List<ResourceTypeTag>> GetAllEntryPointTemplatesAsync(CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].ResourceTypeTag_GetAll");
+            return await _db.Execute.ExecuteQueryAsync(cmd, dr => new ResourceTypeTag
+            {
+                ResourceTypeId = dr.ReadInt("ResourceTypeId"),
+                TagDefinitionId = dr.ReadInt("TagDefinitionId"),
+                IsDefaultPrimary = dr.ReadBoolean("IsDefaultPrimary"),
+                RequirementLevel = dr.ReadString("RequirementLevel")
+            }, cancellationToken: cancellationToken);
+        }
+
+        public async Task SetResourceTagsAsync(int resourceId, IReadOnlyList<(string TagKey, string TagValue)> tags,
+            CancellationToken cancellationToken)
+        {
+            using var table = new DataTable();
+            table.Columns.Add("TagDefinitionKey", typeof(string));
+            table.Columns.Add("TagValue", typeof(string));
+            foreach (var (tagKey, tagValue) in tags)
+                table.Rows.Add(tagKey, (object?)tagValue ?? DBNull.Value);
+
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].ResourceTag_SetForResource")
+                .AddInteger("@ResourceId", resourceId)
+                .AddTvp("@Tags", TagKeyValueListType, table);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
         }
 
         // Builds the [HTResourceMapper].[ResourceFilterList] TVP rows: one per selected enumerable

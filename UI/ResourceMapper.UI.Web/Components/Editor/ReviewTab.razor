@@ -15,6 +15,37 @@
     </tbody>
 </MudSimpleTable>
 
+<MudSimpleTable Dense="true" Elevation="0" Class="mt-3" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
+    <thead>
+        <tr><th colspan="2">Tags</th></tr>
+    </thead>
+    <tbody>
+        @{
+            var visibleTags = VisibleTags();
+        }
+        @if (visibleTags.Count == 0)
+        {
+            <tr><td colspan="2" class="rm-review-label">No tags set.</td></tr>
+        }
+        else
+        {
+            @foreach (var row in visibleTags)
+            {
+                <tr>
+                    <td class="rm-review-label">
+                        @row.Definition.DisplayName
+                        @if (row.IsPrimary)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Primary" Class="ml-1" />
+                        }
+                    </td>
+                    <td>@RowValueDisplay(row)</td>
+                </tr>
+            }
+        }
+    </tbody>
+</MudSimpleTable>
+
 @{
     var messages = CollectMessages();
 }
@@ -47,6 +78,14 @@ else
         AddFieldMessages("Domain", Model.Domain, result);
         AddFieldMessages("Name", Model.Name, result);
         AddFieldMessages("Key", Model.Key, result);
+
+        foreach (var row in Model.Tags.Where(t => !t.IsRemoved))
+        {
+            var label = row.Definition.DisplayName ?? row.Definition.TagDefinitionKey;
+            foreach (var m in row.RowMessages)
+                result.Add((label, m.Message ?? string.Empty, m.Level));
+        }
+
         return result;
     }
 
@@ -55,4 +94,10 @@ else
         foreach (var m in editor.Messages)
             result.Add((field, m.Message ?? string.Empty, m.Level));
     }
+
+    private List<TagRowEditor> VisibleTags() =>
+        Model.Tags.Where(t => !t.IsRemoved && t.Values.Any(v => !string.IsNullOrWhiteSpace(v.EditedValue))).ToList();
+
+    private static string RowValueDisplay(TagRowEditor row) =>
+        string.Join(", ", row.Values.Where(v => !string.IsNullOrWhiteSpace(v.EditedValue)).Select(v => v.EditedValue));
 }

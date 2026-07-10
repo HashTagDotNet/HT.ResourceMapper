@@ -1,0 +1,125 @@
+@using ResourceMapper.Common.Shared.Editor
+
+@if (Row.Definition.IsMultiValued)
+{
+    <div class="rm-tag-multivalue">
+        <MudChipSet T="string" Class="rm-tag-chipset">
+            @foreach (var v in ActiveValues())
+            {
+                <MudChip T="string" Value="@v.EditedValue" OnClose="@(() => RemoveValue(v))" Disabled="@ReadOnlyEffective">@v.EditedValue</MudChip>
+            }
+        </MudChipSet>
+        @if (!ReadOnlyEffective)
+        {
+            @if (Row.IsControlledVocab)
+            {
+                <MudSelect T="string" @key="_vocabSelectKey" Value="@_pendingValue" ValueChanged="OnPendingVocabSelected"
+                           Placeholder="Add value…" Margin="Margin.Dense" Variant="Variant.Outlined">
+                    @foreach (var opt in AvailableVocabValues())
+                    {
+                        <MudSelectItem Value="@opt">@opt</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+            else
+            {
+                <div class="d-flex align-center rm-tag-add-row">
+                    <MudTextField T="string" @bind-Value="_pendingValue" Placeholder="Add value…"
+                                  Margin="Margin.Dense" Variant="Variant.Outlined" Immediate="true" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Add" Size="Size.Small"
+                                   Disabled="@string.IsNullOrWhiteSpace(_pendingValue)" OnClick="AddPendingValue" />
+                </div>
+            }
+        }
+    </div>
+}
+else
+{
+    var editor = EnsureSingleValue();
+    @if (Row.IsLink)
+    {
+        <MudTextField T="string" Value="@editor.EditedValue" ValueChanged="@(v => OnSingleValueChanged(editor, v))"
+                      Placeholder="https://…" Disabled="@ReadOnlyEffective" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Error="@(!string.IsNullOrWhiteSpace(editor.EditedValue) && !IsValidLink(editor.EditedValue))"
+                      ErrorText="Must be a valid http/https URL" />
+    }
+    else if (Row.IsControlledVocab)
+    {
+        <MudSelect T="string" Value="@editor.EditedValue" ValueChanged="@(v => OnSingleValueChanged(editor, v))"
+                   Placeholder="Select…" Disabled="@ReadOnlyEffective" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+            @foreach (var opt in Row.Definition.AllowedValues ?? new List<string>())
+            {
+                <MudSelectItem Value="@opt">@opt</MudSelectItem>
+            }
+        </MudSelect>
+    }
+    else
+    {
+        <MudTextField T="string" Value="@editor.EditedValue" ValueChanged="@(v => OnSingleValueChanged(editor, v))"
+                      Disabled="@ReadOnlyEffective" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    }
+}
+
+@code {
+    [Parameter] public TagRowEditor Row { get; set; } = default!;
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private string? _pendingValue;
+    private int _vocabSelectKey;
+
+    private bool ReadOnlyEffective => ReadOnly || !Row.IsEditable;
+
+    private SingleValueEditor EnsureSingleValue()
+    {
+        if (Row.Values.Count == 0)
+            Row.Values.Add(new SingleValueEditor { OriginalValue = string.Empty, EditedValue = string.Empty });
+        return Row.Values[0];
+    }
+
+    private IEnumerable<SingleValueEditor> ActiveValues() =>
+        Row.Values.Where(v => !string.IsNullOrWhiteSpace(v.EditedValue));
+
+    private IEnumerable<string> AvailableVocabValues()
+    {
+        var active = new HashSet<string>(ActiveValues().Select(v => v.EditedValue), StringComparer.Ordinal);
+        return (Row.Definition.AllowedValues ?? new List<string>()).Where(o => !active.Contains(o));
+    }
+
+    private async Task OnSingleValueChanged(SingleValueEditor editor, string value)
+    {
+        editor.EditedValue = value ?? string.Empty;
+        StateHasChanged();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task RemoveValue(SingleValueEditor value)
+    {
+        Row.Values.Remove(value);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnPendingVocabSelected(string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+            Row.Values.Add(new SingleValueEditor { OriginalValue = string.Empty, EditedValue = value });
+        _pendingValue = null;
+        _vocabSelectKey++; // force the select to remount so it visually resets to the placeholder
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task AddPendingValue()
+    {
+        if (string.IsNullOrWhiteSpace(_pendingValue)) return;
+        Row.Values.Add(new SingleValueEditor { OriginalValue = string.Empty, EditedValue = _pendingValue });
+        _pendingValue = null;
+        await OnChanged.InvokeAsync();
+    }
+
+    private static bool IsValidLink(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        return Uri.TryCreate(value, UriKind.Absolute, out var uri)
+               && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+    }
+}
