@@ -24,6 +24,13 @@ The contracts it needs already exist from slice #3 (`ResourcePickerRequest/Item/
 `DependencyRowEditor`, `SaveResourceRequest.DependsOnUids`/`DependentOnUids`,
 `ResourceEditorModel.DependsOn`/`DependentOn`).
 
+**Additionally (mid-planning decision):** #8 stands up the project's first **committed Playwright
+regression suite** (`@playwright/test`) under `tools/e2e/`, with DB seed/teardown fixtures — the
+permanent E2E home future slices add specs to, replacing the drive-once-then-discard scripts used
+in #6/#7. See *E2E regression suite* below. This roughly doubles #8's surface (feature work **plus**
+a test-infra workstream) — flag if you'd rather split it into #8a (feature) / #8b (E2E harness);
+default is to keep both in #8 per your call.
+
 ## Verified starting state
 
 - **Relationship sprocs exist** (slices #2/#4): `ResourceRelationship_Add` (idempotent, no-op on
@@ -149,6 +156,49 @@ The contracts it needs already exist from slice #3 (`ResourcePickerRequest/Item/
   type), matching how #7 added the tags roll-up.
 - **`app.css`** — a small `rm-deps-editor` block (compact rows, picker layout) in the `rm-` style.
 
+## E2E regression suite (committed — `@playwright/test`)
+
+Promotes `tools/e2e` from a drive-script toolkit into a committed, re-runnable regression suite.
+The MudBlazor locator helpers (`mud-helpers.js` — `clickSelect`, `clickSelectInScope`,
+`pickOption`) stay the shared core; the runner + auto-managed server + DB fixtures are new.
+
+- **Runner + config.** Add `@playwright/test` (devDependency) to `tools/e2e/package.json` (it
+  re-exports `chromium` and pulls `playwright-core` transitively) + a `"test:e2e": "playwright test"`
+  script. `tools/e2e/playwright.config.js`:
+  - `use: { baseURL, channel: 'chrome', headless: true, launchOptions: { args: ['--no-sandbox'] },
+    screenshot: 'only-on-failure', trace: 'retain-on-failure' }` — **system Chrome, no bundled
+    Chromium download** (`channel: 'chrome'`, the proven #7 setup — so `npx playwright install` is
+    NOT needed).
+  - `webServer: { command: 'dotnet run --project UI/ResourceMapper.UI.Web --no-launch-profile',
+    cwd: <repo root>, url: baseURL, env: { ASPNETCORE_ENVIRONMENT: 'Development', ASPNETCORE_URLS },
+    reuseExistingServer: !process.env.CI, timeout: 120_000 }` — the runner starts/stops the app and
+    waits for it, replacing the manual `dotnet run &` / `taskkill` dance (RD19).
+  - `workers: 1`, `fullyParallel: false` — a single shared localdb has no parallel isolation (RD17).
+  - `testDir: './tests'`.
+- **DB seed/teardown.** `tools/e2e/sql/seed.sql` + `tools/e2e/sql/cleanup.sql`, invoked from a
+  `globalSetup` (cleanup-then-seed — idempotent even after a crashed prior run) and `globalTeardown`
+  (cleanup) that **shell out to `sqlcmd`** — reliable for `(localdb)\MSSQLLocalDB`; the `mssql` npm
+  client's localdb named-pipe handling is fiddly, avoid it (RD18). Both scripts start with
+  `SET QUOTED_IDENTIFIER ON;` (filtered indexes).
+- **Fixture data.** A dedicated E2E `ResourceType` (`E2eDepType`) + a Link tag def + a
+  controlled-vocab multi-valued tag def + entry-point templates (also usable by a future #7 spec),
+  and picker candidates: **2 resources in `non-prod` + 1 in `prod`**, each with a Domain
+  `ResourceTag` row **referencing the existing shared domain `TagDefinition`** (value from its
+  `AllowedValues`) — never creating or deleting that shared system row (RD15).
+- **Isolation model.** Picker candidates are a **read-only baseline** seeded once; each spec's
+  **resource-under-edit** is created via the UI's Create flow so mutating specs don't depend on each
+  other; `globalTeardown` wipes all E2E-prefixed rows regardless. `workers:1` + the fixed E2E prefix
+  bound any leakage (RD17).
+- **First spec — `tests/dependencies.spec.js`.** The slice-#8 flow, now as assertions (see Tests):
+  picker offers only same-domain targets; add DependsOn + DependentOn; Save; reload asserts
+  round-trip; open the DependentOn target asserts the far-side edge (RD7); remove one → Save →
+  asserts removed.
+- **README + package.** Update `tools/e2e/README.md` for the runner (`npm install`, `npm run
+  test:e2e`, the seed/cleanup model, "system Chrome — no `playwright install`"), and note the suite
+  targets **local localdb** and assumes the dacpac is published; **CI wiring is out of scope** (a
+  pipeline would need Chrome + localdb + a published dacpac — OQ6). `example-drive-editor.js` stays
+  for quick ad-hoc pokes.
+
 ## Rubber-duck — bugs / logic traps caught up front
 
 - **RD1 — per-direction reconciliation scope.** DependsOn (out, `from=this`) and DependentOn (in,
@@ -211,6 +261,32 @@ The contracts it needs already exist from slice #3 (`ResourcePickerRequest/Item/
   editors are routes; dialogs are only for tag-create"). **Defer to #9** (OQ1); #8's picker
   empty-state simply says the target must exist first.
 
+### E2E-suite traps
+
+- **RD15 — cleanup must preserve shared system rows.** The domain `TagDefinition` (`IsDomainTag=1`,
+  key `Domain`), the `TagContentType` rows, and any real seed are shared app state — deleting the
+  domain def would break the whole app (identity, picker, tags). The E2E fixture **references** them
+  by lookup and cleanup targets **only** E2E-prefixed rows (by the `E2eDepType` id + the E2E
+  tag-def keys), never the shared rows.
+- **RD16 — FK-safe cleanup order + cleanup-first seed.** Delete children before parents:
+  `ResourceRelationship` (edges touching E2E resources) → `ResourceTag` (of E2E resources) →
+  `Resource` (of `E2eDepType`) → `ResourceTypeTag` (of `E2eDepType`) → `TagDefinition` (E2E keys
+  only) → `ResourceType` (`E2eDepType`). `globalSetup` runs cleanup **then** seed so a crashed prior
+  run leaves no residue.
+- **RD17 — no parallel isolation on a shared localdb.** `workers:1` + `fullyParallel:false`; a
+  read-only candidate baseline plus a per-spec subject resource keeps mutating specs independent.
+- **RD18 — use `sqlcmd`, not the `mssql` node client, for localdb.** `(localdb)\MSSQLLocalDB` needs
+  the instance named pipe, which the `mssql` package handles poorly; `sqlcmd` is the proven path.
+  `SET QUOTED_IDENTIFIER ON;` in every batch (filtered indexes).
+- **RD19 — `webServer` cwd + reuse.** `webServer.cwd` must be the **repo root**, not `tools/e2e`
+  (else `dotnet run --project UI/...` can't resolve the path — the exact bug hit while smoke-testing
+  the #7 tooling). `reuseExistingServer: !CI` so a dev server already on the port is reused, not
+  double-started (port clash).
+- **RD20 — `channel: 'chrome'` (no browser download) is a hard requirement here.** The environment
+  has system Chrome but the ~150 MB `playwright install` download is undesirable/blocked; the config
+  must pin `channel: 'chrome'`. CI would additionally need Chrome + localdb + a published dacpac —
+  out of scope (OQ6).
+
 ## Open questions / decisions (documented defaults)
 
 - **OQ1 — defer "Create new…" to #9 (recommended).** The nested-create target needs #9's
@@ -231,6 +307,15 @@ The contracts it needs already exist from slice #3 (`ResourcePickerRequest/Item/
 - **OQ5 — target resolution: per-uid vs batch.** *Default:* resolve each desired uid via
   `GetResourceByUidAsync` (gives id + domain in one call, reused for validation). Chatty for large
   N; a batch `Resource_GetByUids` is a future optimization.
+- **OQ6 — E2E suite is local-only for now.** *Default:* the committed suite is a **local** regression
+  home (run manually / pre-commit); CI integration (Chrome + localdb + a published dacpac in the
+  pipeline) is a separate future task, not a #8 blocker.
+- **OQ7 — backfilling #6/#7 flows as specs.** *Default:* #8 stands up the harness + the one
+  dependency spec; retroactively porting the General/Tags flows into specs is out of scope for #8
+  (the harness makes it easy to add later).
+- **OQ8 — sizing / split.** *Default:* keep the feature work and the E2E harness both in #8 per your
+  request; flag that they're separable (#8a feature / #8b harness) if the slice balloons in
+  execution.
 
 ## Out of scope (later slices)
 
@@ -261,14 +346,15 @@ The contracts it needs already exist from slice #3 (`ResourcePickerRequest/Item/
   - **Test-fixture note:** add a default `GetRelationshipsForResourceAsync(...)` → empty-list stub
     in the test ctor (like #7 did for tags) so existing happy-path save tests don't NRE now that
     Save reconciles relationships.
-- **Drive the app** (no bUnit — same as #6/#7; use the new `tools/e2e` Playwright helpers):
-  seed a domain-consistent set — 2–3 resources in `non-prod` + 1 in `prod` — via `sqlcmd`. Open a
-  `non-prod` resource → **Dependencies**: confirm the picker offers only `non-prod` targets (the
-  `prod` one absent); add one → **Dependent On**: add another → **Save** → reopen and confirm both
-  round-trip; open the *target* of the Dependent On edge and confirm it now lists this resource
-  under **Dependencies** (the far-side write, RD7). Remove one dep → Save → confirm removal. Screenshot
-  each step and check the browser console. **Clean up all seed + created edges after; stop the
-  server** (`taskkill //F //IM dotnet.exe`). Do not add permanent seed.
+- **Committed E2E spec** — `tools/e2e/tests/dependencies.spec.js`, run via `npm run test:e2e` (the
+  runner starts the app + seeds via `globalSetup`, tears down via `globalTeardown` — no manual
+  `dotnet run`/`taskkill`/`sqlcmd` dance). The flow, as assertions against the seeded baseline (2
+  `non-prod` candidates + 1 `prod`): create/open a `non-prod` subject → **Dependencies**: the picker
+  offers only `non-prod` targets (the `prod` one absent); add one → **Dependent On**: add another →
+  **Save** → reload asserts both round-trip; open the *target* of the DependentOn edge and assert it
+  now lists the subject under **Dependencies** (the far-side write, RD7); remove one dep → Save →
+  assert removed. This spec is the permanent regression for the slice; ad-hoc pokes can still use
+  `example-drive-editor.js`.
 
 ## Verification
 
@@ -278,7 +364,9 @@ The contracts it needs already exist from slice #3 (`ResourcePickerRequest/Item/
 2. `dotnet build HT.ResourceMapper.slnx` clean (only the known non-SDK `sqlproj` MSB4278);
    `dotnet test` green (existing 73 server + new relationship tests; the 2 pre-existing unrelated
    `HT.Api.Service.Contracts.Tests` failures remain out of scope).
-3. Drive the app end-to-end in a browser (the flow above), screenshotting each step.
+3. `cd tools/e2e && npm install && npm run test:e2e` green — the committed suite starts the app
+   (webServer), seeds localdb, runs `dependencies.spec.js`, and cleans up. Confirm it also passes on
+   a **second** run (idempotent seed/teardown, RD16) and leaves no E2E rows behind.
 
 Then: flip slice #8 → Done and slice #9 → Planning in `00-implementation-plan-list.md`, add an
 "Execution notes" section here, and commit. Per our pattern, planning is on the stronger model;
