@@ -1,0 +1,32 @@
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            Are you sure you want to delete <strong>@ResourceName</strong>?
+        </MudText>
+        @if (Dependents.Count > 0)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">
+                The following resources depend on this service:
+                <ul class="mb-0">
+                    @foreach (var dependent in Dependents)
+                    {
+                        <li>@dependent</li>
+                    }
+                </ul>
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Confirm">Delete</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string ResourceName { get; set; } = string.Empty;
+    [Parameter] public List<string> Dependents { get; set; } = new();
+
+    private void Cancel() => MudDialog.Cancel();
+    private void Confirm() => MudDialog.Close(DialogResult.Ok(true));
+}

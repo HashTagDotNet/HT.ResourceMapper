@@ -1,5 +1,6 @@
 @page "/resources"
 @page "/resources/{ResourceUid}"
+@implements IDisposable
 @using HT.Api.Client.Contracts.Models
 @using HT.Api.Service.Contracts
 @using ResourceMapper.Common.Server.Resources.Interfaces
@@ -9,6 +10,8 @@
 @inject IResourceService ResourceService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject EditorNavStack Stack
 
 <PageTitle>@PageTitleText — Hashtag Resource Mapper</PageTitle>
 
@@ -25,6 +28,11 @@ else if (_model is not null && _response is not null)
     <div class="d-flex align-center mb-3">
         <MudText Typo="Typo.h5" Style="font-weight:600;">@PageTitleText</MudText>
         <MudSpacer />
+        @if (_model.IsPersisted)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Outlined.Delete"
+                       Disabled="@_deleting" OnClick="DeleteAsync" Class="mr-2">Delete</MudButton>
+        }
         @if (_mode == "View")
         {
             <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Edit" OnClick="EnterEditMode">Edit</MudButton>
@@ -35,7 +43,7 @@ else if (_model is not null && _response is not null)
         <MudTabs Class="rm-editor-tabs">
             <MudTabPanel Text="General">
                 <GeneralTab Model="_model" ResourceTypes="_response.ResourceTypes" DomainAllowedValues="_response.DomainAllowedValues"
-                            TagDictionary="_response.TagDictionary" ReadOnly="@(_mode == "View")"
+                            TagDictionary="_response.TagDictionary" ReadOnly="@(_mode == "View")" DomainLocked="_domainLocked"
                             OnFieldChanged="OnGeneralFieldChanged" OnCheckUniqueness="CheckUniquenessAsync"
                             OnResourceTypeChanged="OnResourceTypeChanged" OnResourceDomainChanged="OnResourceDomainChanged" />
             </MudTabPanel>
@@ -47,13 +55,15 @@ else if (_model is not null && _response is not null)
                 <DependencyTab Rows="_model.DependsOn" Direction="DependsOn"
                                 HelpText="What this resource depends on."
                                 Domain="@_model.Domain.EditedValue" ExcludeResourceUid="@_model.ResourceUid"
-                                ReadOnly="@(_mode == "View")" OnFieldChanged="OnGeneralFieldChanged" />
+                                ReadOnly="@(_mode == "View")" OnFieldChanged="OnGeneralFieldChanged"
+                                OnCreateNewRequested="InitiateNestedCreate" />
             </MudTabPanel>
             <MudTabPanel Text="Dependent On">
                 <DependencyTab Rows="_model.DependentOn" Direction="DependentOn"
                                 HelpText="What depends on this resource."
                                 Domain="@_model.Domain.EditedValue" ExcludeResourceUid="@_model.ResourceUid"
-                                ReadOnly="@(_mode == "View")" OnFieldChanged="OnGeneralFieldChanged" />
+                                ReadOnly="@(_mode == "View")" OnFieldChanged="OnGeneralFieldChanged"
+                                OnCreateNewRequested="InitiateNestedCreate" />
             </MudTabPanel>
             <MudTabPanel Text="Review">
                 <ReviewTab Model="_model" />
@@ -80,16 +90,56 @@ else if (_model is not null && _response is not null)
 @code {
     [Parameter] public string? ResourceUid { get; set; }
 
+    /// <summary>Nested-editor marker (?n=k). Its presence (rather than mere Stack.HasFrames)
+    /// distinguishes a genuine nested descent from a stale/abandoned frame (RD12) — see
+    /// OnParametersSetAsync. Each nested level gets a distinct k so browser history and
+    /// OnParametersSetAsync treat descents as real navigations (RD17).</summary>
+    [SupplyParameterFromQuery(Name = "n")]
+    public int? NestedLevel { get; set; }
+
     private OpenEditorResponse? _response;
     private ResourceEditorModel? _model => _response?.EditorModel;
     private string _mode = "Create";
     private bool _loading = true;
     private string? _loadError;
     private bool _saving;
+    private bool _deleting;
+    private bool _domainLocked;
     private bool _hasLoadedOnce;
     private string? _lastLoadedUid;
+    private int? _lastNestedLevel;
 
-    protected override async Task OnParametersSetAsync() => await LoadAsync();
+    // Dirty-guard bookkeeping (RD1/RD3): one-shot suppression for intentional navigations, and a
+    // re-entrancy guard while the unsaved-changes dialog is open.
+    private bool _suppressNavGuard;
+    private bool _navPromptOpen;
+    private IDisposable? _locationChangingRegistration;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsReturningToFrame())
+        {
+            RestoreFromFrame();
+            return;
+        }
+
+        // A fresh top-level entry (no ?n marker) abandons any stale/abandoned nested frame
+        // (RD12) so the hamburger "Create Resource" is always a genuine fresh start.
+        if (NestedLevel is null)
+            Stack.Clear();
+
+        await LoadAsync();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _locationChangingRegistration = Navigation.RegisterLocationChangingHandler(OnLocationChanging);
+        }
+    }
+
+    public void Dispose() => _locationChangingRegistration?.Dispose();
 
     private string PageTitleText => _mode switch
     {
@@ -97,13 +147,102 @@ else if (_model is not null && _response is not null)
         _ => string.IsNullOrWhiteSpace(_model?.Name.EditedValue) ? "Resource" : _model!.Name.EditedValue
     };
 
+    /// <summary>Normalizes a location to a comparable, no-leading-slash base-relative form,
+    /// regardless of whether it arrives absolute (Navigation.Uri) or root-relative
+    /// (LocationChangingContext.TargetLocation isn't documented to guarantee either shape).</summary>
+    private string NormalizeRoute(string location)
+    {
+        if (Uri.TryCreate(location, UriKind.Absolute, out _))
+            return Navigation.ToBaseRelativePath(location);
+        return location.TrimStart('/');
+    }
+
+    private string CurrentRelativePath() => NormalizeRoute(Navigation.Uri);
+
+    /// <summary>True when the current URL is the parent frame's route — i.e. we're ascending
+    /// back to it (via child Save, Cancel, or browser Back), not descending into a fresh nested
+    /// create. The ?n marker on nested URLs guarantees a descent's URL never equals its parent's,
+    /// so this predicate can't misread a descent as a return (RD6).</summary>
+    private bool IsReturningToFrame() =>
+        Stack.HasFrames && string.Equals(CurrentRelativePath(), Stack.Peek().ParentRoute, StringComparison.Ordinal);
+
+    private void RestoreFromFrame()
+    {
+        var frame = Stack.Peek();
+        _response = frame.Response;
+        _mode = frame.ParentMode;
+        _domainLocked = false; // the parent set its own domain; it was never locked
+        _loading = false;
+        _loadError = null;
+        _hasLoadedOnce = true;
+        _lastLoadedUid = ResourceUid;
+        _lastNestedLevel = NestedLevel;
+
+        if (frame.Returned is not null)
+        {
+            LinkReturnedChild(frame.Direction, frame.Returned);
+            frame.Returned = null;
+        }
+
+        Stack.Pop();
+    }
+
+    /// <summary>Appends the nested-created child as a new dependency row, deduping against an
+    /// existing (or removed) row for the same uid — mirrors DependencyTab.OnPicked's RD9/RD10.</summary>
+    private void LinkReturnedChild(string direction, ReturnedChild child)
+    {
+        if (_model is null) return;
+        var rows = direction == "DependsOn" ? _model.DependsOn : _model.DependentOn;
+
+        var removedRow = rows.FirstOrDefault(r => r.IsRemoved && string.Equals(r.OtherResourceUid, child.ResourceUid, StringComparison.Ordinal));
+        if (removedRow is not null)
+        {
+            removedRow.IsRemoved = false;
+            return;
+        }
+
+        if (rows.Any(r => !r.IsRemoved && string.Equals(r.OtherResourceUid, child.ResourceUid, StringComparison.Ordinal)))
+            return;
+
+        rows.Add(new DependencyRowEditor
+        {
+            Direction = direction,
+            OtherResourceUid = child.ResourceUid,
+            OtherResourceName = child.Name,
+            OtherResourceType = child.TypeName,
+            OtherDomain = child.Domain,
+            IsNew = true
+        });
+    }
+
+    /// <summary>Pushes the CURRENT (parent) state onto the stack before navigating — the reused
+    /// component instance's _response is about to be overwritten by the nested load, so the
+    /// parent's live edits must be stashed first (RD4).</summary>
+    private void InitiateNestedCreate(string direction)
+    {
+        if (_response is null) return;
+
+        Stack.Push(new EditorFrame
+        {
+            Response = _response,
+            ParentRoute = CurrentRelativePath(),
+            Direction = direction,
+            ParentMode = _mode
+        });
+        _suppressNavGuard = true;
+        Navigation.NavigateTo($"/resources?n={Stack.Depth}");
+    }
+
     private async Task LoadAsync(bool forceReload = false)
     {
-        if (!forceReload && _hasLoadedOnce && string.Equals(ResourceUid, _lastLoadedUid, StringComparison.Ordinal))
+        if (!forceReload && _hasLoadedOnce
+            && string.Equals(ResourceUid, _lastLoadedUid, StringComparison.Ordinal)
+            && _lastNestedLevel == NestedLevel)
             return;
 
         _hasLoadedOnce = true;
         _lastLoadedUid = ResourceUid;
+        _lastNestedLevel = NestedLevel;
         _loading = true;
         _loadError = null;
         try
@@ -117,6 +256,23 @@ else if (_model is not null && _response is not null)
             if (response.IsSuccess() && response.ApiResponse.Data is not null)
             {
                 _response = response.ApiResponse.Data;
+
+                // A nested create (has a ?n marker AND an ancestor frame) is domain-locked to its
+                // immediate parent (RD7) — reading Peek() here means a multi-level chain stays
+                // same-domain, since each ancestor was itself already locked to its own parent.
+                _domainLocked = false;
+                if (NestedLevel is not null && Stack.HasFrames)
+                {
+                    var parentDomain = Stack.Peek().Response.EditorModel.Domain.EditedValue;
+                    // Set BOTH Original and Edited so this system pre-fill does not itself count
+                    // as a user change — an untouched nested-create page must not read as dirty
+                    // (SingleValueEditor.IsChanged compares the two); only an actual edit by the
+                    // user should trip the dirty guard.
+                    _model!.Domain.OriginalValue = parentDomain;
+                    _model!.Domain.EditedValue = parentDomain;
+                    _domainLocked = true;
+                    OnGeneralFieldChanged();
+                }
             }
             else
             {
@@ -132,6 +288,7 @@ else if (_model is not null && _response is not null)
         finally
         {
             _loading = false;
+            _suppressNavGuard = false; // RD3 belt-and-braces: a suppress that never met a handler can't leak forward
         }
     }
 
@@ -139,13 +296,20 @@ else if (_model is not null && _response is not null)
 
     private void Cancel()
     {
-        if (_model?.IsPersisted == true)
+        if (Stack.HasFrames)
+        {
+            // Discarding a nested child: pop back to the parent, linking nothing (Returned stays null).
+            _suppressNavGuard = true;
+            Navigation.NavigateTo(Stack.Peek().ParentRoute);
+        }
+        else if (_model?.IsPersisted == true)
         {
             _mode = "View";
             _ = LoadAsync(forceReload: true); // discard in-memory edits, reload the persisted values
         }
         else
         {
+            _suppressNavGuard = true;
             Navigation.NavigateTo("/");
         }
     }
@@ -250,14 +414,45 @@ else if (_model is not null && _response is not null)
 
     private async Task SaveAsync()
     {
-        if (_model is null) return;
+        var savedUid = await SaveInternalAsync();
+        if (savedUid is null) return;
+
+        if (Stack.HasFrames)
+        {
+            CommitChildAndReturn(savedUid);
+            return;
+        }
+
+        if (string.Equals(ResourceUid, savedUid, StringComparison.Ordinal))
+        {
+            // Edit-mode save on the same route — reload fresh and drop back to View.
+            _mode = "View";
+            await LoadAsync(forceReload: true);
+        }
+        else
+        {
+            // Create-mode save — move to the resource's permalink; OnParametersSetAsync loads it.
+            // The model is still (harmlessly) "dirty" per IsChanged bookkeeping even though the
+            // save just succeeded (nothing resets OriginalValue), so this navigation must suppress
+            // the guard itself (RD13) or it would prompt "unsaved changes?" on every Create save.
+            _suppressNavGuard = true;
+            Navigation.NavigateTo($"/resources/{savedUid}", replace: true);
+        }
+    }
+
+    /// <summary>Validates + persists the current model. Returns the saved uid, or null on
+    /// validation/server failure. Never navigates — callers (the Save button, the dirty guard's
+    /// save choice) own the follow-on navigation (RD13).</summary>
+    private async Task<string?> SaveInternalAsync()
+    {
+        if (_model is null) return null;
 
         var generalValid = EditorValidation.ValidateGeneral(_model);
         var tagsValid = EditorValidation.ValidateTags(_model);
         if (!generalValid || !tagsValid)
         {
             Snackbar.Add("Fix the highlighted fields before saving.", Severity.Warning);
-            return;
+            return null;
         }
 
         _saving = true;
@@ -282,35 +477,41 @@ else if (_model is not null && _response is not null)
             var response = await ResourceService.SaveResourceAsync(request, CancellationToken.None);
             if (response.IsSuccess() && response.ApiResponse.Data is not null)
             {
-                var savedUid = response.ApiResponse.Data.ResourceUid;
                 Snackbar.Add(response.ApiResponse.Data.Message, Severity.Success);
+                return response.ApiResponse.Data.ResourceUid;
+            }
 
-                if (string.Equals(ResourceUid, savedUid, StringComparison.Ordinal))
-                {
-                    // Edit-mode save on the same route — reload fresh and drop back to View.
-                    _mode = "View";
-                    await LoadAsync(forceReload: true);
-                }
-                else
-                {
-                    // Create-mode save — move to the resource's permalink; OnParametersSetAsync loads it.
-                    Navigation.NavigateTo($"/resources/{savedUid}", replace: true);
-                }
-            }
-            else
-            {
-                ApplyServerErrors(response);
-                Snackbar.Add("Could not save — see the highlighted fields.", Severity.Warning);
-            }
+            ApplyServerErrors(response);
+            Snackbar.Add("Could not save — see the highlighted fields.", Severity.Warning);
+            return null;
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Save failed: {ex.Message}", Severity.Error);
+            return null;
         }
         finally
         {
             _saving = false;
         }
+    }
+
+    /// <summary>The single pop-back-with-link path (RD8): the child is already fully persisted
+    /// (a plain Create); the parent gets only an in-memory dependency row — the edge itself
+    /// persists on the parent's own next Save.</summary>
+    private void CommitChildAndReturn(string uid)
+    {
+        if (_model is null) return;
+        var frame = Stack.Peek();
+        frame.Returned = new ReturnedChild
+        {
+            ResourceUid = uid,
+            Name = _model.Name.EditedValue,
+            TypeName = _model.ResourceType.EditedValue,
+            Domain = _model.Domain.EditedValue
+        };
+        _suppressNavGuard = true;
+        Navigation.NavigateTo(frame.ParentRoute);
     }
 
     private static List<SaveTagValue> FlattenTags(ResourceEditorModel model)
@@ -376,5 +577,104 @@ else if (_model is not null && _response is not null)
                 Snackbar.Add(message, Severity.Error);
             }
         }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (_model is null) return;
+
+        var dependents = _model.DependentOn.Where(d => !d.IsRemoved).Select(d => d.OtherResourceName).ToList();
+        var parameters = new DialogParameters
+        {
+            { nameof(ConfirmDeleteDialog.ResourceName), _model.Name.EditedValue },
+            { nameof(ConfirmDeleteDialog.Dependents), dependents }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDeleteDialog>("Delete resource", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        _deleting = true;
+        try
+        {
+            var deletedName = _model.Name.EditedValue;
+            var response = await ResourceService.DeleteResourceAsync(_model.ResourceUid, CancellationToken.None);
+            if (response.IsSuccess())
+            {
+                Snackbar.Add($"Deleted {deletedName}", Severity.Success);
+                _suppressNavGuard = true; // deleting is a leave (RD16) — the resource is gone, don't dirty-prompt
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                Snackbar.Add("Could not delete — it may already be gone.", Severity.Error);
+            }
+        }
+        finally
+        {
+            _deleting = false;
+        }
+    }
+
+    /// <summary>Dirty guard (RD1): always PreventNavigation first, then show the Save/Discard/
+    /// Cancel dialog, then re-NavigateTo the target on confirm. Awaiting a dialog BEFORE
+    /// preventing risks the navigation committing (especially browser Back) while it's still open.</summary>
+    private async ValueTask OnLocationChanging(LocationChangingContext context)
+    {
+        if (_suppressNavGuard)
+        {
+            _suppressNavGuard = false; // one-shot: consume this intentional navigation
+            return;
+        }
+
+        if (_mode == "View" || _model is null || !_model.IsDirty) return;
+
+        if (_navPromptOpen)
+        {
+            context.PreventNavigation(); // a prompt is already up — hold this second nav too
+            return;
+        }
+
+        context.PreventNavigation();
+        var target = context.TargetLocation;
+
+        _navPromptOpen = true;
+        string? choice;
+        try
+        {
+            choice = await ShowUnsavedDialogAsync();
+        }
+        finally
+        {
+            _navPromptOpen = false;
+        }
+
+        if (choice is null || choice == "cancel") return; // stay put — already prevented
+
+        if (choice == "save")
+        {
+            var uid = await SaveInternalAsync();
+            if (uid is null) return; // save failed → stay
+
+            // A nested child saved via the back-prompt (rather than the Save button) must still
+            // link into the parent exactly as the button would (RD19).
+            if (Stack.HasFrames && string.Equals(NormalizeRoute(target), Stack.Peek().ParentRoute, StringComparison.Ordinal))
+            {
+                CommitChildAndReturn(uid);
+                return;
+            }
+        }
+
+        _suppressNavGuard = true; // discard, or a save with nothing more to link → let the re-nav through
+        Navigation.NavigateTo(target);
+    }
+
+    private async Task<string?> ShowUnsavedDialogAsync()
+    {
+        var name = string.IsNullOrWhiteSpace(_model?.Name.EditedValue) ? "this resource" : _model!.Name.EditedValue;
+        var parameters = new DialogParameters { { nameof(UnsavedChangesDialog.ResourceName), name } };
+        var dialog = await DialogService.ShowAsync<UnsavedChangesDialog>("Unsaved changes", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return "cancel"; // dismissed unexpectedly → fail safe, stay put
+        return result.Data as string;
     }
 }

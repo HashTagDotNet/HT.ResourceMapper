@@ -13,7 +13,13 @@ else
                       Placeholder="Add resource…" Variant="Variant.Outlined" Margin="Margin.Dense"
                       Clearable="true" ResetValueOnEmptyText="true" CoerceValue="false" Class="rm-deps-picker">
         <NoItemsTemplate>
-            <MudText Typo="Typo.body2" Class="pa-2">No matching resources — the target must already exist.</MudText>
+            <div class="pa-2 rm-picker-no-items">
+                <MudText Typo="Typo.body2">No matching resources.</MudText>
+                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
+                           OnClick="@(() => OnCreateNewRequested.InvokeAsync())" Class="mt-1 rm-picker-create-new">
+                    Create new resource…
+                </MudButton>
+            </div>
         </NoItemsTemplate>
     </MudAutocomplete>
 }
@@ -23,6 +29,9 @@ else
     [Parameter] public string? ExcludeResourceUid { get; set; }
     [Parameter] public List<string> ExcludedUids { get; set; } = new();
     [Parameter] public EventCallback<ResourcePickerItem> OnPicked { get; set; }
+
+    /// <summary>Fired when the user asks to create a new target from the "no matches" state.</summary>
+    [Parameter] public EventCallback OnCreateNewRequested { get; set; }
 
     private static string FormatItem(ResourcePickerItem? item) =>
         item is null ? string.Empty : $"{item.ResourceName} · {item.ResourceTypeName} · {item.Domain}";

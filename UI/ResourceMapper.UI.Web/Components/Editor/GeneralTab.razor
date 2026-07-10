@@ -18,8 +18,9 @@
     </MudSelect>
 
     <MudSelect T="string" Value="@Model.Domain.EditedValue" ValueChanged="OnDomainChanged"
-               Label="@DomainLabel" Required="true" Disabled="@(ReadOnly || Model.IsPersisted)"
+               Label="@DomainLabel" Required="true" Disabled="@(ReadOnly || Model.IsPersisted || DomainLocked)"
                Variant="Variant.Outlined" Margin="Margin.Dense"
+               HelperText="@(DomainLocked ? $"Locked to the parent resource's {DomainLabel}" : null)"
                Error="@(Model.Domain.Level == EditorFieldLevel.Error)"
                ErrorText="@Model.Domain.Messages.FirstOrDefault()?.Message">
         @foreach (var value in DomainAllowedValues)
@@ -66,6 +67,10 @@
     [Parameter] public List<string> DomainAllowedValues { get; set; } = new();
     [Parameter] public List<TagDefinitionModel> TagDictionary { get; set; } = new();
     [Parameter] public bool ReadOnly { get; set; }
+
+    /// <summary>True for a nested "Create new…" dependency target — locks Domain to the parent's
+    /// (same-domain rule); the parent already pre-set Model.Domain.EditedValue before render.</summary>
+    [Parameter] public bool DomainLocked { get; set; }
 
     /// <summary>Parent performs the uniqueness-check service call and updates Model.IdentityPreview.</summary>
     [Parameter] public EventCallback OnCheckUniqueness { get; set; }

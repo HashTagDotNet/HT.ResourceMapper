@@ -1,0 +1,19 @@
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2">
+            You have unsaved changes to <strong>@ResourceName</strong>. What would you like to do?
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => Choose("cancel"))">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Text" OnClick="@(() => Choose("discard"))">Discard</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => Choose("save"))">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string ResourceName { get; set; } = "this resource";
+
+    private void Choose(string choice) => MudDialog.Close(DialogResult.Ok(choice));
+}

@@ -564,4 +564,117 @@ planning is on the stronger model; execution switches to the cheaper one.
 
 ## Execution notes
 
-_(to be filled in during execution)_
+- **All steps completed and verified.** `dotnet build` — zero `error CS` (only the documented
+  non-SDK sqlproj MSB4278 under `dotnet build`; unrelated). `dotnet test` — 157/157 relevant tests
+  green (73 Shared + 84 Server, spanning the whole solution — 65 pre-existing Shared + 8 new
+  `EditorNavStack` tests; Server suite unchanged since this slice is UI-only). The 2 pre-existing
+  `HT.Api.Service.Contracts.Tests` failures noted in #7/#8 remain, confirmed unrelated — untouched
+  by this slice.
+- **File-placement deviation from the plan (deliberate, low-risk):** `EditorNavStack`/`EditorFrame`/
+  `ReturnedChild` were placed in `Modules/Common/ResourceMapper.Common.Shared/Editor/` rather than
+  `UI/ResourceMapper.UI.Web/Components/Editor/` as originally planned. Reason: the class has zero
+  Blazor/Razor dependencies (only references `OpenEditorResponse`, already in
+  `Common.Shared.Editor.Contracts`), and there is no dedicated UI test project in this solution —
+  placing it in Common.Shared let its unit tests live in the existing, proven
+  `ResourceMapper.Common.Shared.Tests` project instead of standing up a new test project just for
+  one small class. Behavior is unchanged; `Program.cs` still registers `AddScoped<EditorNavStack>()`
+  and `ResourceEditor.razor` still `@inject`s it identically to the plan.
+- **A real bug found and fixed while driving the app (not caught by any unit test or a clean
+  build):** the plan's own RD13 called for suppressing the dirty-navigation guard before the
+  Create-mode "move to the resource's permalink" navigation in `SaveAsync`, but the initial
+  implementation missed it. Every **successful Create save** therefore silently triggered the
+  guard's `PreventNavigation()` — the user would see no visible error (the "Saved" snackbar still
+  fired from inside `SaveInternalAsync`, which runs before the guard is ever consulted), but the
+  URL would never advance to the new resource's permalink, an invisible "unsaved changes?" dialog
+  would open, and the page would appear to silently hang on "Create Resource." Root-caused by a
+  temporary `Console.WriteLine` diagnostic (removed before commit) tracing `SaveAsync`'s branch
+  selection, which showed the correct branch executing but no visible effect — the missing
+  `_suppressNavGuard = true` before that one `NavigateTo` call was the fix. Confirmed fixed by
+  driving the real Create → Save flow repeatedly afterward.
+- **A second, more subtle bug caught before it ever shipped:** the domain-lock write for a nested
+  create (`_model.Domain.EditedValue = parentDomain`) set only `EditedValue`, not `OriginalValue`.
+  Since `SingleValueEditor.IsChanged` compares the two, this would have made every **untouched**
+  nested-create page register as dirty the instant it loaded (both `OriginalValue` and
+  `EditedValue` default to `null` for a fresh Create model; setting only one made them differ).
+  A user who opened "Create new…" and immediately hit browser Back — having typed nothing — would
+  have hit an unwarranted "unsaved changes?" prompt for a purely system-driven pre-fill. Caught by
+  manually re-deriving `IsChanged`'s definition against the fix *before* running it, not by a test
+  failure; fixed by setting both `OriginalValue` and `EditedValue` to the parent's domain.
+- **Framework-mechanics risk (RD1's core assumption) verified against current Microsoft Learn docs,
+  not assumed from memory**, since getting this wrong would have silently broken the dirty guard:
+  confirmed (a) this app's global-interactivity render mode (`<Routes @rendermode="RenderMode.
+  InteractiveServer">`, root-level, no static-SSR routing) means `RegisterLocationChangingHandler`
+  reliably fires for both in-app link clicks *and* the browser back/forward buttons — the
+  "handlers only fire for programmatic nav" caveat in the docs applies specifically to a
+  static-SSR-plus-enhanced-nav app, which this is not; (b) `LocationChangingContext.TargetLocation`'s
+  exact string shape (absolute vs. root-relative vs. base-relative, with/without leading slash) is
+  not documented precisely, so the implementation normalizes defensively (`NormalizeRoute`: run
+  `ToBaseRelativePath` if the string parses as an absolute URI, else `TrimStart('/')`) rather than
+  assuming one specific format — verified against Microsoft's own canonical example, which compares
+  `TargetLocation` directly to a literal root-relative string.
+- **Extensive real-browser verification** (beyond the committed specs) drove every scenario in the
+  plan's Tests section manually first, to separate genuine defects from test-script artifacts
+  before trusting any assertion: Create→Save→permalink navigation; Delete with and without
+  dependents, including Cancel-does-not-delete and the cascade removing the edge from the
+  dependent's own Dependencies tab and the deleted uid 404ing; the dirty guard's Cancel/Discard/Save
+  choices via an in-app hamburger-menu link click; the same three choices via genuine browser
+  back/forward (required rebuilding real SPA-pushed history via in-app navigation rather than
+  `page.goto`, which performs a full cross-document reload that tears down the interactive circuit
+  and any in-app history the router relies on — a test-methodology lesson documented at the top of
+  `dirty-guard.spec.js`); the nested-create domain lock, child-save-links-into-parent, and
+  parent-Save-persists-the-edge-after-reload round trip; an untouched nested create producing no
+  dirty-guard prompt on Back; and RD19 specifically (a nested child saved via the back-prompt
+  dialog, not the Save button, still links into the parent) — confirmed functionally correct, with
+  one incidental, purely cosmetic finding: `MudTabs` resets to the first tab (General) after
+  `RestoreFromFrame` swaps the model back in on a stack pop, so a spec must re-select "Dependencies"
+  after any pop-back before asserting on its rows rather than assume the tab stayed active. Not a
+  data-correctness defect — out of scope to "fix" (no design requirement to preserve tab position
+  across a nested pop) — but documented in `nested-create.spec.js` so a future reader doesn't
+  mistake it for one.
+- **A second, harder-won test-methodology lesson: Playwright's own timing margins, not the app,
+  caused real flakiness across full-suite runs.** Three consecutive full-suite passes plus one
+  more after a cold server restart were required before trusting the suite as stable, because
+  early runs intermittently failed in different specs each time with symptoms that looked
+  app-side (a Save validation failure, a field silently empty) but were purely test-script races:
+  (a) selecting Resource Type and/or Subscription each triggers its own async change-handler
+  round-trip (`OnResourceTypeChanged` re-seeds Tags-tab rows; `OnDomainChanged` similarly
+  re-renders) — if the test moved on to fill the Name field before those handlers' own
+  server-driven re-render had landed, the late re-render could silently overwrite the
+  just-typed Name back to the (still-empty) model value, confirmed via a failure screenshot
+  showing Type/Domain correctly selected but Name visibly blank; (b) MudTextField's `ValueChanged`
+  fires on blur but a fixed short wait afterward proved too tight under the heavier load of a full
+  multi-spec run, so an immediate next action (clicking Save, or calling `goBack()`) could race
+  the round-trip and act on a stale/empty Name. Fixed by adding two new shared, *observable*
+  readiness gates to `mud-helpers.js` rather than guessing at longer fixed timeouts:
+  `selectTypeAndDomain` (selects both, then waits for the read-only Identity preview to reflect
+  both values before returning) and `fillNameAndWaitForSlug` (fills Name, then waits for the Key
+  field's auto-slug to appear — a directly observable proof the C# model received the update).
+  Both are now used consistently by all three new spec files' subject-creation helpers. Verified
+  by four consecutive clean full-suite runs after the fix (three back-to-back, one more after a
+  cold `dotnet run` restart) — zero failures, versus intermittent failures in every run beforehand.
+- **New tests:** `EditorNavStackTests` (8 unit tests — push/peek/pop/depth/`HasFrames`/`Clear`
+  semantics, `EditorFrame.Returned` round-tripping a `ReturnedChild`, and frame field carriage) in
+  `ResourceMapper.Common.Shared.Tests/Editor/`. Three new committed Playwright specs:
+  `delete.spec.js` (2 tests: with-dependents listing + Cancel + cascade-confirmed delete;
+  no-dependents variant), `dirty-guard.spec.js` (2 tests: Cancel/Discard/Save via an in-app link
+  click; the same via browser back/forward per RD1), `nested-create.spec.js` (3 tests: full
+  domain-locked create-link-persist-round-trip flow; untouched-child-clean-Back; RD19's
+  save-via-back-prompt still links). All run alongside the existing `dependencies.spec.js` with no
+  regressions.
+- **UI implementation matches the plan's design as written**, with the one deliberate file-
+  placement deviation noted above: `EditorNavStack` service + DI registration; the
+  descend/ascend discriminator (`IsReturningToFrame` / fresh-entry `Stack.Clear()`); the
+  `NestedLevel` query param widening the reload-dedupe key; domain lock with the Original+Edited
+  fix; `SaveInternalAsync` factored out and shared by both the Save button and the dirty guard's
+  save choice; `CommitChildAndReturn` as the single pop-back-with-link path (used identically by
+  both the button and the guard, per RD19); the "always prevent, then re-navigate on confirm"
+  dirty-guard pattern; `UnsavedChangesDialog` / `ConfirmDeleteDialog` as plain Mud modals (never
+  history entries); the Delete button in the header (visible in both View and Edit, per OQ2's
+  default); the "Create new…" affordance both as a standalone `DependencyTab` button and in the
+  picker's `NoItemsTemplate` (per OQ1's default, both surfaces wired to the same callback).
+- **All temporary artifacts removed:** the diagnostic `Console.WriteLine` in `SaveAsync` (used to
+  root-cause the missing-suppression bug) was deleted before the final build; two ad-hoc probe
+  screenshots (`probe-before-save.png`, `probe-after-save.png`) generated while manually driving
+  the app were deleted before commit; the dev server was stopped (`taskkill //F //IM dotnet.exe`)
+  after the final verification runs; `tools/e2e/test-results/` (Playwright's own run-tracking
+  artifact) remains gitignored, unchanged from #8.

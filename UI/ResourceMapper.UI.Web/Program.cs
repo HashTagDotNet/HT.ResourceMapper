@@ -1,5 +1,6 @@
 using MudBlazor.Services;
 using ResourceMapper.Common.Server.Utils;
+using ResourceMapper.Common.Shared.Editor;
 using ResourceMapper.UI.Web.Components;
 using Serilog;
 
@@ -13,6 +14,11 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddMudServices();
+
+// Circuit-scoped nested-editor nav stack (slice #9) — per-circuit so it survives route changes
+// within a connection but is cleared on refresh/reconnect (design: "refresh mid-stack loses the
+// in-progress stack").
+builder.Services.AddScoped<EditorNavStack>();
 
 // API controllers (e.g. POST /api/resources/import for external/Bruno use; the UI calls services in-process).
 builder.Services.AddControllers();
