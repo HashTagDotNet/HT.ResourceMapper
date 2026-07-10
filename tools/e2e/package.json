@@ -1,0 +1,9 @@
+{
+  "name": "ht-resourcemapper-e2e",
+  "private": true,
+  "description": "Playwright-driven browser verification helpers for the HT.ResourceMapper Blazor Server UI (uses system Chrome, no bundled Chromium download).",
+  "version": "1.0.0",
+  "dependencies": {
+    "playwright-core": "^1.48.0"
+  }
+}

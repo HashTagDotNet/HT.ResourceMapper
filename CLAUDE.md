@@ -31,6 +31,16 @@ dotnet test --filter "FullyQualifiedName=Namespace.ClassName.MethodName"
 
 > **Note**: The SQL database project (`Database/HTResourceMapperDb/HTResourceMapperDb.sqlproj`) is an **old-style SSDT / DACPAC** project (`TargetFrameworkVersion v4.7.2`; imports `Microsoft.Data.Tools.Schema.SqlTasks.targets`). It builds in **Visual Studio 2026** or **full MSBuild** — **not** `dotnet build` — to produce a `.dacpac`, and is published to `(localdb)\MSSQLLocalDB\ResourceMapper` via **SqlPackage** or VS Publish using `localhost.publish.xml`. It is **declarative**: edit the `.sql` files (desired state) and the publish engine diffs against the target. Reference/system seed lives in `Scripts/Script.PostDeployment1.sql` (a `PostDeploy` item; idempotent `MERGE`). Because it is not SDK-style, a solution-wide `dotnet build` does not build the DB project — build/publish it separately.
 
+### Browser-driven UI verification
+
+For UI/frontend changes, actually drive the running app in a real browser (don't just rely on
+`dotnet build`/`dotnet test`). `tools/e2e/` has reusable Playwright tooling for this — a one-time
+`npm install` (uses `playwright-core` against system-installed Chrome, no bundled Chromium
+download) plus helper functions for MudBlazor's quirkier controls (selects, radio groups, dialogs)
+that are otherwise easy to mis-target with naive locators. See `tools/e2e/README.md` for setup,
+the helper API, and the documented DOM gotchas; `tools/e2e/example-drive-editor.js` is a minimal
+template to copy and adapt per feature.
+
 ## Solution Structure
 
 ```
