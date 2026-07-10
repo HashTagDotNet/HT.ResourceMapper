@@ -1,0 +1,95 @@
+@using ResourceMapper.Common.Shared.Editor
+@using ResourceMapper.Common.Shared.Editor.Contracts
+
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">@HelpText</MudText>
+
+<div class="rm-deps-editor">
+    @{
+        var visibleRows = VisibleRows();
+    }
+    @if (visibleRows.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="rm-deps-empty">No resources added.</MudText>
+    }
+    else
+    {
+        @foreach (var row in visibleRows)
+        {
+            <div class="rm-dep-row">
+                <div class="rm-dep-name">@row.OtherResourceName</div>
+                <div class="rm-dep-type">@row.OtherResourceType</div>
+                <div class="rm-dep-domain">@(string.IsNullOrEmpty(row.OtherDomain) ? "—" : row.OtherDomain)</div>
+                <div class="rm-dep-remove">
+                    @if (!ReadOnly)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="@(() => RemoveRow(row))" />
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@if (!ReadOnly)
+{
+    <div class="mt-3">
+        <ResourcePicker Domain="@Domain" ExcludeResourceUid="@ExcludeResourceUid"
+                        ExcludedUids="@ExcludedUids()" OnPicked="OnPicked" />
+    </div>
+}
+
+@code {
+    [Parameter] public List<DependencyRowEditor> Rows { get; set; } = new();
+    [Parameter] public string Direction { get; set; } = string.Empty; // "DependsOn" | "DependentOn"
+    [Parameter] public string HelpText { get; set; } = string.Empty;
+    [Parameter] public string? Domain { get; set; }
+    [Parameter] public string? ExcludeResourceUid { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback OnFieldChanged { get; set; }
+
+    private List<DependencyRowEditor> VisibleRows() => Rows.Where(r => !r.IsRemoved).ToList();
+
+    private List<string> ExcludedUids() => VisibleRows().Select(r => r.OtherResourceUid).ToList();
+
+    private async Task OnPicked(ResourcePickerItem item)
+    {
+        var removedRow = Rows.FirstOrDefault(r => r.IsRemoved && string.Equals(r.OtherResourceUid, item.ResourceUid, StringComparison.Ordinal));
+        if (removedRow != null)
+        {
+            // RD10: re-adding a target whose row was flagged removed un-removes it rather than
+            // appending a duplicate.
+            removedRow.IsRemoved = false;
+        }
+        else if (!Rows.Any(r => !r.IsRemoved && string.Equals(r.OtherResourceUid, item.ResourceUid, StringComparison.Ordinal)))
+        {
+            Rows.Add(new DependencyRowEditor
+            {
+                Direction = Direction,
+                OtherResourceUid = item.ResourceUid,
+                OtherResourceName = item.ResourceName,
+                OtherResourceType = item.ResourceTypeName,
+                OtherDomain = item.Domain,
+                IsNew = true
+            });
+        }
+
+        await OnFieldChanged.InvokeAsync();
+    }
+
+    private async Task RemoveRow(DependencyRowEditor row)
+    {
+        // A never-persisted row (added this session) can just vanish; a row that came from the
+        // loaded model must stay (flagged IsRemoved) so IsDirty/save can see the removal —
+        // mirror of #7's tag-row removal.
+        if (row.IsNew)
+        {
+            Rows.Remove(row);
+        }
+        else
+        {
+            row.IsRemoved = true;
+        }
+
+        await OnFieldChanged.InvokeAsync();
+    }
+}

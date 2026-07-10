@@ -4,6 +4,7 @@ using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces;
 using Microsoft.Data.SqlClient;
 using ResourceMapper.Common.Server.Resources.Interfaces;
 using ResourceMapper.Common.Server.Resources.Models;
+using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
 using System.Data;
 
@@ -196,7 +197,8 @@ namespace ResourceMapper.Common.Server.Resources
                 OtherResourceUid = dr.ReadString("OtherResourceUid"),
                 OtherResourceKey = dr.ReadString("OtherResourceKey"),
                 OtherResourceName = dr.ReadString("OtherResourceName"),
-                OtherResourceType = dr.ReadString("OtherResourceType")
+                OtherResourceType = dr.ReadString("OtherResourceType"),
+                OtherDomain = dr.ReadString("OtherDomain")
             }, cancellationToken: cancellationToken);
         }
 
@@ -359,6 +361,31 @@ namespace ResourceMapper.Common.Server.Resources
                 .AddTvp("@Tags", TagKeyValueListType, table);
 
             await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+        }
+
+        public async Task<(List<ResourcePickerItem> Items, int TotalCount)> SearchResourcesForPickerAsync(
+            ResourcePickerRequest request, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].Resource_SearchForPicker")
+                .AddNVarchar("@SearchFor", request.SearchFor)
+                .AddNVarchar("@Domain", request.Domain)
+                .AddInteger("@ResourceTypeId", request.ResourceTypeId)
+                .AddVarchar("@ExcludeResourceUid", request.ExcludeResourceUid)
+                .AddInteger("@Skip", request.Skip)
+                .AddInteger("@Take", request.Take)
+                .AddInteger("@TotalRecords", 0, ParameterDirection.Output);
+
+            var items = await _db.Execute.ExecuteQueryAsync(cmd, dr => new ResourcePickerItem
+            {
+                ResourceUid = dr.ReadString("ResourceUid") ?? string.Empty,
+                ResourceName = dr.ReadString("ResourceName") ?? string.Empty,
+                ResourceKey = dr.ReadString("ResourceKey") ?? string.Empty,
+                ResourceTypeName = dr.ReadString("ResourceTypeName") ?? string.Empty,
+                Domain = dr.ReadString("Domain")
+            }, cancellationToken: cancellationToken);
+
+            var totalCount = cmd.ReadInt("@TotalRecords");
+            return (items, totalCount);
         }
 
         // Builds the [HTResourceMapper].[ResourceFilterList] TVP rows: one per selected enumerable

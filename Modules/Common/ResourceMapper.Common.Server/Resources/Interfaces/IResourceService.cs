@@ -41,5 +41,8 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
         Task<ApiServiceResponse<object>> AddRelationshipAsync(string fromResourceUid, string toResourceUid, CancellationToken cancellationToken = default);
 
         Task<ApiServiceResponse<object>> RemoveRelationshipAsync(string fromResourceUid, string toResourceUid, CancellationToken cancellationToken = default);
+
+        /// <summary>Same-domain resource search backing the Dependencies / Dependent On tabs' picker.</summary>
+        Task<ApiServiceResponse<ResourcePickerResponse>> SearchResourcesForPickerAsync(ResourcePickerRequest request, CancellationToken cancellationToken = default);
     }
 }

@@ -37,11 +37,23 @@ else if (_model is not null && _response is not null)
                 <GeneralTab Model="_model" ResourceTypes="_response.ResourceTypes" DomainAllowedValues="_response.DomainAllowedValues"
                             TagDictionary="_response.TagDictionary" ReadOnly="@(_mode == "View")"
                             OnFieldChanged="OnGeneralFieldChanged" OnCheckUniqueness="CheckUniquenessAsync"
-                            OnResourceTypeChanged="OnResourceTypeChanged" />
+                            OnResourceTypeChanged="OnResourceTypeChanged" OnResourceDomainChanged="OnResourceDomainChanged" />
             </MudTabPanel>
             <MudTabPanel Text="Tags">
                 <TagsTab Model="_model" TagDictionary="_response.TagDictionary" ReadOnly="@(_mode == "View")"
                          OnFieldChanged="OnGeneralFieldChanged" />
+            </MudTabPanel>
+            <MudTabPanel Text="Dependencies">
+                <DependencyTab Rows="_model.DependsOn" Direction="DependsOn"
+                                HelpText="What this resource depends on."
+                                Domain="@_model.Domain.EditedValue" ExcludeResourceUid="@_model.ResourceUid"
+                                ReadOnly="@(_mode == "View")" OnFieldChanged="OnGeneralFieldChanged" />
+            </MudTabPanel>
+            <MudTabPanel Text="Dependent On">
+                <DependencyTab Rows="_model.DependentOn" Direction="DependentOn"
+                                HelpText="What depends on this resource."
+                                Domain="@_model.Domain.EditedValue" ExcludeResourceUid="@_model.ResourceUid"
+                                ReadOnly="@(_mode == "View")" OnFieldChanged="OnGeneralFieldChanged" />
             </MudTabPanel>
             <MudTabPanel Text="Review">
                 <ReviewTab Model="_model" />
@@ -197,6 +209,18 @@ else if (_model is not null && _response is not null)
         StateHasChanged();
     }
 
+    private void OnResourceDomainChanged()
+    {
+        if (_model is null || _model.IsPersisted) return;
+
+        // RD6: rows added under the old domain could now be cross-domain — clear both
+        // directions rather than leave stale, now-invalid dependency rows.
+        _model.DependsOn.Clear();
+        _model.DependentOn.Clear();
+
+        StateHasChanged();
+    }
+
     private async Task CheckUniquenessAsync()
     {
         if (_model is null) return;
@@ -250,7 +274,9 @@ else if (_model is not null && _response is not null)
                 ResourceKey = _model.Key.EditedValue,
                 Description = _model.Description.EditedValue,
                 PrimaryTagDefinitionId = ResolveEffectivePrimary(_model, flattenedTags),
-                Tags = flattenedTags
+                Tags = flattenedTags,
+                DependsOnUids = FlattenDependencyUids(_model.DependsOn),
+                DependentOnUids = FlattenDependencyUids(_model.DependentOn)
             };
 
             var response = await ResourceService.SaveResourceAsync(request, CancellationToken.None);
@@ -305,6 +331,9 @@ else if (_model is not null && _response is not null)
         return result;
     }
 
+    private static List<string> FlattenDependencyUids(List<DependencyRowEditor> rows) =>
+        rows.Where(r => !r.IsRemoved).Select(r => r.OtherResourceUid).Distinct().ToList();
+
     // RD2: only send a primary when its row is a Link tag with a non-empty value that
     // survives this save (an emptied/removed primary row must clear the primary).
     private static int? ResolveEffectivePrimary(ResourceEditorModel model, List<SaveTagValue> flattenedTags)
@@ -337,10 +366,13 @@ else if (_model is not null && _response is not null)
             {
                 target.Messages.Add(new EditorMessage { Message = message, Level = EditorFieldLevel.Error });
             }
-            else if (string.Equals(error.PropertyName, "request.Tags", StringComparison.Ordinal))
+            else if (string.Equals(error.PropertyName, "request.Tags", StringComparison.Ordinal)
+                     || string.Equals(error.PropertyName, "request.DependsOnUids", StringComparison.Ordinal)
+                     || string.Equals(error.PropertyName, "request.DependentOnUids", StringComparison.Ordinal))
             {
-                // Server-side tag validation is a defense backstop (the client already
-                // validates), so surface it directly rather than trying to map it to a row.
+                // Server-side tag/relationship validation is a defense backstop (the client
+                // already validates via the picker), so surface it directly rather than trying
+                // to map it to a row.
                 Snackbar.Add(message, Severity.Error);
             }
         }

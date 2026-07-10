@@ -346,6 +346,27 @@ namespace ResourceMapper.Common.Server.Tests.Resources
             tags.Single().TagDefinitionId.Should().Be(2, "because only the non-domain Overview tag should remain");
         }
 
+        [Fact]
+        public async Task GetResourceEditorModelAsync_EditLoad_PopulatesOtherDomainOnDependencyRows()
+        {
+            _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceType> { new() { ResourceTypeId = 5, TypeName = "AppService" } });
+            _repo.Setup(r => r.GetResourceByUidAsync("uid-10", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 10, ResourceUid = "uid-10", ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api", Domain = "non-prod" });
+            _repo.Setup(r => r.GetTagsForResourceAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceTagRead>());
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceRelationshipItem>
+                {
+                    new() { RelationshipId = 1, Direction = "DependsOn", OtherResourceUid = "uid-20", OtherResourceName = "Redis", OtherResourceType = "Cache", OtherDomain = "non-prod" }
+                });
+
+            var response = await _sut.GetResourceEditorModelAsync(new OpenEditorRequest { Mode = "Edit", ResourceUid = "uid-10" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the resource exists");
+            var row = response.ApiResponse.Data!.EditorModel.DependsOn.Should().ContainSingle().Subject;
+            row.OtherDomain.Should().Be("non-prod", "because OtherDomain must be populated from the relationship read, not hard-null (closes the #5 TODO)");
+        }
+
         #endregion
 
         #region GetResourceDetailAsync
@@ -654,6 +675,271 @@ namespace ResourceMapper.Common.Server.Tests.Resources
 
         #endregion
 
+        #region SaveResourceAsync — relationship reconciliation (#8)
+
+        [Fact]
+        public async Task SaveResourceAsync_DependsOn_AddsMissingAndRemovesExtra()
+        {
+            var uid = Guid.NewGuid().ToString();
+            SetupHappySaveStubs(uid, resourceId: 10, domain: "non-prod");
+
+            _repo.Setup(r => r.GetResourceByUidAsync("uid-keep", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 101, ResourceUid = "uid-keep", ResourceName = "Keep", Domain = "non-prod" });
+            _repo.Setup(r => r.GetResourceByUidAsync("uid-add", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 102, ResourceUid = "uid-add", ResourceName = "Add", Domain = "non-prod" });
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceRelationshipItem>
+                {
+                    new() { RelationshipId = 1, Direction = "DependsOn", OtherResourceId = 101 }, // stays
+                    new() { RelationshipId = 2, Direction = "DependsOn", OtherResourceId = 999 }  // stale — removed
+                });
+
+            var request = new SaveResourceRequest
+            {
+                Mode = "Create", ResourceUid = uid, ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api",
+                Domain = "non-prod",
+                DependsOnUids = new List<string> { "uid-keep", "uid-add" }
+            };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because both dependency targets are valid and same-domain");
+            _repo.Verify(r => r.AddRelationshipAsync(10, 102, It.IsAny<CancellationToken>()), Times.Once,
+                "because uid-add is newly desired and must be added");
+            _repo.Verify(r => r.RemoveRelationshipAsync(10, 999, It.IsAny<CancellationToken>()), Times.Once,
+                "because the stale edge to 999 is no longer desired and must be removed");
+            _repo.Verify(r => r.AddRelationshipAsync(10, 101, It.IsAny<CancellationToken>()), Times.Never,
+                "because uid-keep's edge already exists and must not be re-added");
+            _repo.Verify(r => r.RemoveRelationshipAsync(10, 101, It.IsAny<CancellationToken>()), Times.Never,
+                "because uid-keep is still desired and must not be removed");
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_DependentOn_WritesTheFarSideEdge()
+        {
+            var uid = Guid.NewGuid().ToString();
+            SetupHappySaveStubs(uid, resourceId: 10, domain: "non-prod");
+
+            _repo.Setup(r => r.GetResourceByUidAsync("uid-x", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 201, ResourceUid = "uid-x", ResourceName = "X", Domain = "non-prod" });
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceRelationshipItem>());
+
+            var request = new SaveResourceRequest
+            {
+                Mode = "Create", ResourceUid = uid, ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api",
+                Domain = "non-prod",
+                DependentOnUids = new List<string> { "uid-x" }
+            };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the dependent target is valid and same-domain");
+            _repo.Verify(r => r.AddRelationshipAsync(201, 10, It.IsAny<CancellationToken>()), Times.Once,
+                "because editing DependentOn writes the edge on the FAR side (from=target, to=this) — RD7");
+            _repo.Verify(r => r.AddRelationshipAsync(10, 201, It.IsAny<CancellationToken>()), Times.Never,
+                "because the edge direction must not be reversed");
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_EmptyDependsOnList_RemovesAllDependsOnEdgesButLeavesDependentOnUntouched()
+        {
+            var uid = Guid.NewGuid().ToString();
+            SetupHappySaveStubs(uid, resourceId: 10, domain: "non-prod");
+
+            _repo.Setup(r => r.GetResourceByUidAsync("uid-y", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 301, ResourceUid = "uid-y", ResourceName = "Y", Domain = "non-prod" });
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceRelationshipItem>
+                {
+                    new() { RelationshipId = 1, Direction = "DependsOn", OtherResourceId = 401 },
+                    new() { RelationshipId = 2, Direction = "DependentOn", OtherResourceId = 301 }
+                });
+
+            var request = new SaveResourceRequest
+            {
+                Mode = "Create", ResourceUid = uid, ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api",
+                Domain = "non-prod",
+                DependsOnUids = new List<string>(), // empty — full-set-replace wipes this direction (RD3)
+                DependentOnUids = new List<string> { "uid-y" } // unchanged from current
+            };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue();
+            _repo.Verify(r => r.RemoveRelationshipAsync(10, 401, It.IsAny<CancellationToken>()), Times.Once,
+                "because an empty DependsOnUids removes every existing DependsOn edge");
+            _repo.Verify(r => r.RemoveRelationshipAsync(301, 10, It.IsAny<CancellationToken>()), Times.Never,
+                "because DependentOn's own edge is still desired and reconciling DependsOn must not touch it (RD1)");
+            _repo.Verify(r => r.AddRelationshipAsync(301, 10, It.IsAny<CancellationToken>()), Times.Never,
+                "because the DependentOn edge already exists and must not be re-added");
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_CrossDomainDependsOnTarget_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var uid = Guid.NewGuid().ToString();
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            _repo.Setup(r => r.GetResourceByUidAsync("uid-cross", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 501, ResourceUid = "uid-cross", ResourceName = "Cross", Domain = "prod" });
+
+            var request = new SaveResourceRequest
+            {
+                Mode = "Create", ResourceUid = uid, ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api",
+                Domain = "non-prod",
+                DependsOnUids = new List<string> { "uid-cross" }
+            };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because the target is in a different domain (RD4)");
+            VerifySaveRepoNeverCalled();
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_SelfReferentialDependsOnUid_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var uid = Guid.NewGuid().ToString();
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+
+            var request = new SaveResourceRequest
+            {
+                Mode = "Create", ResourceUid = uid, ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api",
+                Domain = "non-prod",
+                DependsOnUids = new List<string> { uid } // self
+            };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because a resource cannot depend on itself (RD5)");
+            VerifySaveRepoNeverCalled();
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_UnknownDependsOnUid_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var uid = Guid.NewGuid().ToString();
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            _repo.Setup(r => r.GetResourceByUidAsync("uid-missing", It.IsAny<CancellationToken>()))
+                .ReturnsAsync((ResourceDetail?)null);
+
+            var request = new SaveResourceRequest
+            {
+                Mode = "Create", ResourceUid = uid, ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api",
+                Domain = "non-prod",
+                DependsOnUids = new List<string> { "uid-missing" }
+            };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because the target resource does not exist");
+            VerifySaveRepoNeverCalled();
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_DuplicateDependsOnUids_ResolvesOnceAndAddsOnce()
+        {
+            var uid = Guid.NewGuid().ToString();
+            SetupHappySaveStubs(uid, resourceId: 10, domain: "non-prod");
+
+            _repo.Setup(r => r.GetResourceByUidAsync("uid-dup", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 601, ResourceUid = "uid-dup", ResourceName = "Dup", Domain = "non-prod" });
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceRelationshipItem>());
+
+            var request = new SaveResourceRequest
+            {
+                Mode = "Create", ResourceUid = uid, ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api",
+                Domain = "non-prod",
+                DependsOnUids = new List<string> { "uid-dup", "uid-dup" } // duplicate — must collapse
+            };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue();
+            _repo.Verify(r => r.AddRelationshipAsync(10, 601, It.IsAny<CancellationToken>()), Times.Once,
+                "because duplicate uids in one direction must collapse to a single edge write");
+        }
+
+        [Fact]
+        public async Task SaveResourceAsync_EditMode_UsesPersistedDomainNotRequestDomainForRelationshipValidation()
+        {
+            var uid = Guid.NewGuid().ToString();
+            var existing = new ResourceDetail { ResourceId = 10, ResourceUid = uid, ResourceKey = "orders-api", ResourceTypeId = 5, ResourceName = "Orders API", Domain = "non-prod" };
+            _repo.Setup(r => r.GetResourceByUidAsync(uid, It.IsAny<CancellationToken>())).ReturnsAsync(existing);
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            _repo.Setup(r => r.SaveResourceAsync(uid, 5, "orders-api", "Orders API", It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("updated", 10));
+            _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceType>());
+            _repo.Setup(r => r.GetTagsForResourceAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceTagRead>());
+
+            _repo.Setup(r => r.GetResourceByUidAsync("uid-same-domain", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 701, ResourceUid = "uid-same-domain", ResourceName = "Same", Domain = "non-prod" });
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceRelationshipItem>());
+
+            // Request omits Domain entirely (simulating a stale/partial client payload in Edit
+            // mode) — the frozen-domain guard only fires when BOTH sides are non-empty, so this
+            // slips past it; relationship validation must still use the PERSISTED domain
+            // ("non-prod"), not the empty request.Domain (RD14).
+            var request = new SaveResourceRequest
+            {
+                Mode = "Edit", ResourceUid = uid, ResourceTypeId = 5, ResourceName = "Orders API", ResourceKey = "orders-api",
+                Domain = null,
+                DependsOnUids = new List<string> { "uid-same-domain" }
+            };
+
+            var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the target shares the persisted domain, even though request.Domain was empty");
+            _repo.Verify(r => r.AddRelationshipAsync(10, 701, It.IsAny<CancellationToken>()), Times.Once,
+                "because same-domain validation must use existing.Domain, not the empty request.Domain");
+        }
+
+        #endregion
+
+        #region SearchResourcesForPickerAsync
+
+        [Fact]
+        public async Task SearchResourcesForPickerAsync_ForwardsDomainAndExcludeToRepository()
+        {
+            ResourcePickerRequest? captured = null;
+            _repo.Setup(r => r.SearchResourcesForPickerAsync(It.IsAny<ResourcePickerRequest>(), It.IsAny<CancellationToken>()))
+                .Callback((ResourcePickerRequest req, CancellationToken _) => captured = req)
+                .ReturnsAsync((new List<ResourcePickerItem>(), 0));
+
+            var request = new ResourcePickerRequest { SearchFor = "orders", Domain = "non-prod", ExcludeResourceUid = "self-uid", Skip = 0, Take = 20 };
+
+            var response = await _sut.SearchResourcesForPickerAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue();
+            captured.Should().NotBeNull();
+            captured!.Domain.Should().Be("non-prod");
+            captured!.ExcludeResourceUid.Should().Be("self-uid");
+            captured!.SearchFor.Should().Be("orders");
+        }
+
+        [Fact]
+        public async Task SearchResourcesForPickerAsync_OutOfRangeTake_ClampsToDefault()
+        {
+            ResourcePickerRequest? captured = null;
+            _repo.Setup(r => r.SearchResourcesForPickerAsync(It.IsAny<ResourcePickerRequest>(), It.IsAny<CancellationToken>()))
+                .Callback((ResourcePickerRequest req, CancellationToken _) => captured = req)
+                .ReturnsAsync((new List<ResourcePickerItem>(), 0));
+
+            var request = new ResourcePickerRequest { Take = 99999 };
+
+            await _sut.SearchResourcesForPickerAsync(request, CancellationToken.None);
+
+            captured!.Take.Should().Be(20, "because an out-of-range Take falls back to the default rather than being forwarded as-is");
+        }
+
+        #endregion
+
         #region CheckUniquenessAsync
 
         [Fact]
@@ -786,6 +1072,22 @@ namespace ResourceMapper.Common.Server.Tests.Resources
                 It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(),
                 It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Never,
                 "because validation must short-circuit before the repository is called");
+        }
+
+        /// <summary>Stubs the common Create-mode SaveResourceAsync happy-path chain (uniqueness,
+        /// the repo save call, and the post-save projection reads) so a relationship-focused test
+        /// only has to add its own dependency-specific stubs.</summary>
+        private void SetupHappySaveStubs(string uid, int resourceId, string? domain)
+        {
+            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            _repo.Setup(r => r.SaveResourceAsync(uid, It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("created", resourceId));
+            _repo.Setup(r => r.GetResourceByUidAsync(uid, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = resourceId, ResourceUid = uid, ResourceKey = "orders-api", ResourceTypeId = 5, ResourceName = "Orders API", Domain = domain });
+            _repo.Setup(r => r.GetAllResourceTypesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceType>());
+            _repo.Setup(r => r.GetTagsForResourceAsync(resourceId, It.IsAny<CancellationToken>())).ReturnsAsync(new List<ResourceTagRead>());
         }
 
         private void SetupCapture(Action<IReadOnlyList<ResourceGridFilterDefinition>?> capture)

@@ -371,3 +371,85 @@ The MudBlazor locator helpers (`mud-helpers.js` — `clickSelect`, `clickSelectI
 Then: flip slice #8 → Done and slice #9 → Planning in `00-implementation-plan-list.md`, add an
 "Execution notes" section here, and commit. Per our pattern, planning is on the stronger model;
 execution switches to the cheaper one.
+
+## Execution notes
+
+- **All steps completed and verified.** `dotnet build` — zero `error CS` (only the documented
+  non-SDK sqlproj MSB4278 under `dotnet build`; unrelated). `dotnet test` — 84/84 relevant tests
+  green (65 Shared + 25 Client-contracts + 84 Server, spanning the whole solution; the same 2
+  pre-existing `HT.Api.Service.Contracts.Tests` failures noted in #7 remain, confirmed unrelated —
+  untouched by this slice). 11 new `ResourceServiceTests`: DependsOn add/remove, DependentOn
+  far-side write (RD7), empty-list-wipes-one-direction-only (RD1/RD3), cross-domain rejection
+  (RD4), self-loop rejection (RD5), unknown-uid rejection, duplicate-uid dedup, the Edit-mode
+  persisted-domain check (RD14), `OtherDomain` projection on relationship rows, and 2
+  `SearchResourcesForPickerAsync` forwarding/clamping tests.
+- **DB:** `Resource_SearchForPicker.sql` added (+ `.sqlproj` entry); `ResourceRelationship_
+  GetForResource.sql` modified to join+return `OtherDomain`. Dacpac rebuilt via full MSBuild,
+  republished via SqlPackage `/p:DropObjectsNotInSource=True`.
+- **Real DB bug found and fixed while verifying via `sqlcmd` (not just a clean build).** The new
+  sproc used one `;WITH Candidates AS (...)` CTE followed by *two* separate `SELECT` statements
+  (one for `@TotalRecords`, one for the paged rows) — but a CTE only scopes to the single
+  statement immediately following its `WITH` clause. This compiled fine (SSDT only emitted a
+  SQL71502 "unresolved reference" *warning*, easy to dismiss as a static-analysis quirk) but threw
+  `Invalid object name 'Candidates'` at actual execution. Confirmed as a real runtime bug — not a
+  false-positive — by running it via `sqlcmd` before trusting the warning either way. Fixed by
+  repeating the CTE definition for the count query, matching the existing convention in
+  `Resource_GetItems.sql` (which already re-runs its `@whereClause` once for the count and once
+  for the page). **Lesson: a "just a warning" from the SSDT build is not proof of correctness —
+  verify DB logic that spans multiple statements by actually executing it.**
+- **Functional DB verification beyond the unit tests:** ran `Resource_SearchForPicker` via
+  `sqlcmd` against real seeded rows covering all four domain-filter branches — `non-prod` matches
+  only `non-prod` candidates, `NULL` domain matches only the "Unused"-state candidate (both sides
+  null), `ExcludeResourceUid` correctly drops self, and free-text search matches. All four
+  confirmed correct; temp data cleaned up immediately after.
+- **A second, more consequential real bug found while driving the app — a Razor `@`-prefix
+  binding mistake that silently passed literal text instead of the model value, with zero compiler
+  feedback.** `ResourceEditor.razor` wired `<DependencyTab Domain="_model.Domain.EditedValue"
+  ExcludeResourceUid="_model.ResourceUid" .../>` — **without `@`**. For a `string`-typed Blazor
+  component parameter, omitting `@` is valid Razor and compiles cleanly, but the compiler then
+  treats the quoted content as a **literal string**, not a C# expression (this only auto-evaluates
+  for *non*-`string`-typed parameters, which is why `Rows="_model.DependsOn"` right next to it
+  worked fine). The picker's same-domain search was therefore filtering on the literal text
+  `"_model.Domain.EditedValue"` — never matching any real domain — so the picker showed "No
+  matching resources" for *every* search, indistinguishable at a glance from "the feature doesn't
+  work." Root-caused by adding a temporary `Console.WriteLine` in `ResourcePicker.SearchAsync`
+  logging the actual `Domain` value received, which printed the literal source text verbatim,
+  making the bug obvious. Fixed both attributes (`Domain="@_model.Domain.EditedValue"`,
+  `ExcludeResourceUid="@_model.ResourceUid"`); confirmed via a direct `sqlcmd` call with the exact
+  intended parameters that the DB layer was already correct, isolating the bug to this one binding
+  before touching any other code. Documented as a new gotcha in `tools/e2e/README.md` — this class
+  of bug produces zero build errors and zero exceptions, so it's easy to burn a long time chasing
+  the wrong layer.
+- **E2E suite stood up and verified twice.** `tools/e2e` now has a committed `@playwright/test`
+  suite: `playwright.config.js` (system Chrome via `channel: 'chrome'`, `webServer` auto-managing
+  `dotnet run` from the repo root, `workers: 1`), `global-setup.js`/`global-teardown.js` (shell out
+  to `sqlcmd`, cleanup-then-seed), `sql/seed.sql`/`sql/cleanup.sql` (verified idempotent by running
+  each twice via `sqlcmd` directly before wiring them into the harness — the second `seed.sql` run
+  inserted zero rows, the second `cleanup.sql` run had nothing left to delete, and the shared
+  domain `TagDefinition` survived both), and `tests/dependencies.spec.js` covering the full flow:
+  same-domain picker exclusion, both-direction add, Save, reload round-trip, the far-side write
+  visible from the *target's own* editor (RD7), removal, and a final round-trip confirming the
+  untouched direction (RD1). Ran via `npm run test:e2e` **twice in a row** — both green (~11s and
+  ~13s) — confirming idempotent seed/teardown per the plan's verification requirement.
+  `example-drive-editor.js` (the ad-hoc path) is unchanged.
+- **UI decisions vs. the plan:** `ResourcePicker` uses `MudAutocomplete` exactly as planned, with a
+  `NoItemsTemplate` stating the target must already exist (per RD13's "empty-state simply says the
+  target must exist first"). `DependencyTab` is the single reusable component used twice (Direction
+  = `"DependsOn"`/`"DependentOn"`) exactly as scoped.
+- **Full manual walkthrough (via the E2E spec, which drives the real browser against the real
+  app+DB — equivalent to and more repeatable than a one-off manual pass):** Create → General (Type
+  `E2eDepType`, Domain `non-prod`, Name) → **Dependencies**: picker search confirmed to return only
+  the two `non-prod` candidates (the `prod` one absent), added Candidate One → **Dependent On**:
+  added Candidate Two → **Save** → reload confirmed both directions round-tripped → opened
+  Candidate Two's own editor and confirmed the Subject appears under *its* **Dependencies** tab
+  (the far-side write, RD7) → back on the Subject, removed the DependsOn edge, saved, reloaded, and
+  confirmed it was gone while the DependentOn edge (Candidate Two) was untouched (RD1). Zero
+  unexpected console errors (the one benign pre-existing 404 noted in #6/#7 is explicitly filtered
+  in the spec's assertion).
+- **All temporary test artifacts removed:** the manual-inspection debug script runs (`inspect8.js`,
+  `inspect8b.js`) and their screenshots lived only in the session scratchpad, not the repo; the
+  `E2E Subject` resource created while manually inspecting the picker was cleaned up by the E2E
+  suite's own `globalSetup` cleanup-then-seed on the next run; the temporary `Console.WriteLine`
+  debug line added to `ResourcePicker.razor` while root-causing the `@`-prefix bug was removed
+  before the final build/test pass; the dev server was stopped (`taskkill //F //IM dotnet.exe`).
+  `tools/e2e/test-results/` (Playwright's own run-tracking artifact) is now gitignored.

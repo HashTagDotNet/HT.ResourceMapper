@@ -248,3 +248,39 @@ html, body {
 .rm-tag-add-search {
     max-width: 320px;
 }
+
+/* Dependencies / Dependent On tabs: compact rows (name / type / domain / remove) + picker. */
+.rm-deps-editor {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+}
+
+.rm-dep-row {
+    display: grid;
+    grid-template-columns: 1fr 160px 140px 40px;
+    align-items: center;
+    gap: .5rem;
+    padding: .35rem 0;
+    border-bottom: 1px solid var(--mud-palette-divider);
+}
+
+.rm-dep-type,
+.rm-dep-domain {
+    font-size: .875rem;
+    color: var(--mud-palette-text-secondary);
+}
+
+.rm-dep-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.rm-deps-empty {
+    padding: .5rem 0;
+}
+
+.rm-deps-picker {
+    max-width: 400px;
+}

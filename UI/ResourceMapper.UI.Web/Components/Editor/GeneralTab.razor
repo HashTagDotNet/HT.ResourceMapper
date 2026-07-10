@@ -74,6 +74,10 @@
     /// <summary>Fired (Create mode only, via the Type select) so the parent can re-seed the Tags tab's entry-point rows.</summary>
     [Parameter] public EventCallback<int?> OnResourceTypeChanged { get; set; }
 
+    /// <summary>Fired (Create mode only, via the Domain select) so the parent can clear dependency
+    /// rows that were validated same-domain against the old domain (RD6).</summary>
+    [Parameter] public EventCallback OnResourceDomainChanged { get; set; }
+
     private bool _keyManuallyEdited;
 
     private string DomainLabel =>
@@ -91,6 +95,7 @@
     {
         Model.Domain.EditedValue = value;
         await NotifyChangedAndCheckUniqueness();
+        await OnResourceDomainChanged.InvokeAsync();
     }
 
     private async Task OnNameChanged(string value)

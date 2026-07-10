@@ -1,0 +1,53 @@
+@using ResourceMapper.Common.Shared.Editor.Contracts
+@using ResourceMapper.Common.Server.Resources.Interfaces
+@inject IResourceService ResourceService
+
+@if (string.IsNullOrWhiteSpace(Domain))
+{
+    <MudText Typo="Typo.caption" Color="Color.Secondary">Choose a Subscription on the General tab first.</MudText>
+}
+else
+{
+    <MudAutocomplete T="ResourcePickerItem" Value="null" ValueChanged="OnItemPicked"
+                      SearchFunc="SearchAsync" ToStringFunc="@FormatItem"
+                      Placeholder="Add resource…" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Clearable="true" ResetValueOnEmptyText="true" CoerceValue="false" Class="rm-deps-picker">
+        <NoItemsTemplate>
+            <MudText Typo="Typo.body2" Class="pa-2">No matching resources — the target must already exist.</MudText>
+        </NoItemsTemplate>
+    </MudAutocomplete>
+}
+
+@code {
+    [Parameter] public string? Domain { get; set; }
+    [Parameter] public string? ExcludeResourceUid { get; set; }
+    [Parameter] public List<string> ExcludedUids { get; set; } = new();
+    [Parameter] public EventCallback<ResourcePickerItem> OnPicked { get; set; }
+
+    private static string FormatItem(ResourcePickerItem? item) =>
+        item is null ? string.Empty : $"{item.ResourceName} · {item.ResourceTypeName} · {item.Domain}";
+
+    private async Task<IEnumerable<ResourcePickerItem>> SearchAsync(string search, CancellationToken cancellationToken)
+    {
+        var request = new ResourcePickerRequest
+        {
+            SearchFor = search,
+            Domain = Domain,
+            ExcludeResourceUid = ExcludeResourceUid,
+            Skip = 0,
+            Take = 20
+        };
+
+        var response = await ResourceService.SearchResourcesForPickerAsync(request, cancellationToken);
+        if (!response.IsSuccess() || response.ApiResponse.Data is null)
+            return Enumerable.Empty<ResourcePickerItem>();
+
+        return response.ApiResponse.Data.Items.Where(i => !ExcludedUids.Contains(i.ResourceUid));
+    }
+
+    private async Task OnItemPicked(ResourcePickerItem? item)
+    {
+        if (item is null) return;
+        await OnPicked.InvokeAsync(item);
+    }
+}

@@ -277,9 +277,10 @@ namespace ResourceMapper.Common.Server.Resources
                     return builder.BuildResponse();
 
                 var isEdit = string.Equals(request.Mode, "Edit", StringComparison.OrdinalIgnoreCase);
+                ResourceDetail? existing = null;
                 if (isEdit)
                 {
-                    var existing = await _repo.GetResourceByUidAsync(request.ResourceUid, cancellationToken);
+                    existing = await _repo.GetResourceByUidAsync(request.ResourceUid, cancellationToken);
                     if (existing == null)
                     {
                         builder.Errors.AddError(CallStatusCode.NotFound, "Resource Not Found",
@@ -325,6 +326,15 @@ namespace ResourceMapper.Common.Server.Resources
                 // actually survives this save (the client already filters this; double-safe).
                 var effectivePrimaryId = ResolveEffectivePrimary(request.PrimaryTagDefinitionId, nonEmptyTags, tagDictionary);
 
+                // Relationships: validate + resolve BEFORE any write (self-loop / not-found /
+                // same-domain — RD2/RD4/RD5/RD14). Create has no resourceId yet, so the actual
+                // edge writes are deferred to after Resource_Save below.
+                var effectiveDomain = isEdit ? existing!.Domain : request.Domain;
+                var (relationshipsValid, resolvedDependsOn, resolvedDependentOn) =
+                    await ValidateAndResolveRelationshipsAsync(builder, request, effectiveDomain, cancellationToken);
+                if (!relationshipsValid)
+                    return builder.BuildResponse();
+
                 var (result, resourceId) = await _repo.SaveResourceAsync(
                     request.ResourceUid, request.ResourceTypeId, request.ResourceKey, request.ResourceName,
                     request.Description, request.Domain, effectivePrimaryId, cancellationToken);
@@ -341,6 +351,10 @@ namespace ResourceMapper.Common.Server.Resources
                 // double-safe).
                 await _repo.SetResourceTagsAsync(resourceId,
                     nonEmptyTags.Select(t => (t.TagDefinitionKey, t.Value!)).ToList(), cancellationToken);
+
+                // RD8 (non-atomic): reconcile relationship edges after the resource + tags are
+                // written, using the resourceId that (in Create mode) only exists post-save.
+                await ReconcileRelationshipsAsync(resourceId, resolvedDependsOn, resolvedDependentOn, cancellationToken);
 
                 var saved = await _repo.GetResourceByUidAsync(request.ResourceUid, cancellationToken);
                 builder.Data.Set(new SaveResourceResponse
@@ -544,6 +558,40 @@ namespace ResourceMapper.Common.Server.Resources
             }
         }
 
+        public async Task<ApiServiceResponse<ResourcePickerResponse>> SearchResourcesForPickerAsync(ResourcePickerRequest request, CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<ResourcePickerResponse>();
+            try
+            {
+                if (request == null)
+                {
+                    builder.Validation.AddValidation("request", "Is required");
+                    return builder.BuildResponse();
+                }
+
+                var skip = request.Skip < 0 ? 0 : request.Skip;
+                var take = request.Take is > 0 and <= MaxPickerTake ? request.Take : DefaultPickerTake;
+
+                var (items, totalCount) = await _repo.SearchResourcesForPickerAsync(new ResourcePickerRequest
+                {
+                    SearchFor = request.SearchFor,
+                    Domain = request.Domain,
+                    ResourceTypeId = request.ResourceTypeId,
+                    ExcludeResourceUid = request.ExcludeResourceUid,
+                    Skip = skip,
+                    Take = take
+                }, cancellationToken);
+
+                builder.Data.Set(new ResourcePickerResponse { Items = items, TotalItems = totalCount });
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
         // ---------------- editor / detail helpers ----------------
 
         private async Task<ResourceDetailModel> ProjectResourceDetailAsync(ResourceDetail detail, CancellationToken cancellationToken)
@@ -571,7 +619,8 @@ namespace ResourceMapper.Common.Server.Resources
                 OtherResourceUid = r.OtherResourceUid,
                 OtherResourceKey = r.OtherResourceKey,
                 OtherResourceName = r.OtherResourceName,
-                OtherResourceType = r.OtherResourceType
+                OtherResourceType = r.OtherResourceType,
+                OtherDomain = r.OtherDomain
             }).ToList();
 
             var primaryLinkUrl = tagModels.FirstOrDefault(t => t.IsPrimary)?.Value;
@@ -786,8 +835,108 @@ namespace ResourceMapper.Common.Server.Resources
                 OtherResourceUid = item.OtherResourceUid,
                 OtherResourceName = item.OtherResourceName,
                 OtherResourceType = item.OtherResourceType,
-                OtherDomain = null // #5
+                OtherDomain = item.OtherDomain
             };
+        }
+
+        // ---------------- relationship reconciliation (slice #8) ----------------
+
+        /// <summary>
+        /// Validates + resolves every desired relationship uid BEFORE any write: rejects a
+        /// self-loop, an unknown uid, or a cross-domain target. Returns the resolved (uid, id)
+        /// pairs per direction so ReconcileRelationshipsAsync doesn't need to re-resolve them.
+        /// </summary>
+        private async Task<(bool IsValid, List<(string Uid, int Id)> DependsOn, List<(string Uid, int Id)> DependentOn)>
+            ValidateAndResolveRelationshipsAsync(
+                ServiceResponseBuilder<SaveResourceResponse> builder,
+                SaveResourceRequest request,
+                string? effectiveDomain,
+                CancellationToken cancellationToken)
+        {
+            var isValid = true;
+            var dependsOnResolved = new List<(string Uid, int Id)>();
+            var dependentOnResolved = new List<(string Uid, int Id)>();
+
+            var directions = new (List<string> Uids, string PropertyKey, List<(string Uid, int Id)> Resolved)[]
+            {
+                (request.DependsOnUids ?? new List<string>(), "request.DependsOnUids", dependsOnResolved),
+                (request.DependentOnUids ?? new List<string>(), "request.DependentOnUids", dependentOnResolved)
+            };
+
+            foreach (var (uids, propertyKey, resolved) in directions)
+            {
+                foreach (var uid in uids.Where(u => !string.IsNullOrWhiteSpace(u)).Distinct(StringComparer.Ordinal))
+                {
+                    if (string.Equals(uid, request.ResourceUid, StringComparison.Ordinal))
+                    {
+                        builder.Validation.AddValidation(propertyKey, "A resource cannot depend on itself");
+                        isValid = false;
+                        continue;
+                    }
+
+                    var other = await _repo.GetResourceByUidAsync(uid, cancellationToken);
+                    if (other is null)
+                    {
+                        builder.Validation.AddValidation(propertyKey, $"Resource '{uid}' was not found");
+                        isValid = false;
+                        continue;
+                    }
+
+                    // Both-null domains are equal (the "Unused" state, design §6); a
+                    // domain-having side never matches a domain-less side, and vice-versa.
+                    var sameDomain = string.IsNullOrEmpty(effectiveDomain)
+                        ? string.IsNullOrEmpty(other.Domain)
+                        : string.Equals(effectiveDomain, other.Domain, StringComparison.Ordinal);
+                    if (!sameDomain)
+                    {
+                        builder.Validation.AddValidation(propertyKey, $"'{other.ResourceName}' is not in the same domain");
+                        isValid = false;
+                        continue;
+                    }
+
+                    resolved.Add((uid, other.ResourceId));
+                }
+            }
+
+            return (isValid, dependsOnResolved, dependentOnResolved);
+        }
+
+        /// <summary>
+        /// Full-set-replace per direction (RD3), scoped so each direction only touches its own
+        /// edges (RD1). DependentOn adds/removes write the FAR side — editing "what depends on
+        /// me" mutates the other resource's out-edge (RD7).
+        /// </summary>
+        private async Task ReconcileRelationshipsAsync(
+            int resourceId,
+            List<(string Uid, int Id)> desiredDependsOn,
+            List<(string Uid, int Id)> desiredDependentOn,
+            CancellationToken cancellationToken)
+        {
+            var currentEdges = await _repo.GetRelationshipsForResourceAsync(resourceId, cancellationToken);
+
+            var currentDependsOnIds = currentEdges
+                .Where(e => string.Equals(e.Direction, "DependsOn", StringComparison.Ordinal))
+                .Select(e => e.OtherResourceId)
+                .ToHashSet();
+            var currentDependentOnIds = currentEdges
+                .Where(e => string.Equals(e.Direction, "DependentOn", StringComparison.Ordinal))
+                .Select(e => e.OtherResourceId)
+                .ToHashSet();
+
+            var desiredDependsOnIds = desiredDependsOn.Select(d => d.Id).ToHashSet();
+            var desiredDependentOnIds = desiredDependentOn.Select(d => d.Id).ToHashSet();
+
+            // DependsOn: out-edges (from=this, to=target).
+            foreach (var targetId in desiredDependsOnIds.Except(currentDependsOnIds))
+                await _repo.AddRelationshipAsync(resourceId, targetId, cancellationToken);
+            foreach (var targetId in currentDependsOnIds.Except(desiredDependsOnIds))
+                await _repo.RemoveRelationshipAsync(resourceId, targetId, cancellationToken);
+
+            // DependentOn: in-edges (from=target, to=this) — the system writes the far side.
+            foreach (var targetId in desiredDependentOnIds.Except(currentDependentOnIds))
+                await _repo.AddRelationshipAsync(targetId, resourceId, cancellationToken);
+            foreach (var targetId in currentDependentOnIds.Except(desiredDependentOnIds))
+                await _repo.RemoveRelationshipAsync(targetId, resourceId, cancellationToken);
         }
 
         private async Task<(bool IsValid, int FromId, int ToId)> ValidateRelationshipEndpointsAsync(
@@ -841,6 +990,8 @@ namespace ResourceMapper.Common.Server.Resources
         private const int MaxResourceKeyLength = 250;
         private const int MaxTagDefinitionKeyLength = 50;
         private const int MaxAllowedValuesLength = 2000;
+        private const int DefaultPickerTake = 20;
+        private const int MaxPickerTake = 100;
 
         private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.Ordinal) { "Text", "Link" };
 

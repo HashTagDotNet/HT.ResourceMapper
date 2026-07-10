@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using ResourceMapper.Common.Server.Resources.Models;
+using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
 
 namespace ResourceMapper.Common.Server.Resources.Interfaces
@@ -98,5 +99,9 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
         // ResourceTag_SetForResource — domain-safe; a domain-keyed pair is ignored by the sproc).
         Task SetResourceTagsAsync(int resourceId, IReadOnlyList<(string TagKey, string TagValue)> tags,
             CancellationToken cancellationToken);
+
+        // Same-domain resource search backing the Dependencies / Dependent On tabs' picker.
+        Task<(List<ResourcePickerItem> Items, int TotalCount)> SearchResourcesForPickerAsync(
+            ResourcePickerRequest request, CancellationToken cancellationToken);
     }
 }

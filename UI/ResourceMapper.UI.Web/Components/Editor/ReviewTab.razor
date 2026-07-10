@@ -46,6 +46,50 @@
     </tbody>
 </MudSimpleTable>
 
+<MudSimpleTable Dense="true" Elevation="0" Class="mt-3" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
+    <thead>
+        <tr><th colspan="2">Dependencies</th></tr>
+    </thead>
+    <tbody>
+        @{
+            var dependsOn = VisibleDependencies(Model.DependsOn);
+        }
+        @if (dependsOn.Count == 0)
+        {
+            <tr><td colspan="2" class="rm-review-label">No dependencies set.</td></tr>
+        }
+        else
+        {
+            @foreach (var row in dependsOn)
+            {
+                <tr><td class="rm-review-label">@row.OtherResourceName</td><td>@row.OtherResourceType</td></tr>
+            }
+        }
+    </tbody>
+</MudSimpleTable>
+
+<MudSimpleTable Dense="true" Elevation="0" Class="mt-3" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
+    <thead>
+        <tr><th colspan="2">Dependent On</th></tr>
+    </thead>
+    <tbody>
+        @{
+            var dependentOn = VisibleDependencies(Model.DependentOn);
+        }
+        @if (dependentOn.Count == 0)
+        {
+            <tr><td colspan="2" class="rm-review-label">No dependents set.</td></tr>
+        }
+        else
+        {
+            @foreach (var row in dependentOn)
+            {
+                <tr><td class="rm-review-label">@row.OtherResourceName</td><td>@row.OtherResourceType</td></tr>
+            }
+        }
+    </tbody>
+</MudSimpleTable>
+
 @{
     var messages = CollectMessages();
 }
@@ -100,4 +144,7 @@ else
 
     private static string RowValueDisplay(TagRowEditor row) =>
         string.Join(", ", row.Values.Where(v => !string.IsNullOrWhiteSpace(v.EditedValue)).Select(v => v.EditedValue));
+
+    private static List<DependencyRowEditor> VisibleDependencies(List<DependencyRowEditor> rows) =>
+        rows.Where(r => !r.IsRemoved).ToList();
 }

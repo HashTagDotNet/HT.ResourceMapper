@@ -16,5 +16,6 @@ namespace ResourceMapper.Common.Server.Resources.Models
         public string OtherResourceKey { get; set; } = string.Empty;
         public string OtherResourceName { get; set; } = string.Empty;
         public string OtherResourceType { get; set; } = string.Empty;
+        public string? OtherDomain { get; set; }
     }
 }
