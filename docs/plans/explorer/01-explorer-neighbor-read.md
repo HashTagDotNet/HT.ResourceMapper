@@ -567,9 +567,9 @@ Expected: all green; no changes to editor tests (this slice didn't touch that pa
 
 ## Out of scope (later slices)
 
-- **All UI** — the `/explore/{ResourceUid}` page, the Cytoscape canvas, and the grid "Explore" action → **slice 4**. This slice is **back-end only**, verified by unit tests + `sqlcmd` (per the master-list rule that pure back-end slices need no UI stub).
-- **One-hop expand/collapse, layout, presets, node actions** → slices 4–6.
-- **Diagram persistence, client identity, sharing, export** → slices 2, 3, 7, 8.
+- **All UI** — the `/explore/{ResourceUid}` page, the Cytoscape canvas, and the grid "Explore" action → **slice 2** (canvas foundation). This slice is **back-end only**, verified by unit tests + `sqlcmd` (per the master-list rule that pure back-end slices need no UI stub).
+- **One-hop expand/collapse, layout, presets, node actions** → slices 2–4.
+- **Diagram persistence, client identity, sharing, export** → slices 5, 6, 7, 8. *(Note: the plan was reordered canvas-first after slice 1 — see master-list Notes.)*
 - **No change to the editor's `ResourceRelationship_GetForResource`, `ResourceRelationshipModel`, or `DependencyRowEditor`** — the editor path is intentionally untouched.
 
 ---

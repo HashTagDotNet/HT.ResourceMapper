@@ -164,8 +164,17 @@ internal infrastructure tool); touch is out of scope and revisited only if it ma
 ### 7.1 Anonymous durable client identity
 
 - There is **no per-user login** yet. Ownership is an **anonymous durable `clientId`** (a GUID)
-  stored on the client in **localStorage + a cookie**, with an optional "copy recovery key" so a
+  stored on the client in **`localStorage`**, read/written via **JS interop** (the same mechanism
+  `Home.razor` already uses for grid-view persistence), with an optional "copy recovery key" so a
   user can carry their identity to another browser/machine.
+  - **Why `localStorage`, not a cookie (Blazor Server reality):** the UI runs as **Interactive
+    Server** over a SignalR circuit, where `IHttpContextAccessor.HttpContext` is `null` — so a
+    cookie set by middleware cannot be read back inside the circuit where diagram saves happen
+    (it would require `PersistentComponentState` gymnastics). `localStorage` via JS interop is the
+    idiomatic, simpler choice and matches existing code. The `clientId` is obtained at the UI
+    layer and passed as a **parameter** into the (identity-agnostic) diagram services. (JS-interop
+    caveat: `localStorage` is unavailable during prerender, so the read is deferred until the
+    circuit is interactive.)
 - **Accepted trade-off:** clearing storage / a new browser / a new machine yields a **new
   `clientId`**, so the user no longer sees their own diagrams in Open-Recent. The data is **not
   lost** — it stays on the server and any shared links still resolve; only the ownership handle
@@ -245,7 +254,7 @@ These are the concrete workstreams the design implies; sequencing/design happens
 - **Read-model extension:** add each node's **primary URL** to the neighbor read used by the canvas.
 - **Diagram persistence:** diagram store schema (owner `clientId`, public `shareId`, seed, node
   set + expansion state + positions, display preset) + CRUD/resolve API.
-- **Anonymous client identity:** durable `clientId` bootstrap (localStorage + cookie) + recovery-key.
+- **Anonymous client identity:** durable `clientId` bootstrap in `localStorage` via JS interop (deferred past prerender) + recovery-key; passed as a parameter into the diagram services.
 - **Canvas/engine integration:** JS-interop graph library selection and the Blazor wrapper.
 - **Explore entry point:** "Explore" launch from grid/editor rooted on a resource.
 - **Export/clipboard:** copy-PNG, PNG, SVG, print wiring from the chosen engine.
