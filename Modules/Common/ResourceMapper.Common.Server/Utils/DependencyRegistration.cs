@@ -3,6 +3,8 @@ using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ResourceMapper.Common.Server.Config;
+using ResourceMapper.Common.Server.Explorer;
+using ResourceMapper.Common.Server.Explorer.Interfaces;
 using ResourceMapper.Common.Server.Resources;
 using ResourceMapper.Common.Server.Resources.Interfaces;
 
@@ -22,6 +24,8 @@ namespace ResourceMapper.Common.Server.Utils
 
             services.TryAddScoped<IResourceRepository,ResourceSqlRepository>();
             services.TryAddScoped<IResourceService,ResourceService>();
+            services.TryAddScoped<IExplorerRepository, ExplorerSqlRepository>();
+            services.TryAddScoped<IExplorerService, ExplorerService>();
             services.TryAddScoped<IImportRepository,ImportSqlRepository>();
             services.TryAddScoped<IImportService,ImportService>();
         }

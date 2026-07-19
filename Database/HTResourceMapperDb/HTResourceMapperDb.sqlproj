@@ -78,6 +78,7 @@
     <Build Include="Stored Procedures\Resource_GetByResourceUid.sql" />
     <Build Include="Stored Procedures\Resource_GetDaysAgo.sql" />
     <Build Include="Stored Procedures\Resource_GetFilterValues.sql" />
+    <Build Include="Stored Procedures\Resource_GetForExplorer.sql" />
     <Build Include="Stored Procedures\Resource_GetItems.sql" />
     <Build Include="Stored Procedures\Resource_Save.sql" />
     <Build Include="Stored Procedures\Resource_SearchForPicker.sql" />
