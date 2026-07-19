@@ -576,7 +576,22 @@ Expected: all green; no changes to editor tests (this slice didn't touch that pa
 
 ## Execution notes
 
-_(Written after execution — record what actually happened, any deviations, bugs found + fixed,
-and the exact `using`/member-name reconciliations against `ResourceService.cs`/`ResourceServiceTests.cs`.)_
+Executed via subagent-driven development. **Done** — commit `4129adf` (11 files, 383 insertions),
+4/4 new `ExplorerServiceTests` green; C# solution builds clean (the `HTResourceMapperDb.sqlproj`
+`MSB4278` under `dotnet build` is the expected old-style-SSDT behavior, not a failure). Task review:
+spec ✅ / code quality approved.
 
-Then: mark slice #1 **Done** ✓ / slice #2 **Planning** in the master list, and commit.
+- **DB apply:** the sproc was applied to `(localdb)\MSSQLLocalDB\ResourceMapper` via `sqlcmd`
+  (`CREATE OR ALTER`) and the `.sql` + `<Build Include>` added to the project. The local DB had
+  **no `ResourceRelationship` rows and no primary-link tags**, so the implementer inserted temporary
+  relationship/tag rows to exercise the happy path, verified all three scenarios (neighbors / no
+  relationships / unknown-uid → 0 rows / null PrimaryUrl), then **deleted the temp data** (confirmed
+  0 remaining). Seeding real explorer demo data is a candidate for a later demo script.
+- **Reconciliations:** none needed beyond the brief — the pre-verified `using`s, `IsSuccess()`,
+  and `builder.Data.Set(...)` compiled as written.
+- **Minor (deferred to final review):** `catch (System.Exception ex)` fully-qualifies `Exception`
+  where the codebase uses `Exception` (cosmetic).
+- **Environment:** a running `ResourceMapper.UI.Web.exe` (under a VS debugger) was locking build
+  outputs and was stopped to let the build proceed. Two pre-existing failures in
+  `HT.Api.Service.Contracts.Tests` (`NotFound`→404 mapping, 422 observed) are in an untouched
+  library and unrelated to this slice.
