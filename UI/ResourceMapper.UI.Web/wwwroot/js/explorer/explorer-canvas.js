@@ -246,7 +246,11 @@ export function serializeJson() {
 // Rebuild the canvas from a serialized diagram (positions preserved, no layout, no server calls).
 // Returns the list of expanded node uids so C# can restore its expanded set.
 export function loadJson(json) {
-    const graph = JSON.parse(json);
+    let graph;
+    try { graph = JSON.parse(json); }
+    catch (e) { return null; }
+    if (!graph) return null;
+
     cy.elements().remove();
     seedId = graph.seedUid || null;
     currentPreset = graph.preset || 'nameType';

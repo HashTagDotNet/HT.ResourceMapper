@@ -110,7 +110,7 @@ namespace ResourceMapper.Common.Server.Explorer
             }
         }
 
-        public async Task<ApiServiceResponse<DiagramModel>> GetByShareIdAsync(string shareId, CancellationToken cancellationToken = default)
+        public async Task<ApiServiceResponse<DiagramModel>> GetByShareIdAsync(string shareId, string? callerClientId, CancellationToken cancellationToken = default)
         {
             var builder = new ServiceResponseBuilder<DiagramModel>();
             try
@@ -129,7 +129,14 @@ namespace ResourceMapper.Common.Server.Explorer
                     return builder.BuildResponse();
                 }
 
-                builder.Data.Set(ToModel(row));
+                var model = ToModel(row);
+                model.IsOwner = !string.IsNullOrEmpty(callerClientId) && row.ClientId == callerClientId;
+                if (!model.IsOwner)
+                {
+                    model.DiagramUid = string.Empty;   // don't leak the owner handle to a read-only recipient
+                }
+
+                builder.Data.Set(model);
                 return builder.BuildResponse();
             }
             catch (Exception ex)

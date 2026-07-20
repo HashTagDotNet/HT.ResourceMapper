@@ -10,5 +10,6 @@ namespace ResourceMapper.Common.Shared.Explorer.Diagrams
         public string DisplayPreset { get; set; } = string.Empty;
         public string DiagramJson { get; set; } = string.Empty;
         public string? UpdatedOnUtc { get; set; }
+        public bool IsOwner { get; set; }
     }
 }

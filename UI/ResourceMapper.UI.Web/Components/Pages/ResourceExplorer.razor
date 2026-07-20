@@ -1,4 +1,5 @@
 @page "/explore/{ResourceUid}"
+@page "/explore/shared/{ShareId}"
 @using Microsoft.JSInterop
 @using ResourceMapper.Common.Server.Explorer.Interfaces
 @using ResourceMapper.Common.Shared.Explorer
@@ -12,17 +13,25 @@
 @inject IDiagramService DiagramService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject NavigationManager Navigation
 
 <PageTitle>Explorer</PageTitle>
 
 <div class="rm-explorer-host">
     <div class="rm-explorer-bar">
         <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
-                   StartIcon="@Icons.Material.Outlined.Save" OnClick="SaveAsync">Save</MudButton>
+                   StartIcon="@Icons.Material.Outlined.Save" OnClick="SaveAsync" Disabled="_isReadOnly">Save</MudButton>
         <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
                    StartIcon="@Icons.Material.Outlined.SaveAs" OnClick="SaveAsAsync">Save As</MudButton>
         <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
                    StartIcon="@Icons.Material.Outlined.FolderOpen" OnClick="OpenAsync">Open</MudButton>
+        <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
+                   StartIcon="@Icons.Material.Outlined.Share" OnClick="ShareAsync">Share</MudButton>
+        @if (_isReadOnly)
+        {
+            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Secondary" Class="ml-1"
+                       StartIcon="@Icons.Material.Outlined.ContentCopy" OnClick="SaveCopyAsync">Save a copy to mine</MudButton>
+        }
         <MudDivider Vertical="true" FlexItem="true" Class="mx-2" />
         <MudTooltip Text="Fit to screen">
             <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.CenterFocusStrong"
@@ -52,6 +61,12 @@
             </MudTooltip>
         }
     </div>
+    @if (_isReadOnly)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="ma-1">
+            Read-only shared diagram — use &ldquo;Save a copy to mine&rdquo; to edit.
+        </MudAlert>
+    }
     @if (_error is not null)
     {
         <MudAlert Severity="Severity.Error" Class="ma-2">@_error</MudAlert>
@@ -60,7 +75,8 @@
 </div>
 
 @code {
-    [Parameter] public string ResourceUid { get; set; } = string.Empty;
+    [Parameter] public string? ResourceUid { get; set; }
+    [Parameter] public string? ShareId { get; set; }
 
     private ElementReference _canvasEl;
     private IJSObjectReference? _module;
@@ -68,6 +84,7 @@
     private readonly HashSet<string> _expanded = new();
     private string? _error;
     private bool _initialized;
+    private bool _isReadOnly;
     private string _preset = "nameType";
     private string _clientId = string.Empty;
     private string _seedUid = string.Empty;
@@ -89,8 +106,15 @@
         _clientId = await ClientIdentity.GetOrCreateAsync(JS);
         StateHasChanged();
 
-        _seedUid = ResourceUid;
-        await LoadNodeAsync(ResourceUid, seed: true, expandFromUid: null);
+        if (!string.IsNullOrEmpty(ShareId))
+        {
+            await LoadSharedAsync(ShareId);
+        }
+        else
+        {
+            _seedUid = ResourceUid ?? string.Empty;
+            await LoadNodeAsync(ResourceUid ?? string.Empty, seed: true, expandFromUid: null);
+        }
         await SafeInvokeAsync("fit");
     }
 
@@ -216,7 +240,7 @@
         var shareId = result.Data as string;
         if (string.IsNullOrWhiteSpace(shareId)) return;
 
-        var resp = await DiagramService.GetByShareIdAsync(shareId!);
+        var resp = await DiagramService.GetByShareIdAsync(shareId!, _clientId);
         if (!resp.IsSuccess() || resp.ApiResponse.Data is null)
         {
             Snackbar.Add("Could not open diagram.", Severity.Error);
@@ -224,7 +248,8 @@
         }
         var model = resp.ApiResponse.Data;
 
-        _diagramUid = model.DiagramUid;
+        _isReadOnly = !model.IsOwner;
+        _diagramUid = model.IsOwner ? model.DiagramUid : null;
         _shareId = model.ShareId;
         _diagramName = model.Name;
         _seedUid = model.SeedResourceUid;
@@ -236,6 +261,74 @@
 
         Snackbar.Add($"Opened “{model.Name}”.", Severity.Success);
         StateHasChanged();
+    }
+
+    private async Task LoadSharedAsync(string shareId)
+    {
+        var resp = await DiagramService.GetByShareIdAsync(shareId, _clientId);
+        if (!resp.IsSuccess() || resp.ApiResponse.Data is null)
+        {
+            _error = "Shared diagram not found.";
+            StateHasChanged();
+            return;
+        }
+        var model = resp.ApiResponse.Data;
+
+        _shareId = model.ShareId;
+        _diagramName = model.Name;
+        _seedUid = model.SeedResourceUid;
+        _preset = string.IsNullOrWhiteSpace(model.DisplayPreset) ? "nameType" : model.DisplayPreset;
+        _isReadOnly = !model.IsOwner;
+        _diagramUid = model.IsOwner ? model.DiagramUid : null;   // suppressed for non-owners
+
+        var expanded = await SafeInvokeResultAsync<string[]>("loadJson", model.DiagramJson);
+        if (expanded is null)
+        {
+            _error = "This shared diagram could not be loaded (corrupt data).";
+            StateHasChanged();
+            return;
+        }
+        _expanded.Clear();
+        foreach (var u in expanded) _expanded.Add(u);
+        StateHasChanged();
+    }
+
+    private async Task SaveCopyAsync()
+    {
+        if (string.IsNullOrEmpty(_shareId)) return;
+        var resp = await DiagramService.SaveCopyAsync(_clientId, _shareId, null);
+        if (resp.IsSuccess() && resp.ApiResponse.Data is not null)
+        {
+            _diagramUid = resp.ApiResponse.Data.DiagramUid;
+            _shareId = resp.ApiResponse.Data.ShareId;
+            _diagramName = $"{_diagramName} (copy)";   // matches the server-side default name
+            _isReadOnly = false;
+            Snackbar.Add("Saved a copy to your diagrams.", Severity.Success);
+            StateHasChanged();
+        }
+        else
+        {
+            Snackbar.Add("Could not save a copy.", Severity.Error);
+        }
+    }
+
+    private async Task ShareAsync()
+    {
+        if (string.IsNullOrEmpty(_shareId))
+        {
+            await SaveAsAsync();                       // must be saved to have a share id
+            if (string.IsNullOrEmpty(_shareId)) return; // cancelled
+        }
+        var url = $"{Navigation.BaseUri.TrimEnd('/')}/explore/shared/{_shareId}";
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
+            Snackbar.Add("Share link copied to clipboard.", Severity.Success);
+        }
+        catch
+        {
+            Snackbar.Add(url, Severity.Info);          // clipboard blocked — show it to copy manually
+        }
     }
 
     private static object NodePayload(string uid, string key, string name, string type, string? domain, string? url)

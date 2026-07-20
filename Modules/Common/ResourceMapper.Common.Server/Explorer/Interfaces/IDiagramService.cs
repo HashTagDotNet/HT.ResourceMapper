@@ -11,7 +11,7 @@ namespace ResourceMapper.Common.Server.Explorer.Interfaces
     {
         Task<ApiServiceResponse<SaveDiagramResponse>> SaveAsync(string clientId, SaveDiagramRequest request, CancellationToken cancellationToken = default);
         Task<ApiServiceResponse<List<DiagramListItem>>> ListForClientAsync(string clientId, CancellationToken cancellationToken = default);
-        Task<ApiServiceResponse<DiagramModel>> GetByShareIdAsync(string shareId, CancellationToken cancellationToken = default);
+        Task<ApiServiceResponse<DiagramModel>> GetByShareIdAsync(string shareId, string? callerClientId, CancellationToken cancellationToken = default);
         Task<ApiServiceResponse<SaveDiagramResponse>> SaveCopyAsync(string clientId, string shareId, string? newName, CancellationToken cancellationToken = default);
         Task<ApiServiceResponse<object>> DeleteAsync(string clientId, string diagramUid, CancellationToken cancellationToken = default);
     }

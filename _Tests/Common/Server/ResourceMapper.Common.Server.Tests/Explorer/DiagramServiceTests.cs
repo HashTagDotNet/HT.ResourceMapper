@@ -108,9 +108,35 @@ namespace ResourceMapper.Common.Server.Tests.Explorer
         {
             _repo.Setup(r => r.GetByShareIdAsync("nope", It.IsAny<CancellationToken>())).ReturnsAsync((DiagramRow?)null);
 
-            var response = await _sut.GetByShareIdAsync("nope", CancellationToken.None);
+            var response = await _sut.GetByShareIdAsync("nope", "client1", CancellationToken.None);
 
             response.IsSuccess().Should().BeFalse("because an unknown share id is NotFound");
+        }
+
+        [Fact]
+        public async Task GetByShareIdAsync_CallerIsOwner_SetsIsOwnerTrueAndKeepsDiagramUid()
+        {
+            _repo.Setup(r => r.GetByShareIdAsync("s1", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DiagramRow { DiagramUid = "d1", ShareId = "s1", ClientId = "owner", Name = "N", SeedResourceUid = "seed", DisplayPreset = "nameType", DiagramJson = "{}" });
+
+            var response = await _sut.GetByShareIdAsync("s1", "owner", CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the share resolves");
+            response.ApiResponse.Data!.IsOwner.Should().BeTrue("because the caller owns it");
+            response.ApiResponse.Data!.DiagramUid.Should().Be("d1", "because the owner may edit and needs the handle");
+        }
+
+        [Fact]
+        public async Task GetByShareIdAsync_CallerNotOwner_SetsIsOwnerFalseAndBlanksDiagramUid()
+        {
+            _repo.Setup(r => r.GetByShareIdAsync("s1", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DiagramRow { DiagramUid = "d1", ShareId = "s1", ClientId = "owner", Name = "N", SeedResourceUid = "seed", DisplayPreset = "nameType", DiagramJson = "{}" });
+
+            var response = await _sut.GetByShareIdAsync("s1", "someone-else", CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the share resolves for anyone");
+            response.ApiResponse.Data!.IsOwner.Should().BeFalse("because the caller is not the owner");
+            response.ApiResponse.Data!.DiagramUid.Should().BeEmpty("because the owner handle is suppressed for a read-only recipient");
         }
 
         [Fact]

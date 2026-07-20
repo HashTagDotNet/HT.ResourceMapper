@@ -342,6 +342,38 @@ and after assigning `model`, add:
 
 ## Execution notes
 
-_(Written after execution — record the two-browser ownership check, the corrupt-JSON guard behavior,
-any `GetByShareIdAsync` call-site reconciliations, and commit hash(es). Then mark slice #7b done /
-slice #8 next in the master list, and commit.)_
+Implemented as written; no deviations from the brief.
+
+- **Both `GetByShareIdAsync` call sites** updated to pass `_clientId`: the new `LoadSharedAsync`
+  (`/explore/shared/{ShareId}`) and the existing 7a `OpenAsync` handler (Open dialog). Both now also
+  set `_isReadOnly = !model.IsOwner` and `_diagramUid = model.IsOwner ? model.DiagramUid : null`.
+- **Two-browser ownership check** — driven with Playwright (`playwright-core`, system Chrome) using
+  two separate `BrowserContext`s (each gets its own `localStorage`, hence its own `rm_client_id` —
+  no manual storage clearing needed). Flow: Context A (owner) opens the seed, Save-As's a diagram,
+  clicks Share (clipboard granted via `context.grantPermissions`), reads the copied URL back off
+  `navigator.clipboard`. Reopening that URL in a **new page in the same context** loads editable (no
+  banner, Save enabled). Opening the same URL in **Context B** (different `rm_client_id`, confirmed
+  distinct via `localStorage.getItem('rm_client_id')` in both contexts) loads read-only: banner
+  shown, Save disabled, "Save a copy to mine" visible. Clicking it clears the banner, re-enables
+  Save, and the diagram shows in Context B's Open dialog as "… (copy)". Verified via `sqlcmd` that
+  the copy landed as a distinct `Diagram` row owned by Context B's `ClientId` with a brand-new
+  `DiagramUid`/`ShareId` (not reusing the owner's blanked handle) — screenshots captured for the
+  owner-reopen and non-owner-shared states.
+  - Note: since this is Blazor **Server** (interactive server render mode), `GetByShareIdAsync` is an
+    in-process service call from the component, not a client-visible HTTP/JSON response — there's no
+    browser Network-tab payload to inspect for the blanked `DiagramUid`. That guarantee is instead
+    verified directly at the unit level (`GetByShareIdAsync_CallerNotOwner_SetsIsOwnerFalseAndBlanksDiagramUid`)
+    and indirectly in the browser run: Save is disabled for the whole read-only session (so the
+    blanked/null `_diagramUid` is never exercised for a write), and `SaveCopyAsync` takes the
+    `shareId`, not `_diagramUid`, so the clone path never depends on it either.
+- **Corrupt-JSON guard** — set an existing `Diagram.DiagramJson` row to `'{not valid json!!!'` via
+  `sqlcmd`, then opened its share link fresh. Result: "This shared diagram could not be loaded
+  (corrupt data)." alert shown, canvas stays empty, no unhandled-exception page, no thrown JS error
+  reaching the console beyond an unrelated 404 (favicon-class, present in all runs including
+  unmodified pages). Confirms both the JS `loadJson` try/catch (returns `null` on `JSON.parse`
+  failure) and the C# `LoadSharedAsync` null-check path work end-to-end.
+- Test diagram rows created during the browser drive were deleted afterward via `sqlcmd`; the DB
+  was restored to its pre-existing 2 `Diagram` rows.
+- Slice #7b is done. Master list update deferred — out of scope for this task (only this slice
+  doc's execution notes were touched; see the task's explicit instruction not to read/edit the
+  master list).
