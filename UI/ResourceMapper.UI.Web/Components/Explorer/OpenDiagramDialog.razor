@@ -1,0 +1,67 @@
+@namespace ResourceMapper.UI.Web.Components.Explorer
+@using ResourceMapper.Common.Server.Explorer.Interfaces
+@using ResourceMapper.Common.Shared.Explorer.Diagrams
+@inject IDiagramService DiagramService
+
+<MudDialog>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else if (_items.Count == 0)
+        {
+            <MudText Typo="Typo.body2">No saved diagrams yet.</MudText>
+        }
+        else
+        {
+            <MudList T="string" Dense="true">
+                @foreach (var d in _items)
+                {
+                    <MudListItem T="string">
+                        <div class="d-flex align-center" style="gap:8px">
+                            <MudText Class="flex-grow-1">@d.Name</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@d.UpdatedOnUtc</MudText>
+                            <MudButton Size="Size.Small" Color="Color.Primary" OnClick="@(() => Open(d))">Open</MudButton>
+                            <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.Delete"
+                                           aria-label="Delete diagram" OnClick="@(() => Delete(d))" />
+                        </div>
+                    </MudListItem>
+                }
+            </MudList>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string ClientId { get; set; } = string.Empty;
+
+    private readonly List<DiagramListItem> _items = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        _loading = true;
+        _items.Clear();
+        var resp = await DiagramService.ListForClientAsync(ClientId);
+        if (resp.IsSuccess() && resp.ApiResponse.Data is not null)
+            _items.AddRange(resp.ApiResponse.Data);
+        _loading = false;
+    }
+
+    private void Open(DiagramListItem d) => MudDialog.Close(DialogResult.Ok(d.ShareId));
+
+    private async Task Delete(DiagramListItem d)
+    {
+        await DiagramService.DeleteAsync(ClientId, d.DiagramUid);
+        await RefreshAsync();
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

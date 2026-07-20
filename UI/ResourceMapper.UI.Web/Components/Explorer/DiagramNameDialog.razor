@@ -1,0 +1,20 @@
+@namespace ResourceMapper.UI.Web.Components.Explorer
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="Name" Label="Diagram name" Immediate="true" MaxLength="200" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit"
+                   Disabled="@string.IsNullOrWhiteSpace(Name)">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string Name { get; set; } = string.Empty;
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(Name.Trim()));
+    private void Cancel() => MudDialog.Cancel();
+}

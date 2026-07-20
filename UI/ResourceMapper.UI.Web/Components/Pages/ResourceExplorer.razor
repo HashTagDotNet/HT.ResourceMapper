@@ -2,29 +2,45 @@
 @using Microsoft.JSInterop
 @using ResourceMapper.Common.Server.Explorer.Interfaces
 @using ResourceMapper.Common.Shared.Explorer
+@using ResourceMapper.Common.Shared.Explorer.Diagrams
+@using ResourceMapper.Common.Shared.Explorer.Diagrams.Contracts
 @using ResourceMapper.UI.Web.Explorer
+@using ResourceMapper.UI.Web.Components.Explorer
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @inject IExplorerService ExplorerService
+@inject IDiagramService DiagramService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <PageTitle>Explorer</PageTitle>
 
 <div class="rm-explorer-host">
     <div class="rm-explorer-bar">
-        <MudButton Size="Size.Small" Variant="Variant.Outlined"
-                   StartIcon="@Icons.Material.Outlined.UnfoldLess"
-                   OnClick="CollapseAllAsync">Collapse all</MudButton>
+        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Outlined.Save" OnClick="SaveAsync">Save</MudButton>
+        <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
+                   StartIcon="@Icons.Material.Outlined.SaveAs" OnClick="SaveAsAsync">Save As</MudButton>
+        <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
+                   StartIcon="@Icons.Material.Outlined.FolderOpen" OnClick="OpenAsync">Open</MudButton>
+        <MudDivider Vertical="true" FlexItem="true" Class="mx-2" />
+        <MudTooltip Text="Fit to screen">
+            <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.CenterFocusStrong"
+                           aria-label="Fit" OnClick="FitAsync" />
+        </MudTooltip>
+        <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
+                   StartIcon="@Icons.Material.Outlined.UnfoldLess" OnClick="CollapseAllAsync">Collapse all</MudButton>
         <MudSelect T="string" Value="_preset" ValueChanged="OnPresetChanged"
                    Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined"
-                   Class="ml-3" Style="max-width:180px" Label="Display">
+                   Class="ml-2" Style="max-width:170px" Label="Display">
             <MudSelectItem Value="@("name")">Name only</MudSelectItem>
             <MudSelectItem Value="@("nameType")">Name + Type</MudSelectItem>
             <MudSelectItem Value="@("detailed")">Detailed</MudSelectItem>
         </MudSelect>
-        <MudText Typo="Typo.caption" Class="ml-3 mud-text-secondary">
-            Tap to expand / collapse · right-click for actions · drag to arrange
-        </MudText>
         <MudSpacer />
+        <MudText Typo="Typo.body2" Class="mr-3">
+            @(string.IsNullOrWhiteSpace(_diagramName) ? "(unsaved)" : _diagramName)
+        </MudText>
         @if (!string.IsNullOrEmpty(_clientId))
         {
             <MudText Typo="Typo.caption" Class="mud-text-secondary mr-1">
@@ -54,6 +70,10 @@
     private bool _initialized;
     private string _preset = "nameType";
     private string _clientId = string.Empty;
+    private string _seedUid = string.Empty;
+    private string? _diagramUid;
+    private string? _shareId;
+    private string _diagramName = string.Empty;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -69,6 +89,7 @@
         _clientId = await ClientIdentity.GetOrCreateAsync(JS);
         StateHasChanged();
 
+        _seedUid = ResourceUid;
         await LoadNodeAsync(ResourceUid, seed: true, expandFromUid: null);
         await SafeInvokeAsync("fit");
     }
@@ -139,6 +160,82 @@
         if (string.IsNullOrEmpty(_clientId)) return;
         try { await JS.InvokeVoidAsync("navigator.clipboard.writeText", _clientId); }
         catch { /* clipboard unavailable */ }
+    }
+
+    private async Task FitAsync() => await SafeInvokeAsync("fit");
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_diagramName)) { await SaveAsAsync(); return; }
+        await PersistAsync(_diagramUid, _diagramName);
+    }
+
+    private async Task SaveAsAsync()
+    {
+        var parameters = new DialogParameters { ["Name"] = _diagramName };
+        var dialog = await DialogService.ShowAsync<DiagramNameDialog>("Save diagram as", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+        var name = result.Data as string;
+        if (string.IsNullOrWhiteSpace(name)) return;
+        await PersistAsync(null, name!);   // null uid => new diagram
+    }
+
+    private async Task PersistAsync(string? diagramUid, string name)
+    {
+        var json = await SafeInvokeResultAsync<string>("serializeJson") ?? "{}";
+        var request = new SaveDiagramRequest
+        {
+            DiagramUid = diagramUid,
+            Name = name,
+            SeedResourceUid = _seedUid,
+            DisplayPreset = _preset,
+            DiagramJson = json
+        };
+        var resp = await DiagramService.SaveAsync(_clientId, request);
+        if (resp.IsSuccess() && resp.ApiResponse.Data is not null)
+        {
+            _diagramUid = resp.ApiResponse.Data.DiagramUid;
+            _shareId = resp.ApiResponse.Data.ShareId;
+            _diagramName = name;
+            Snackbar.Add($"Saved “{name}”.", Severity.Success);
+            StateHasChanged();
+        }
+        else
+        {
+            Snackbar.Add("Save failed.", Severity.Error);
+        }
+    }
+
+    private async Task OpenAsync()
+    {
+        var parameters = new DialogParameters { ["ClientId"] = _clientId };
+        var dialog = await DialogService.ShowAsync<OpenDiagramDialog>("Open diagram", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+        var shareId = result.Data as string;
+        if (string.IsNullOrWhiteSpace(shareId)) return;
+
+        var resp = await DiagramService.GetByShareIdAsync(shareId!);
+        if (!resp.IsSuccess() || resp.ApiResponse.Data is null)
+        {
+            Snackbar.Add("Could not open diagram.", Severity.Error);
+            return;
+        }
+        var model = resp.ApiResponse.Data;
+
+        _diagramUid = model.DiagramUid;
+        _shareId = model.ShareId;
+        _diagramName = model.Name;
+        _seedUid = model.SeedResourceUid;
+        _preset = string.IsNullOrWhiteSpace(model.DisplayPreset) ? "nameType" : model.DisplayPreset;
+
+        var expanded = await SafeInvokeResultAsync<string[]>("loadJson", model.DiagramJson);
+        _expanded.Clear();
+        if (expanded is not null) foreach (var u in expanded) _expanded.Add(u);
+
+        Snackbar.Add($"Opened “{model.Name}”.", Severity.Success);
+        StateHasChanged();
     }
 
     private static object NodePayload(string uid, string key, string name, string type, string? domain, string? url)

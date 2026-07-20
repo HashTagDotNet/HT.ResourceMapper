@@ -220,6 +220,60 @@ export function removeNode(uid) {
 
 export function fit() { if (cy) cy.fit(undefined, 30); }
 
+// ---- persistence (serialize / load) -------------------------------------
+
+function serialize() {
+    return {
+        seedUid: seedId,
+        preset: currentPreset,
+        nodes: cy.nodes().map(n => {
+            const p = n.position();
+            const d = n.data();
+            return {
+                uid: n.id(), name: d.name, key: d.key, type: d.type,
+                domain: d.domain, url: d.url, x: p.x, y: p.y,
+                expanded: n.hasClass('expanded')
+            };
+        }),
+        edges: cy.edges().map(e => ({ source: e.data('source'), target: e.data('target') }))
+    };
+}
+
+export function serializeJson() {
+    return JSON.stringify(serialize());
+}
+
+// Rebuild the canvas from a serialized diagram (positions preserved, no layout, no server calls).
+// Returns the list of expanded node uids so C# can restore its expanded set.
+export function loadJson(json) {
+    const graph = JSON.parse(json);
+    cy.elements().remove();
+    seedId = graph.seedUid || null;
+    currentPreset = graph.preset || 'nameType';
+
+    const els = [];
+    for (const n of graph.nodes || []) {
+        els.push({ group: 'nodes',
+            data: { id: n.uid, uid: n.uid, name: n.name, key: n.key, type: n.type, domain: n.domain, url: n.url },
+            position: { x: n.x, y: n.y } });
+    }
+    for (const e of graph.edges || []) {
+        els.push({ group: 'edges', data: { id: e.source + '__' + e.target, source: e.source, target: e.target } });
+    }
+    cy.add(els);
+
+    if (seedId) cy.getElementById(seedId).addClass('seed');
+    for (const n of graph.nodes || []) {
+        if (n.expanded) cy.getElementById(n.uid).addClass('expanded');
+    }
+    applyLabels();
+    fit();
+
+    return (graph.nodes || []).filter(n => n.expanded).map(n => n.uid);
+}
+
+export function currentPresetValue() { return currentPreset; }
+
 export function dispose() {
     if (menu) { try { menu.destroy(); } catch (e) { /* extension teardown */ } menu = null; }
     if (tip && tip.parentNode) tip.parentNode.removeChild(tip);
