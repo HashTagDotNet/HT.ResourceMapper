@@ -382,6 +382,17 @@ private void Explore(string uid) =>
 
 ## Execution notes
 
-_(Written after execution — record deviations, the module import-path behavior actually observed,
-any Cytoscape sizing/timing issues, what demo relationship data was inserted, and commit hash(es).
-Then mark slice #2 **Done** ✓ / slice #3 **Next** in the master list, and commit.)_
+Executed via subagent-driven development. **Done** — commit `d2ae714`. `dotnet build` clean (expected
+sqlproj `MSB4278` only); `dotnet test` 396 pass / 2 known-unrelated fail — no regressions. The
+implementer **drove the app in Playwright** (system Chrome via `playwright-core`) and confirmed seed
+render, correct edge directions, tap expand/collapse, dedup on a shared dependency, and the not-found
+alert (screenshots in its report). Task review: spec ✅ / code quality approved.
+
+- **Deviation (accepted):** the grid Explore button was wrapped in `MudTooltip` to match the existing
+  `OpenDetails`/`CopyDetailsLink` convention in `Home.razor` — cosmetic, same icon/aria/handler.
+- **Demo data:** 5 `ResourceRelationship` rows inserted around `AAS001` (Production Web App) since
+  localdb had none — **left in place** for the user to click through (test data; details in report).
+- **Minor (deferred to slice 3):** tap-triggered interop calls (`OnNodeTapped`/`LoadNodeAsync` →
+  `InvokeVoidAsync`) aren't guarded against `JSDisconnectedException` if a tap resolves after circuit
+  teardown. Low impact on Blazor Server; slice 3 adds more interop to this page, so it should
+  introduce a small safe-invoke wrapper and adopt it here too.
