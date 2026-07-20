@@ -230,3 +230,57 @@ pre-existing unrelated `HT.Api.Service.Contracts.Tests` failures). Browser-drive
 against `/explore/DEMOEXP-checkout` (demo data already seeded in localdb).
 
 Slice #9 (pass 1) done. Slice #10 (client settings migration) next.
+
+---
+
+## Pass 2 — agreed design (brainstormed 2026-07-20, via visual companion)
+
+A larger visual overhaul driven by user findings + mockups. Bigger than pass 1: it has a **back-end
+piece** (per-type metadata) plus a substantial canvas rework, so at plan time it will likely split
+into sub-slices (e.g. **9b** back-end type metadata, **9c** node/label/layout rework, **9d** chrome).
+Design agreed; detailed TDD plan to follow.
+
+### Findings that drove it
+1. Node labels **overwrite** each other badly (multi-line name+type below every small node collides).
+2. Edge hover should show the relationship in words.
+3. Page needs a **title + report date**.
+4. Initial layout is **crowded/messy**; 5. expanded graph goes **"full cross"** (unreadable crossings);
+6. canvas should **grow/fit** as new nodes appear.
+
+### Agreed design
+
+- **Node redesign (finding #1) — style "B" (icon + code circle):**
+  - Each node is a **color-by-type circle** with a **type icon + short code inside** (e.g. `APP`, `APC`,
+    `SB`, `SBQ`). The code is **always visible**; identity at a glance without labels.
+  - **Full name (14px) + type (12px) labels appear ONLY for the seed + hovered + selected node** —
+    default nodes show just the in-node code. This is the core fix for the overlap.
+  - **Back-end piece:** short code + icon are properties of the **resource type**, not in the data
+    today. Add a `ShortCode` (and an icon key) to `ResourceType`; thread through
+    `Resource_GetForExplorer` → `ExplorerNodeRow`/`ExplorerNodeModel`. Restrained **per-type color
+    palette** (drafted: App=blue, Insights/Monitoring=purple, Cache/Redis=red, Config=teal,
+    ServiceBus/Queue=orange, SQL=indigo, KeyVault=slate).
+
+- **Layout (findings #4/#5/#6) — tidy layered, manual-preserving:**
+  - Replace `cose` with a **layered/directional layout** (dependency flow → minimal crossings) for the
+    initial tidy. (Prefer built-in `breadthfirst` directed from the seed; vendor `cytoscape-dagre` only
+    if breadthfirst still crosses badly.)
+  - **Tidy once** on load; on expand, **place new nodes cleanly near their parent** without a full
+    re-layout (**preserves manual drags**); add a **"Re-tidy"** toolbar button to re-run the clean
+    layout on demand; **auto-fit on expand** so new nodes are always in view.
+
+- **Edge hover (finding #2):** hovering an edge shows a **dark-gray "depends on" pill** on the line
+  (source depends on target). (Fuller "X depends on Y" phrasing is a deferred option.)
+
+- **Page chrome (finding #3):** a **floating title + date overlay** in the canvas's top-left — title =
+  diagram/seed name; metadata line drafted as *"Dependency report · &lt;date&gt; · &lt;N&gt; resources"*.
+  **Chosen because it appears inside PNG/SVG exports** (self-documenting picture).
+  - *Implementation note:* Cytoscape's `cy.png/svg` capture the **graph only**, not HTML overlays — so
+    the title/date must be **composited into the export** (drawn onto the exported PNG canvas / prepended
+    into the SVG), not just an HTML div, for it to travel with the image.
+
+### Deferred / kept-as-drafted (user: "keep these items for now")
+- Exact metadata wording; edge-tooltip long form; the specific per-type color values and icon glyphs.
+
+### Supersedes from pass 1
+- Pass 1's uniform 20px node label under every node is **replaced** by the code-in-node + hover-label
+  model. The thinner arrows and seed-relative dashed upstream edges from pass 1 are **kept**.
