@@ -21,6 +21,10 @@ Each item notes the current state and any nuance to resolve at implementation ti
    - *Current:* node `font-size: '11px'`.
    - *Target:* `1.25rem` (≈ 20px at a 16px root). Cytoscape `font-size` typically wants px/em; if `rem` isn't honored, use the px equivalent (`20px`) or `em`.
 
+4. **On-canvas navigation controls — zoom in/out + pan up/down/left/right.**
+   - *Current:* pan is mouse-drag, zoom is wheel, and Fit is a toolbar button; there are **no on-canvas buttons** for zoom or directional pan.
+   - *Target:* explicit controls (e.g. a `＋`/`－` zoom pair and a 4-way pan D-pad, likely an overlay in a canvas corner) driving `cy.zoom()`/`cy.pan()`/`cy.panBy()`. **Placement decided: slice 9 (this polish slice).**
+
 ## How this list is maintained
 
 - New adjustments the user raises before slice 9 are appended here (numbered), with current-state +
