@@ -109,6 +109,8 @@
     <None Include="Scripts\04_Seed_All.sql" />
     <None Include="Scripts\Demo_Insert_ResourceItemsForGrid.sql" />
     <None Include="Scripts\Demo_Purge_ResourceItemsForGrid.sql" />
+    <None Include="Scripts\Demo_Insert_ExplorerGraph.sql" />
+    <None Include="Scripts\Demo_Purge_ExplorerGraph.sql" />
     <None Include="localhost.publish.xml" />
   </ItemGroup>
   <ItemGroup>
