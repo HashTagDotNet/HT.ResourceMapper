@@ -13,8 +13,15 @@
         <MudButton Size="Size.Small" Variant="Variant.Outlined"
                    StartIcon="@Icons.Material.Outlined.UnfoldLess"
                    OnClick="CollapseAllAsync">Collapse all</MudButton>
+        <MudSelect T="string" Value="_preset" ValueChanged="OnPresetChanged"
+                   Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined"
+                   Class="ml-3" Style="max-width:180px" Label="Display">
+            <MudSelectItem Value="@("name")">Name only</MudSelectItem>
+            <MudSelectItem Value="@("nameType")">Name + Type</MudSelectItem>
+            <MudSelectItem Value="@("detailed")">Detailed</MudSelectItem>
+        </MudSelect>
         <MudText Typo="Typo.caption" Class="ml-3 mud-text-secondary">
-            Tap a node to expand / collapse · Shift-click to remove · drag to arrange
+            Tap to expand / collapse · right-click for actions · drag to arrange
         </MudText>
     </div>
     @if (_error is not null)
@@ -33,6 +40,7 @@
     private readonly HashSet<string> _expanded = new();
     private string? _error;
     private bool _initialized;
+    private string _preset = "nameType";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -43,6 +51,7 @@
             "import", "/js/explorer/explorer-canvas.js");
         _selfRef = DotNetObjectReference.Create(this);
         await SafeInvokeAsync("init", _canvasEl, _selfRef);
+        await SafeInvokeAsync("setPreset", _preset);
 
         await LoadNodeAsync(ResourceUid, seed: true, expandFromUid: null);
         await SafeInvokeAsync("fit");
@@ -101,6 +110,12 @@
     {
         await SafeInvokeAsync("collapseAll");
         _expanded.Clear();
+    }
+
+    private async Task OnPresetChanged(string preset)
+    {
+        _preset = preset;
+        await SafeInvokeAsync("setPreset", preset);
     }
 
     private static object NodePayload(string uid, string key, string name, string type, string? domain, string? url)

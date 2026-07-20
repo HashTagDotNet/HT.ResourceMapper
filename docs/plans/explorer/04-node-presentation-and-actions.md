@@ -422,6 +422,53 @@ tooltip style. Replace the slice-3 `.rm-explorer-canvas` block with the one belo
 
 ## Execution notes
 
-_(Written after execution — record deviations, cxtmenu registration/behavior actually observed,
-tooltip positioning quirks, and commit hash(es). Then mark slice #4 **Done** ✓ / slice #5 **Next**
-in the master list, and commit.)_
+Implemented exactly as specified (Steps 1–4 applied verbatim/as-diffed). Verified with
+`dotnet build` (clean aside from the expected sqlproj MSB4278) and `dotnet test`
+(396/398 passing; the 2 failures are the pre-existing, unrelated
+`HT.Api.Service.Contracts.Tests` failures noted in the brief).
+
+Browser-driven verification (Playwright, ad-hoc scripts, headless system Chrome) against
+`AAS001` / "Production Web App" (`DEMO5d0ee27dbbf148589cdcf2248f579b91`):
+
+- **Glyphs**: seed shows `▾` while expanded, collapsed neighbors show `▸`; confirmed toggling in
+  both directions via tap and via the right-click menu.
+- **Display presets**: *Name only*, *Name + Type*, *Detailed* all re-render every visible node's
+  label live from the same `MudSelect` control — confirmed by screenshot for each preset.
+- **Tooltip**: shows only populated fields (this demo component has no `Domain`/`PrimaryUrl` data,
+  so only Name/Key/Type rendered — confirmed the field-filtering works, not just that the div
+  exists). Hides correctly on mouseout and on pan. **Deviation/observation**: hiding on wheel-zoom
+  could not be exercised via Playwright's synthetic `mouse.wheel()` in headless Chromium — the
+  wheel event didn't register as a cytoscape zoom at all (screenshots showed no zoom occurred).
+  Since `pan`/`zoom`/`drag` share the exact same `hideTip` handler in the code
+  (`cy.on('pan zoom drag', hideTip)`), and `pan` was verified to hide the tooltip, the zoom path is
+  the same code and treated as covered by inspection, not a separate live observation.
+- **Right-click radial menu** (`cxtmenu`): opens on native right mouse button down (Chromium fires
+  it the same as a real user); confirmed all four commands function correctly:
+  - Expand/Collapse: collapsing the seed removes its (unexpanded) neighbors and flips its glyph to
+    `▸`; re-expanding restores them and flips back to `▾`.
+  - Remove: removes a leaf node and its edge, leaving the rest of the reachable component intact.
+  - Open link: demo data has **zero** `PrimaryUrl`-tagged resources anywhere in this connected
+    component (confirmed directly against `Resource_GetForExplorer` via `sqlcmd` — no resource in
+    reach has a `PrimaryTagDefinitionId`, and the DB has no URL-content `TagDefinition` at all), so
+    the item is always non-selectable/disabled for every real node here — confirmed no new tab
+    opens on click. To verify the *enabled* path (menu item selectable, `window.open` fires with
+    the node's URL) without mutating the database (a seed/cleanup SQL write was attempted and
+    blocked by the sandbox's write-classifier), a synthetic node with a `primaryUrl` was injected
+    client-side via `import()` of the same cached module + its real `addGraph()` export — right-
+    clicking it and choosing Open link opened a new tab at exactly that URL. **Note**: the vendored
+    `cxtmenu.js` marks a disabled item with a `cxtmenu-disabled` class but ships no accompanying
+    CSS rule, and none was specified by this slice's Step 4 CSS — so "greyed out" is currently
+    *functional only* (not selectable, no `window.open` call) rather than visually dimmed. This
+    matches the brief's own note that menu styling is deferred to slice 9.
+  - Open in Mapper: opens a new tab at `/resources/{uid}` for the right-clicked node; confirmed the
+    tab actually loads that resource's real editor page (screenshotted).
+- **Shift-click**: shift-clicking the (expanded) seed collapsed it (glyph → `▸`, neighbors
+  removed) rather than removing the node — confirming the old slice-3 shift-to-remove behavior is
+  gone and tap-based shift-click now behaves identically to a plain tap.
+- Confirmed the one pre-existing browser console error (`Failed to load resource ... 404`) is an
+  unrelated, pre-existing `favicon.ico` 404 (verified via direct `curl`), not a regression from
+  this slice.
+
+Commit: see repository log for slice #4's commit hash on `home-page`.
+
+Slice #4 **Done** ✓ / slice #5 **Next**.
