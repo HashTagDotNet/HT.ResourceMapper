@@ -263,5 +263,58 @@ branch). This keeps the overlay/exports in sync with the current name.
 
 ## Execution notes
 
-_(After execution — record the export-contains-title evidence (PNG + SVG), any SVG header-insertion
-reconciliation against cytoscape-svg's actual output, and commit hash(es). This completes pass 2.)_
+Applied 1a–1e, 2a–2c, and the CSS essentially verbatim; see the "collapse() gap" note below for the
+one deliberate deviation.
+
+**`svgWithHeader` vs. the real `cy.svg()` output:** the brief's regexes assume the opening `<svg>`
+tag carries both `height` and `viewBox`. The actual output from this app's `cy.svg({ full: true, bg:
+'#ffffff' })` is `<svg version="1.1" xmlns="..." xmlns:xlink="..." width="1068" height="655">` —
+**no `viewBox` at all**. The `height` bump still works as written (confirmed: exported height =
+original content height + 52px header). The `viewBox` replace is a no-op here (`String.replace`
+returns the string unchanged when the pattern doesn't match), so **no code change was required** —
+the function already degrades gracefully for a viewBox-less SVG; width/height alone are the only
+scale reference and the `<g transform="translate(0,52)">` wrapper lines up correctly (confirmed
+visually, nothing clipped).
+
+**Bug found + fixed while driving the app:** §1c's list of `renderOverlay()` call sites
+(`addGraph`, `loadJson`, `collapseAll`, `removeNode`) omits the single-node `collapse()` function
+(the one invoked by tapping an already-expanded node, or via the cxtmenu's "Collapse"). This is a
+real gap against this slice's own acceptance check ("the count updates as you expand/collapse" —
+Step 5.1): after collapsing a node, the overlay kept showing the pre-collapse count until some
+unrelated action (e.g. Save As) happened to call `renderOverlay()` again. Reproduced this live
+(collapsing the seed's neighbours down to 1 node while the overlay kept showing "7 resources"
+until Save As revealed the true "1 resource"), then added `renderOverlay();` to the end of
+`collapse()` to match the other call sites. Re-verified end-to-end after the fix by expanding then
+collapsing "Mobile BFF" (re-locating it on-canvas by hover-scan before *and* after each click,
+since `fit()` re-centers/rescales the whole viewport on every graph change): 7 → 8 resources on
+expand (Catalog Service added), 8 → 7 on collapse (Catalog Service removed) — both changes reflected
+in the overlay immediately.
+
+**Export-contains-title evidence:**
+- *SVG* (`Save SVG`, downloaded via Playwright): raw file starts
+  `<svg version="1.1" ... width="1068" height="655"><rect x="0" y="0" width="100%" height="52"
+  fill="#ffffff"/><text ...>My Diagram</text><text ...>Dependency report · 2026-07-20 · 7
+  resources</text><g transform="translate(0,52)">...graph...</g></svg>` — title + subtitle text
+  present, height bumped by exactly the 52px header, graph content shifted into a `<g
+  transform="translate(0,52)">` wrapper, nothing clipped.
+- *PNG* (`Save PNG`): downloaded PNG (189834 bytes, 2136×1334px — 2x scale) renders with a white
+  header band reading "My Diagram" / "Dependency report · 2026-07-20 · 7 resources" above the
+  full, unclipped graph.
+- *Copy image*: clipboard read back a 164906-byte `image/png` blob immediately after clicking —
+  consistent with the composited header+graph image, not the bare graph.
+- *Print/PDF*: popup tab title is the diagram name ("My Diagram"); popup body contains the same
+  `svgWithHeader()` output, rendering the header above the graph identically to the SVG/PNG
+  exports.
+
+**Driven in Playwright** against `/explore/DEMOEXP-checkout` (system Chrome via `playwright-core`,
+headless): overlay on load, expand/collapse count updates (see above), Save-As rename switching
+the title live, `pointer-events: none` confirmed via computed style (never blocks canvas
+interaction), and all four export paths (Save SVG / Save PNG / Copy image / Print) — see the
+export-contains-title evidence above for each.
+
+**Build/test:** `dotnet build` clean aside from the expected `HTResourceMapperDb.sqlproj` MSB4278
+(pre-existing, ignored per CLAUDE.md). `dotnet test`: 2 pre-existing, unrelated failures in
+`HT.Api.Service.Contracts.Tests` (NotFound → HTTP status mapping); all other tests (414) passed —
+no regressions (this slice is `wwwroot`/Razor only, no server-side test coverage to affect).
+
+**Commit:** `e783d0e` on `home-page`. This completes pass 2.
