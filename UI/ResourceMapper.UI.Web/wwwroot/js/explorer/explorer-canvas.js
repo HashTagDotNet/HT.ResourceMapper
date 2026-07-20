@@ -278,6 +278,68 @@ export function loadJson(json) {
 
 export function currentPresetValue() { return currentPreset; }
 
+// ---- export -------------------------------------------------------------
+
+export async function copyPng() {
+    try {
+        const blob = cy.png({ output: 'blob', full: true, bg: '#ffffff', scale: 2 });
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        return true;
+    } catch (e) { return false; }
+}
+
+export function savePng(filename) {
+    const uri = cy.png({ output: 'base64uri', full: true, bg: '#ffffff', scale: 2 });
+    downloadUri(uri, (filename || 'diagram') + '.png');
+}
+
+export function saveSvg(filename) {
+    const svg = cy.svg({ full: true, bg: '#ffffff' });   // cytoscape-svg extension
+    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+    downloadUri(url, (filename || 'diagram') + '.svg');
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+export function printDiagram() {
+    const svg = cy.svg({ full: true, bg: '#ffffff' });
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write('<!doctype html><title>Diagram</title>' + svg);
+    w.document.close();
+    w.focus();
+    w.print();
+}
+
+// Copy a link as BOTH a rich text/html anchor (name as label) and text/plain (raw url).
+export async function copyRichLink(url, text) {
+    const html = '<a href="' + escapeHtml(url) + '">' + escapeHtml(text) + '</a>';
+    try {
+        await navigator.clipboard.write([new ClipboardItem({
+            'text/html': new Blob([html], { type: 'text/html' }),
+            'text/plain': new Blob([url], { type: 'text/plain' })
+        })]);
+        return true;
+    } catch (e) {
+        try { await navigator.clipboard.writeText(url); return true; }
+        catch (e2) { return false; }
+    }
+}
+
+function downloadUri(uri, filename) {
+    const a = document.createElement('a');
+    a.href = uri;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+function escapeHtml(s) {
+    return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 export function dispose() {
     if (menu) { try { menu.destroy(); } catch (e) { /* extension teardown */ } menu = null; }
     if (tip && tip.parentNode) tip.parentNode.removeChild(tip);

@@ -27,6 +27,13 @@
                    StartIcon="@Icons.Material.Outlined.FolderOpen" OnClick="OpenAsync">Open</MudButton>
         <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
                    StartIcon="@Icons.Material.Outlined.Share" OnClick="ShareAsync">Share</MudButton>
+        <MudMenu Label="Export" StartIcon="@Icons.Material.Outlined.Download" Size="Size.Small"
+                 Variant="Variant.Outlined" Class="ml-1">
+            <MudMenuItem Icon="@Icons.Material.Outlined.ContentCopy" OnClick="CopyImageAsync">Copy image</MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Outlined.Image" OnClick="SavePngAsync">Save PNG</MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Outlined.Polyline" OnClick="SaveSvgAsync">Save SVG</MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Outlined.Print" OnClick="PrintAsync">Print / PDF</MudMenuItem>
+        </MudMenu>
         @if (_isReadOnly)
         {
             <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Secondary" Class="ml-1"
@@ -320,15 +327,28 @@
             if (string.IsNullOrEmpty(_shareId)) return; // cancelled
         }
         var url = $"{Navigation.BaseUri.TrimEnd('/')}/explore/shared/{_shareId}";
-        try
-        {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
-            Snackbar.Add("Share link copied to clipboard.", Severity.Success);
-        }
-        catch
-        {
-            Snackbar.Add(url, Severity.Info);          // clipboard blocked — show it to copy manually
-        }
+        var label = string.IsNullOrWhiteSpace(_diagramName) ? url : _diagramName;
+        var ok = await SafeInvokeResultAsync<bool>("copyRichLink", url, label);
+        Snackbar.Add(ok ? "Share link copied." : url, ok ? Severity.Success : Severity.Info);
+    }
+
+    private async Task CopyImageAsync()
+    {
+        var ok = await SafeInvokeResultAsync<bool>("copyPng");
+        Snackbar.Add(ok ? "Image copied to clipboard." : "Copy image failed.",
+            ok ? Severity.Success : Severity.Error);
+    }
+
+    private async Task SavePngAsync() => await SafeInvokeAsync("savePng", DownloadName());
+    private async Task SaveSvgAsync() => await SafeInvokeAsync("saveSvg", DownloadName());
+    private async Task PrintAsync() => await SafeInvokeAsync("printDiagram");
+
+    private string DownloadName()
+    {
+        var name = string.IsNullOrWhiteSpace(_diagramName) ? "diagram" : _diagramName;
+        var invalid = System.IO.Path.GetInvalidFileNameChars();
+        var clean = new string(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray()).Trim();
+        return string.IsNullOrWhiteSpace(clean) ? "diagram" : clean;
     }
 
     private static object NodePayload(string uid, string key, string name, string type, string? domain, string? url)
