@@ -7,6 +7,8 @@ using ResourceMapper.Common.Server.Explorer;
 using ResourceMapper.Common.Server.Explorer.Interfaces;
 using ResourceMapper.Common.Server.Resources;
 using ResourceMapper.Common.Server.Resources.Interfaces;
+using ResourceMapper.Common.Server.Settings;
+using ResourceMapper.Common.Server.Settings.Interfaces;
 
 namespace ResourceMapper.Common.Server.Utils
 {
@@ -30,6 +32,8 @@ namespace ResourceMapper.Common.Server.Utils
             services.TryAddScoped<IDiagramService, DiagramService>();
             services.TryAddScoped<IImportRepository,ImportSqlRepository>();
             services.TryAddScoped<IImportService,ImportService>();
+            services.TryAddScoped<IClientSettingsRepository, ClientSettingsSqlRepository>();
+            services.TryAddScoped<IClientSettingsService, ClientSettingsService>();
         }
     }
 }

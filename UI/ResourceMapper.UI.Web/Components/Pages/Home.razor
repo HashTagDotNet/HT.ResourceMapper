@@ -2,14 +2,17 @@
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Routing
 @using ResourceMapper.Common.Server.Resources.Interfaces
+@using ResourceMapper.Common.Server.Settings.Interfaces
 @using ResourceMapper.Common.Shared.HomePage.Contracts
 @using ResourceMapper.Common.Shared.HomePage.Filtering
 @using ResourceMapper.UI.Web.Components.Home
+@using ResourceMapper.UI.Web.Explorer
 @implements IDisposable
 @inject IResourceService ResourceService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
+@inject IClientSettingsService ClientSettings
 
 <PageTitle>Resources — Hashtag Resource Mapper</PageTitle>
 
@@ -136,9 +139,10 @@
     private string _urlOrderBy = "ResourceName";
     private string _urlOrderDirection = "Asc";
 
-    // localStorage-backed "resume where you left off". Persistence is gated until the first-render
-    // resume check has run, so the grid's default initial load can't clobber a saved view.
-    private const string ViewStorageKey = "resourcemapper.home.view";
+    // Server-backed "resume where you left off" (per-client setting). Persistence is gated until the
+    // first-render resume check has run, so the grid's default initial load can't clobber a saved view.
+    private const string GridViewSettingKey = "home.gridView";
+    private string _clientId = string.Empty;
     private bool _resumeChecked;
 
     protected override async Task OnInitializedAsync()
@@ -167,14 +171,21 @@
         if (!firstRender || _grid is null)
             return;
 
-        // Resume: when the URL carries no state of its own, restore the last-saved view from
-        // localStorage. An explicit / deep-linked URL (any query string) always wins over storage.
+        // Resume: when the URL carries no state of its own, restore the last-saved view from the
+        // server-side per-client setting. An explicit / deep-linked URL (any query string) always
+        // wins over the saved setting.
+        _clientId = await ClientIdentity.GetOrCreateAsync(JS);
+
         var restored = false;
         if (string.IsNullOrEmpty(new Uri(Navigation.Uri).Query))
         {
             string? saved = null;
-            try { saved = await JS.InvokeAsync<string?>("localStorage.getItem", ViewStorageKey); }
-            catch { /* storage unavailable — fall back to the default view */ }
+            try
+            {
+                var settingResp = await ClientSettings.GetAsync(_clientId, GridViewSettingKey);
+                saved = settingResp.IsSuccess() ? settingResp.ApiResponse.Data?.Value : null;
+            }
+            catch { /* settings unavailable — fall back to the default view */ }
 
             if (!string.IsNullOrWhiteSpace(saved))
             {
@@ -305,8 +316,9 @@
 
     private async Task PersistViewAsync(string query)
     {
-        try { await JS.InvokeVoidAsync("localStorage.setItem", ViewStorageKey, query); }
-        catch { /* storage unavailable — best-effort persistence */ }
+        if (string.IsNullOrEmpty(_clientId)) return;
+        try { await ClientSettings.SetAsync(_clientId, GridViewSettingKey, query); }
+        catch { /* settings unavailable — best-effort persistence */ }
     }
 
     private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
