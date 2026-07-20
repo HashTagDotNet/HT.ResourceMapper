@@ -161,7 +161,7 @@ export function removeNode(uid) {
 }
 ```
 
-- [ ] **Step 1:** Apply 1a–1d to `explorer-canvas.js` (add `seedId`; replace tap handler, `addGraph`, `collapse`; add `placeAround`, `collapseAll`, `removeNode`; delete `relayout`).
+- [x] **Step 1:** Apply 1a–1d to `explorer-canvas.js` (add `seedId`; replace tap handler, `addGraph`, `collapse`; add `placeAround`, `collapseAll`, `removeNode`; delete `relayout`).
 
 ---
 
@@ -316,7 +316,7 @@ Add the required `using` for the exception types at the top of the page (with th
 lines): `@using Microsoft.JSInterop` is already present and provides `JSDisconnectedException`;
 `ObjectDisposedException` is in `System` (available by default). No new `@using` needed.
 
-- [ ] **Step 2:** Apply 2a–2b to `ResourceExplorer.razor`.
+- [x] **Step 2:** Apply 2a–2b to `ResourceExplorer.razor`.
 
 ---
 
@@ -344,14 +344,14 @@ Add the control-bar rule and shrink the canvas height to make room for it. Repla
 (Replace the existing `.rm-explorer-canvas` block from slice 2 with the one above — only the
 `height` changed; keep the rest. Add `.rm-explorer-bar` new.)
 
-- [ ] **Step 3:** Update `app.css`.
+- [x] **Step 3:** Update `app.css`.
 
 ---
 
 ## UI verification hook (visible slice)
 
-- [ ] **Step 4: Build + run.** `dotnet build` clean; `dotnet run --project UI/ResourceMapper.UI.Web`.
-- [ ] **Step 5: Drive it** (reuse the slice-2 demo data around `AAS001`, or reseed similarly). From
+- [x] **Step 4: Build + run.** `dotnet build` clean; `dotnet run --project UI/ResourceMapper.UI.Web`.
+- [x] **Step 5: Drive it** (reuse the slice-2 demo data around `AAS001`, or reseed similarly). From
   the grid, Explore a resource with dependencies, then confirm:
   1. **Drag** several nodes into a deliberate arrangement.
   2. **Expand** another node — the newly-added neighbors appear **around the tapped node** and your
@@ -361,7 +361,7 @@ Add the control-bar rule and shrink the canvas height to make room for it. Repla
   4. **Shift-click the seed** — the canvas clears.
   5. **Collapse all** — returns to just the seed node, re-fit.
   6. Re-expand after collapse-all works (no stale "already expanded" state).
-- [ ] **Step 6 (optional): Playwright** per `tools/e2e` — assert node count drops to 1 after
+- [x] **Step 6 (optional): Playwright** per `tools/e2e` — assert node count drops to 1 after
   Collapse-all, and that an expand-after-drag keeps a dragged node's position roughly stable.
 
 ---
@@ -385,6 +385,50 @@ Add the control-bar rule and shrink the canvas height to make room for it. Repla
 
 ## Execution notes
 
-_(Written after execution — record deviations, any Cytoscape `.component()`/reachability quirks,
-layout-preservation behavior actually observed, and commit hash(es). Then mark slice #3 **Done** ✓ /
-slice #4 **Next** in the master list, and commit.)_
+Applied Steps 1–3 exactly as specified (1a–1d in `explorer-canvas.js`, 2a–2b in
+`ResourceExplorer.razor`, the CSS block in `app.css`); no deviations from the brief's code. Verified
+with `dotnet build` (clean, only the expected sqlproj `MSB4278`) and `dotnet test` (398 total, 2
+pre-existing/unrelated `HT.Api.Service.Contracts.Tests` failures, everything else — including all
+396 other tests — green, no regression vs slice 2).
+
+**Demo data:** slice 2's `AAS001`-centered `ResourceRelationship` rows were still present (5 rows),
+but they only reached one hop from the seed in every direction, so expanding a *non-seed* node never
+introduced a genuinely new node — insufficient to prove position-preserving placement. Added one
+extra demo row via `sqlcmd` (`APP007` (User Authentication) → `APP008` (Notification Service)) to
+`(localdb)\MSSQLLocalDB\ResourceMapper` so expanding `APP007` after the seed load pulls in a real
+second-hop node. Left in place as reusable demo data (not cleaned up), matching slice 2's precedent.
+
+**Browser verification:** driven headlessly via Playwright (`playwright-core` + system Chrome), not
+just eyeballed. Real user gestures throughout (mouse drag, click, shift+click, the actual "Collapse
+all" button) — no direct JS function calls bypassing the UI. To get hard node-count/position
+evidence without touching any shipped file, the driver wraps the global `cytoscape` factory via
+`page.addInitScript` *before* navigation (intercepting `globalThis.cytoscape = factory()` from the
+vendor UMD bundle) so the app's own `cy = cytoscape({...})` call in `init()` also stashes the
+instance on `window.__cy`. This is a test-harness-only interception living in the driver script, not
+a change to `explorer-canvas.js`.
+
+Verified, with hard assertions plus screenshots:
+- Seed load: 5 nodes (`AAS001`,`AI001`,`CONFIG001`,`REDIS001`,`APP007`).
+- Drag `CONFIG001` and `AI001` to new spots (rendered position moved > 50px each).
+- Expand `APP007` → node count 6 (`APP008` added); `CONFIG001`/`AI001` positions **unchanged**
+  (< 3px, i.e. floating-point-only drift) confirming **no relayout on expansion**; `APP007` itself
+  also stayed put; `APP008` landed **exactly 150 model units** from `APP007` — `placeAround`'s ring
+  radius, confirmed in *model* space (screen-space distance scales with zoom, which is why the first
+  attempt at this check — using rendered/screen distance — was wrong and had to be corrected to
+  model-space `position()`).
+- Shift-click `APP007` (a mid-graph node, connected to both the seed *and* `APP008`) → node count 4:
+  `APP007` and `APP008` both removed (`APP008` was only reachable through `APP007`), while
+  `AAS001`/`AI001`/`CONFIG001`/`REDIS001` (each with their own direct edge to the seed) survive —
+  confirms `.component()`-based undirected reachability cleanup, not a naive "remove neighbors" rule.
+- Shift-click the seed (`AAS001`) → node count 0 (canvas fully cleared).
+- Reload, re-expand `APP007` (count 6), click the **Collapse all** button → node count 1 (`AAS001`
+  only), re-fit.
+- Tap the seed again post-collapse-all → node count back to 5 — confirms `_expanded` is correctly
+  cleared client-side (no stale "already expanded" state blocking re-expansion).
+
+One pre-existing, unrelated console `404` (`GET /favicon.ico`) observed in both the seed-load and
+reload navigations — present before this slice's changes, not investigated further.
+
+Commit: see git log (`feat(ui): slice #3 — arrangement`).
+
+Slice #3 marked **Done** ✓ / slice #4 **Next** in the master list.

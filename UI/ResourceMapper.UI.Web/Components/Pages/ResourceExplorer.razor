@@ -9,6 +9,14 @@
 <PageTitle>Explorer</PageTitle>
 
 <div class="rm-explorer-host">
+    <div class="rm-explorer-bar">
+        <MudButton Size="Size.Small" Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Outlined.UnfoldLess"
+                   OnClick="CollapseAllAsync">Collapse all</MudButton>
+        <MudText Typo="Typo.caption" Class="ml-3 mud-text-secondary">
+            Tap a node to expand / collapse · Shift-click to remove · drag to arrange
+        </MudText>
+    </div>
     @if (_error is not null)
     {
         <MudAlert Severity="Severity.Error" Class="ma-2">@_error</MudAlert>
@@ -31,17 +39,16 @@
         if (!firstRender || _initialized) return;
         _initialized = true;
 
-        // Absolute path so the module resolves the same from any /explore/{uid} route.
         _module = await JS.InvokeAsync<IJSObjectReference>(
             "import", "/js/explorer/explorer-canvas.js");
         _selfRef = DotNetObjectReference.Create(this);
-        await _module.InvokeVoidAsync("init", _canvasEl, _selfRef);
+        await SafeInvokeAsync("init", _canvasEl, _selfRef);
 
-        await LoadNodeAsync(ResourceUid, seed: true);
-        await _module.InvokeVoidAsync("fit");
+        await LoadNodeAsync(ResourceUid, seed: true, expandFromUid: null);
+        await SafeInvokeAsync("fit");
     }
 
-    private async Task LoadNodeAsync(string uid, bool seed)
+    private async Task LoadNodeAsync(string uid, bool seed, string? expandFromUid)
     {
         var response = await ExplorerService.GetNodeAsync(uid);
         if (!response.IsSuccess() || response.ApiResponse.Data is null)
@@ -59,15 +66,14 @@
         foreach (var n in node.Neighbors)
         {
             nodes.Add(NodePayload(n.ResourceUid, n.ResourceKey, n.ResourceName, n.ResourceType, n.Domain, n.PrimaryUrl));
-            // Edge points dependent -> dependency.
             var src = n.Direction == "DependsOn" ? node.ResourceUid : n.ResourceUid;
             var tgt = n.Direction == "DependsOn" ? n.ResourceUid : node.ResourceUid;
             edges.Add(new { source = src, target = tgt });
         }
 
-        await _module!.InvokeVoidAsync("addGraph", nodes, edges, seed ? uid : null);
+        await SafeInvokeAsync("addGraph", nodes, edges, seed ? uid : null, expandFromUid);
         _expanded.Add(uid);
-        await _module.InvokeVoidAsync("markExpanded", uid, true);
+        await SafeInvokeAsync("markExpanded", uid, true);
     }
 
     [JSInvokable]
@@ -75,17 +81,46 @@
     {
         if (_expanded.Contains(uid))
         {
-            await _module!.InvokeVoidAsync("collapse", uid);
+            await SafeInvokeAsync("collapse", uid);
             _expanded.Remove(uid);
         }
         else
         {
-            await LoadNodeAsync(uid, seed: false);
+            await LoadNodeAsync(uid, seed: false, expandFromUid: uid);
         }
+    }
+
+    [JSInvokable]
+    public async Task OnNodeRemoveRequested(string uid)
+    {
+        var surviving = await SafeInvokeResultAsync<string[]>("removeNode", uid) ?? System.Array.Empty<string>();
+        _expanded.IntersectWith(surviving);
+    }
+
+    private async Task CollapseAllAsync()
+    {
+        await SafeInvokeAsync("collapseAll");
+        _expanded.Clear();
     }
 
     private static object NodePayload(string uid, string key, string name, string type, string? domain, string? url)
         => new { uid, key, name, type, domain, primaryUrl = url };
+
+    private async Task SafeInvokeAsync(string identifier, params object?[] args)
+    {
+        if (_module is null) return;
+        try { await _module.InvokeVoidAsync(identifier, args); }
+        catch (JSDisconnectedException) { /* circuit gone — nothing to do */ }
+        catch (ObjectDisposedException) { /* module disposed mid-call */ }
+    }
+
+    private async Task<T?> SafeInvokeResultAsync<T>(string identifier, params object?[] args)
+    {
+        if (_module is null) return default;
+        try { return await _module.InvokeAsync<T>(identifier, args); }
+        catch (JSDisconnectedException) { return default; }
+        catch (ObjectDisposedException) { return default; }
+    }
 
     public async ValueTask DisposeAsync()
     {
@@ -97,7 +132,8 @@
                 await _module.DisposeAsync();
             }
         }
-        catch { /* circuit already torn down — nothing to clean up */ }
+        catch (JSDisconnectedException) { /* circuit already torn down */ }
+        catch (ObjectDisposedException) { /* already disposed */ }
         _selfRef?.Dispose();
     }
 }
