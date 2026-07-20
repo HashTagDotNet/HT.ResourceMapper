@@ -59,6 +59,13 @@ namespace ResourceMapper.Common.Server.Explorer
                     string.IsNullOrWhiteSpace(request.DisplayPreset) ? "nameType" : request.DisplayPreset,
                     request.DiagramJson ?? string.Empty, cancellationToken);
 
+                if (result.Result == "denied")
+                {
+                    builder.Errors.AddError(CallStatusCode.NotFound, "Diagram Not Found",
+                        $"No diagram '{request.DiagramUid}' owned by this client.", "request.DiagramUid");
+                    return builder.BuildResponse();
+                }
+
                 builder.Data.Set(new SaveDiagramResponse
                 {
                     DiagramUid = result.DiagramUid,

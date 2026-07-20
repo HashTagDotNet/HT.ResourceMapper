@@ -85,6 +85,20 @@ namespace ResourceMapper.Common.Server.Tests.Explorer
             response.ApiResponse.Data!.ShareId.Should().Be("existing-share", "because Upsert returns the authoritative existing share id");
         }
 
+        [Fact]
+        public async Task SaveAsync_DiagramUidOwnedByAnotherClient_ReturnsNotFound()
+        {
+            _repo.Setup(r => r.UpsertAsync(It.IsAny<string>(), It.IsAny<string>(), "client1",
+                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DiagramUpsertResult { Result = "denied", DiagramUid = "", ShareId = "" });
+
+            var response = await _sut.SaveAsync("client1",
+                new SaveDiagramRequest { DiagramUid = "someone-elses-uid", Name = "X", SeedResourceUid = "s" },
+                CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because you cannot save over a diagram owned by another client");
+        }
+
         #endregion
 
         #region GetByShareIdAsync / SaveCopyAsync
