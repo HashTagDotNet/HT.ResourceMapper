@@ -72,3 +72,31 @@ Carried from the design spec's non-goals — parked for future stories:
 - **Carried to slice 7** (from slice-5 review): (a) `IDiagramService.DeleteAsync` returns `ApiServiceResponse<object>` (not `<bool>` — the envelope is constrained `class, new()`); consume it accordingly. (b) The public `Diagram_GetByShareId`/`DiagramModel` currently returns the owner's private `DiagramUid`; slice 7's share flow must decide whether a **read-only recipient** should receive it (recipients use `SaveCopy` via `ShareId`, so likely blank/omit `DiagramUid` for non-owners). `Diagram_Upsert` now safely **denies** a cross-client `DiagramUid` (maps to NotFound).
 - **Engine:** Cytoscape.js + MIT extensions, decided at plan time (see design spec §10). Vendored under `wwwroot/js/explorer/` — **no CDN scripts** (the app loads only local `_content`/`_framework` scripts today; the one external ref is a Google Fonts stylesheet).
 - End each slice by moving its plan doc into place, flipping status in this table, and committing.
+
+---
+
+## Build status — 2026-07-20 (resume marker)
+
+**Explorer feature COMPLETE + UI-polish pass 1 & 2 COMPLETE.** Branch `home-page`.
+
+- **Slices 1–8, 10** — feature-complete, code-reviewed, **pushed** to `origin/home-page`
+  (PR into `main`: `compare main...home-page`). Browse · expand/collapse · arrange · node presentation ·
+  save/open/delete · share (read-only + save-a-copy) · export (PNG/SVG/clipboard/print + rich link) ·
+  client identity · home-grid settings migration.
+- **Slice 9 pass 1** — done (`c754a81`): dashed upstream / thin arrows / labels / zoom-pan.
+- **Slice 9 pass 2** — done, **committed LOCAL-ONLY (unpushed)**:
+  - 9b type codes/icons on ResourceType → read (`21ac66d`, reviewed ✓)
+  - 9c node rework: icon+code color circles, hover captions, layered breadthfirst layout, Re-tidy, auto-fit (`8db5eca`)
+  - verification fix batch: interactive hover tooltip w/ Open-in-Azure / Open-in-Mapper links, 3-line edge tooltip, 2× edges + big arrows, expand fan-out (`cfcce86`)
+  - 9d title/date overlay composited into PNG/SVG/print exports (`e783d0e`)
+  - Plans: `09b-type-metadata.md`, `09c-node-layout.md`, `09d-title-chrome.md`, `09-ui-polish.md` (pass-2 design).
+
+**RESUME / TODO**
+1. **Push** the ~9 pass-2 commits (`7ff9a06`..`e783d0e`) to `origin/home-page`.
+2. **Deferred code reviews**: 9c, 9d, and the fix batch (skipped — user verifying live). Run if desired.
+3. **User verification** of pass-2 in the browser (in progress).
+4. **Kept-as-drafted** (user "keep for now"): metadata wording; per-type color/icon fine-tuning.
+
+**Verify:** `/explore/DEMOEXP-checkout` (DEMOEXP-* seeded in localdb; `Demo_Insert_ExplorerGraph.sql`).
+**Build gotcha:** stop any running `ResourceMapper.UI.Web` first (it locks build output). 2 pre-existing
+unrelated failures in `HT.Api.Service.Contracts.Tests` (NotFound→404 mapping) — not ours.
