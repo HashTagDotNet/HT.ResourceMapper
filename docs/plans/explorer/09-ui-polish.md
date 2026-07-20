@@ -203,6 +203,30 @@ earlier slice, just add `position: relative;` to it rather than duplicating.)
 
 ## Execution notes
 
-_(Written after execution — record whether Cytoscape honored `1.25rem` or needed `20px`, the pan-sign
-outcome, dashed-edge behavior on a cycle, and commit hash(es). Then mark slice #9 done / slice #10
-next, and commit.)_
+Executed 2026-07-19/20. All three changes applied verbatim per the plan, with one deviation:
+
+- **Label unit:** `1.25rem` was tried first and confirmed broken — Cytoscape's style parser doesn't
+  recognize `rem`, drops the unit, and treats the bare number as raw pixels (`node.pstyle('font-size')`
+  resolved to `pfValue: 1.25`, i.e. ~1.25px — smaller than the original 11px, not bigger). Switched to
+  `'20px'`, confirmed resolving correctly (`pfValue: 20`) and visibly much larger in the browser.
+- **Pan signs:** all four verified correct as originally specified — no flips needed.
+  `PanAsync(0, 60)`=up, `PanAsync(0, -60)`=down, `PanAsync(60, 0)`=left, `PanAsync(-60, 0)`=right.
+  Confirmed via `cy.pan()` before/after values plus before/after screenshots.
+- **Dashed edges on the demo cycle:** correct on initial load (upstream dashed / downstream solid).
+  After fully expanding the demo's built-in cycle (`checkout → pricing → inventory → checkout`), the
+  direct `checkout→pricing` edge — originally solid/downstream — flips to dashed/upstream. This is an
+  inherent property of `seed.predecessors('edge')` (a full reverse-reachability traversal): once the
+  cycle closes, the seed becomes its own indirect predecessor through the loop, so the traversal
+  legitimately includes the direct downstream edge as part of a reverse path back to the seed. Not a
+  wiring bug — `applyEdgeStyles()` recomputes correctly on every graph change, verified via debug
+  instrumentation of `cy.edges()` at each expand step. Flagging for team awareness since it's a visible
+  quirk on this specific demo graph; no change made since it matches the plan's decided algorithm.
+- Zoom-in appeared to do nothing on a first click from a fresh demo load — the small seed graph's
+  initial `fit()` already sits at the pre-existing `maxZoom: 3` cap (unrelated, set in an earlier
+  slice), so there's nowhere to zoom further in until zoomed out first. Not a regression.
+
+`dotnet build` clean (sqlproj MSB4278 aside); `dotnet test` 410 total / 408 passed / 2 failed (the 2
+pre-existing unrelated `HT.Api.Service.Contracts.Tests` failures). Browser-driven via Playwright
+against `/explore/DEMOEXP-checkout` (demo data already seeded in localdb).
+
+Slice #9 (pass 1) done. Slice #10 (client settings migration) next.

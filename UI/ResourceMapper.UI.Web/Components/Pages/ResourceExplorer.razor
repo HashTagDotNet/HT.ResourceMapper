@@ -79,6 +79,24 @@
         <MudAlert Severity="Severity.Error" Class="ma-2">@_error</MudAlert>
     }
     <div class="rm-explorer-canvas" @ref="_canvasEl"></div>
+    <div class="rm-explorer-nav">
+        <MudIconButton Icon="@Icons.Material.Outlined.Add" Size="Size.Small" Variant="Variant.Filled"
+                       aria-label="Zoom in" OnClick="@(() => ZoomAsync(1.2))" />
+        <MudIconButton Icon="@Icons.Material.Outlined.Remove" Size="Size.Small" Variant="Variant.Filled"
+                       aria-label="Zoom out" OnClick="@(() => ZoomAsync(0.8))" />
+        <div class="rm-explorer-dpad">
+            <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp" Size="Size.Small"
+                           aria-label="Pan up" OnClick="@(() => PanAsync(0, 60))" />
+            <div class="rm-explorer-dpad-mid">
+                <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowLeft" Size="Size.Small"
+                               aria-label="Pan left" OnClick="@(() => PanAsync(60, 0))" />
+                <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowRight" Size="Size.Small"
+                               aria-label="Pan right" OnClick="@(() => PanAsync(-60, 0))" />
+            </div>
+            <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown" Size="Size.Small"
+                           aria-label="Pan down" OnClick="@(() => PanAsync(0, -60))" />
+        </div>
+    </div>
 </div>
 
 @code {
@@ -194,6 +212,8 @@
     }
 
     private async Task FitAsync() => await SafeInvokeAsync("fit");
+    private async Task ZoomAsync(double factor) => await SafeInvokeAsync("zoomBy", factor);
+    private async Task PanAsync(double dx, double dy) => await SafeInvokeAsync("panByDir", dx, dy);
 
     private async Task SaveAsync()
     {

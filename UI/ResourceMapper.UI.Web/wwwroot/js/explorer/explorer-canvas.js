@@ -19,7 +19,7 @@ export function init(hostEl, dotNetRef) {
                 'background-color': '#2563EB',
                 'label': 'data(label)',
                 'color': '#0f172a',
-                'font-size': '11px',
+                'font-size': '20px',
                 'text-valign': 'bottom',
                 'text-halign': 'center',
                 'text-margin-y': 4,
@@ -31,11 +31,15 @@ export function init(hostEl, dotNetRef) {
             { selector: 'node.seed',     style: { 'background-color': '#f59e0b', 'border-color': '#b45309' }},
             { selector: 'node.expanded', style: { 'border-color': '#16a34a', 'border-width': 3 }},
             { selector: 'edge', style: {
-                'width': 2,
+                'width': 1,
                 'line-color': '#94a3b8',
                 'target-arrow-color': '#94a3b8',
                 'target-arrow-shape': 'triangle',
+                'arrow-scale': 0.5,
                 'curve-style': 'bezier'
+            }},
+            { selector: 'edge.upstream', style: {
+                'line-style': 'dashed'
             }}
         ],
         layout: { name: 'grid' },
@@ -71,6 +75,15 @@ function labelFor(ele) {
 
 function applyLabels() {
     cy.nodes().forEach(n => n.data('label', labelFor(n)));
+}
+
+// Dash "upstream" edges (things that depend on the seed). Recompute after any graph change.
+function applyEdgeStyles() {
+    cy.edges().removeClass('upstream');
+    if (!seedId) return;
+    const seed = cy.getElementById(seedId);
+    if (seed.empty()) return;
+    seed.predecessors('edge').addClass('upstream');   // edges leading INTO the seed = upstream
 }
 
 export function setPreset(preset) {
@@ -163,6 +176,7 @@ export function addGraph(nodes, edges, seedUid, expandFromUid) {
         placeAround(expandFromUid, added);
     }
     applyLabels();
+    applyEdgeStyles();
 }
 
 function placeAround(parentUid, newUids) {
@@ -194,6 +208,7 @@ export function collapse(uid) {
     victims.remove();
     node.removeClass('expanded');
     applyLabels();
+    applyEdgeStyles();
 }
 
 export function collapseAll() {
@@ -201,6 +216,7 @@ export function collapseAll() {
     cy.nodes().filter(n => n.id() !== seedId).remove();
     cy.getElementById(seedId).removeClass('expanded');
     applyLabels();
+    applyEdgeStyles();
     fit();
     return cy.nodes().map(n => n.id());
 }
@@ -215,10 +231,21 @@ export function removeNode(uid) {
     const keep = seed.component();
     cy.nodes().not(keep).remove();
     applyLabels();
+    applyEdgeStyles();
     return cy.nodes().map(n => n.id());
 }
 
 export function fit() { if (cy) cy.fit(undefined, 30); }
+
+export function zoomBy(factor) {
+    if (!cy) return;
+    cy.zoom({ level: cy.zoom() * factor, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
+}
+
+export function panByDir(dx, dy) {
+    if (!cy) return;
+    cy.panBy({ x: dx, y: dy });
+}
 
 // ---- persistence (serialize / load) -------------------------------------
 
@@ -271,6 +298,7 @@ export function loadJson(json) {
         if (n.expanded) cy.getElementById(n.uid).addClass('expanded');
     }
     applyLabels();
+    applyEdgeStyles();
     fit();
 
     return (graph.nodes || []).filter(n => n.expanded).map(n => n.uid);
