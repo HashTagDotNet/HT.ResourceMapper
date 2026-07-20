@@ -140,8 +140,8 @@ function initMenu() {
                 { content: 'Remove',
                   select: () => dotNet.invokeMethodAsync('OnNodeRemoveRequested', uid) },
                 { content: 'Open link',
-                  enabled: !!url,
-                  select: () => { if (url) window.open(url, '_blank', 'noopener'); } },
+                  enabled: isHttpUrl(url),
+                  select: () => { if (isHttpUrl(url)) window.open(url, '_blank', 'noopener'); } },
                 { content: 'Open in Mapper',
                   select: () => window.open('/resources/' + encodeURIComponent(uid), '_blank', 'noopener') }
             ];
@@ -366,6 +366,14 @@ function escapeHtml(s) {
     return String(s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function isHttpUrl(u) {
+    if (!u) return false;
+    try {
+        const p = new URL(u);           // absolute only
+        return p.protocol === 'http:' || p.protocol === 'https:';
+    } catch (e) { return false; }
 }
 
 export function dispose() {

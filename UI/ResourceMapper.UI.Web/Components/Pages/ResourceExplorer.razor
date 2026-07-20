@@ -249,6 +249,7 @@
             _diagramUid = resp.ApiResponse.Data.DiagramUid;
             _shareId = resp.ApiResponse.Data.ShareId;
             _diagramName = name;
+            _isReadOnly = false;
             Snackbar.Add($"Saved “{name}”.", Severity.Success);
             StateHasChanged();
         }
@@ -260,6 +261,7 @@
 
     private async Task OpenAsync()
     {
+        _error = null;
         var parameters = new DialogParameters { ["ClientId"] = _clientId };
         var dialog = await DialogService.ShowAsync<OpenDiagramDialog>("Open diagram", parameters);
         var result = await dialog.Result;
@@ -283,8 +285,14 @@
         _preset = string.IsNullOrWhiteSpace(model.DisplayPreset) ? "nameType" : model.DisplayPreset;
 
         var expanded = await SafeInvokeResultAsync<string[]>("loadJson", model.DiagramJson);
+        if (expanded is null)
+        {
+            _error = "This diagram could not be loaded (corrupt data).";
+            StateHasChanged();
+            return;
+        }
         _expanded.Clear();
-        if (expanded is not null) foreach (var u in expanded) _expanded.Add(u);
+        foreach (var u in expanded) _expanded.Add(u);
 
         Snackbar.Add($"Opened “{model.Name}”.", Severity.Success);
         StateHasChanged();
@@ -292,6 +300,7 @@
 
     private async Task LoadSharedAsync(string shareId)
     {
+        _error = null;
         var resp = await DiagramService.GetByShareIdAsync(shareId, _clientId);
         if (!resp.IsSuccess() || resp.ApiResponse.Data is null)
         {
