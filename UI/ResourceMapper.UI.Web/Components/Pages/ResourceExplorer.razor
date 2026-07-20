@@ -2,6 +2,7 @@
 @using Microsoft.JSInterop
 @using ResourceMapper.Common.Server.Explorer.Interfaces
 @using ResourceMapper.Common.Shared.Explorer
+@using ResourceMapper.UI.Web.Explorer
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @inject IExplorerService ExplorerService
@@ -23,6 +24,17 @@
         <MudText Typo="Typo.caption" Class="ml-3 mud-text-secondary">
             Tap to expand / collapse · right-click for actions · drag to arrange
         </MudText>
+        <MudSpacer />
+        @if (!string.IsNullOrEmpty(_clientId))
+        {
+            <MudText Typo="Typo.caption" Class="mud-text-secondary mr-1">
+                Client: @(_clientId.Length >= 8 ? _clientId[..8] : _clientId)…
+            </MudText>
+            <MudTooltip Text="Copy your client id (carry it to another browser)">
+                <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
+                               aria-label="Copy client id" OnClick="CopyClientIdAsync" />
+            </MudTooltip>
+        }
     </div>
     @if (_error is not null)
     {
@@ -41,6 +53,7 @@
     private string? _error;
     private bool _initialized;
     private string _preset = "nameType";
+    private string _clientId = string.Empty;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -52,6 +65,9 @@
         _selfRef = DotNetObjectReference.Create(this);
         await SafeInvokeAsync("init", _canvasEl, _selfRef);
         await SafeInvokeAsync("setPreset", _preset);
+
+        _clientId = await ClientIdentity.GetOrCreateAsync(JS);
+        StateHasChanged();
 
         await LoadNodeAsync(ResourceUid, seed: true, expandFromUid: null);
         await SafeInvokeAsync("fit");
@@ -116,6 +132,13 @@
     {
         _preset = preset;
         await SafeInvokeAsync("setPreset", preset);
+    }
+
+    private async Task CopyClientIdAsync()
+    {
+        if (string.IsNullOrEmpty(_clientId)) return;
+        try { await JS.InvokeVoidAsync("navigator.clipboard.writeText", _clientId); }
+        catch { /* clipboard unavailable */ }
     }
 
     private static object NodePayload(string uid, string key, string name, string type, string? domain, string? url)
