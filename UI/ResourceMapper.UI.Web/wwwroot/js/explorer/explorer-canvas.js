@@ -11,6 +11,9 @@ let dotNet = null;
 let seedId = null;
 let tip = null;
 let menu = null;
+let overlayEl = null;
+let overlayTitle = '';
+let overlaySub = '';
 
 // ---- icon + color maps, data-URI helpers --------------------------------
 
@@ -132,6 +135,41 @@ export function init(hostEl, dotNetRef) {
 
     initTooltip(hostEl);
     initMenu();
+
+    overlayEl = document.createElement('div');
+    overlayEl.className = 'rm-explorer-title';
+    hostEl.appendChild(overlayEl);
+    renderOverlay();
+}
+
+// ---- title/date overlay (also composited into PNG/SVG/print exports) ----
+
+export function setTitle(title, subtitle) {
+    overlayTitle = title || '';
+    overlaySub = subtitle || '';
+    renderOverlay();
+}
+
+function subWithCount() {
+    const n = cy ? cy.nodes().length : 0;
+    const base = overlaySub || '';
+    return base + (base ? ' · ' : '') + n + ' resource' + (n === 1 ? '' : 's');
+}
+
+function renderOverlay() {
+    if (!overlayEl) return;
+    overlayEl.textContent = '';
+    if (overlayTitle) {
+        const h = document.createElement('div');
+        h.className = 'rm-title-h';
+        h.textContent = overlayTitle;
+        overlayEl.appendChild(h);
+    }
+    const s = document.createElement('div');
+    s.className = 'rm-title-sub';
+    s.textContent = subWithCount();
+    overlayEl.appendChild(s);
+    overlayEl.style.display = (overlayTitle || overlaySub) ? 'block' : 'none';
 }
 
 // ---- labeled state (caption visibility) ---------------------------------
@@ -310,6 +348,7 @@ export function addGraph(nodes, edges, seedUid, expandFromUid) {
     }
     applyLabeled();
     applyEdgeStyles();
+    renderOverlay();
 }
 
 // Fan newly-added neighbours out AWAY from the graph (outward from the seed through the parent),
@@ -356,6 +395,7 @@ export function collapse(uid) {
     node.removeClass('expanded');
     applyLabeled();
     applyEdgeStyles();
+    renderOverlay();
 }
 
 export function collapseAll() {
@@ -365,20 +405,22 @@ export function collapseAll() {
     applyLabeled();
     applyEdgeStyles();
     fit();
+    renderOverlay();
     return cy.nodes().map(n => n.id());
 }
 
 export function removeNode(uid) {
     const node = cy.getElementById(uid);
     if (node.empty()) return cy.nodes().map(n => n.id());
-    if (uid === seedId) { cy.elements().remove(); seedId = null; return []; }
+    if (uid === seedId) { cy.elements().remove(); seedId = null; renderOverlay(); return []; }
     node.remove();
     const seed = cy.getElementById(seedId);
-    if (seed.empty()) return cy.nodes().map(n => n.id());
+    if (seed.empty()) { renderOverlay(); return cy.nodes().map(n => n.id()); }
     const keep = seed.component();
     cy.nodes().not(keep).remove();
     applyLabeled();
     applyEdgeStyles();
+    renderOverlay();
     return cy.nodes().map(n => n.id());
 }
 
@@ -454,37 +496,98 @@ export function loadJson(json) {
     applyLabeled();
     applyEdgeStyles();
     fit();
+    renderOverlay();
 
     return (graph.nodes || []).filter(n => n.expanded).map(n => n.uid);
 }
 
-// ---- export -------------------------------------------------------------
+// ---- export ---------------------------------------------------------------
+// Cytoscape's cy.png()/cy.svg() capture the graph only; the exports below
+// composite the title/date overlay into a header band so the exported picture
+// is self-documenting (see docs/plans/explorer/09d-title-chrome.md).
+
+function loadImage(uri) {
+    return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = uri; });
+}
+
+// Render the graph PNG with a title/subtitle header band drawn above it. Returns a Blob.
+async function pngWithHeader(scale) {
+    const uri = cy.png({ output: 'base64uri', full: true, bg: '#ffffff', scale: scale });
+    const title = overlayTitle, sub = subWithCount();
+    const img = await loadImage(uri);
+    const padX = 16 * scale, padTop = 14 * scale, gap = 6 * scale, padBottom = 12 * scale;
+    const titleF = 20 * scale, subF = 12 * scale;
+    const headerH = (title || sub)
+        ? padTop + (title ? titleF : 0) + (title && sub ? gap : 0) + (sub ? subF : 0) + padBottom
+        : 0;
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height + headerH;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, headerH);
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    let y = padTop;
+    if (title) { ctx.fillStyle = '#0f172a'; ctx.font = '700 ' + titleF + 'px system-ui, sans-serif'; ctx.fillText(title, padX, y); y += titleF + gap; }
+    if (sub)   { ctx.fillStyle = '#64748b'; ctx.font = '400 ' + subF + 'px system-ui, sans-serif'; ctx.fillText(sub, padX, y); }
+    return await new Promise(res => canvas.toBlob(res, 'image/png'));
+}
+
+// Prepend a title/subtitle header into an SVG string (bumps height/viewBox, shifts content down).
+function svgWithHeader(svg) {
+    const title = overlayTitle, sub = subWithCount();
+    if (!title && !sub) return svg;
+    const headerH = 52;
+    const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const openMatch = svg.match(/^([\s\S]*?<svg[^>]*>)/);
+    if (!openMatch) return svg;
+    let open = openMatch[1];
+    const inner = svg.slice(open.length, svg.lastIndexOf('</svg>'));
+    const hM = open.match(/height="([\d.]+)"/);
+    if (hM) open = open.replace(/height="[\d.]+"/, 'height="' + (parseFloat(hM[1]) + headerH) + '"');
+    open = open.replace(/viewBox="([-\d.\s]+)"/, (m, vb) => {
+        const p = vb.trim().split(/\s+/).map(Number);
+        if (p.length === 4) p[3] = p[3] + headerH;
+        return 'viewBox="' + p.join(' ') + '"';
+    });
+    const header =
+        '<rect x="0" y="0" width="100%" height="' + headerH + '" fill="#ffffff"/>' +
+        '<text x="16" y="26" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="#0f172a">' + esc(title) + '</text>' +
+        '<text x="16" y="44" font-family="system-ui,sans-serif" font-size="12" fill="#64748b">' + esc(sub) + '</text>';
+    return open + header + '<g transform="translate(0,' + headerH + ')">' + inner + '</g></svg>';
+}
 
 export async function copyPng() {
     try {
-        const blob = cy.png({ output: 'blob', full: true, bg: '#ffffff', scale: 2 });
+        const blob = await pngWithHeader(2);
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
         return true;
     } catch (e) { return false; }
 }
 
-export function savePng(filename) {
-    const uri = cy.png({ output: 'base64uri', full: true, bg: '#ffffff', scale: 2 });
-    downloadUri(uri, (filename || 'diagram') + '.png');
+export async function savePng(filename) {
+    try {
+        const blob = await pngWithHeader(2);
+        const url = URL.createObjectURL(blob);
+        downloadUri(url, (filename || 'diagram') + '.png');
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (e) { /* ignore */ }
 }
 
 export function saveSvg(filename) {
-    const svg = cy.svg({ full: true, bg: '#ffffff' });   // cytoscape-svg extension
+    const svg = svgWithHeader(cy.svg({ full: true, bg: '#ffffff' }));   // cytoscape-svg extension
     const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
     downloadUri(url, (filename || 'diagram') + '.svg');
     setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 export function printDiagram() {
-    const svg = cy.svg({ full: true, bg: '#ffffff' });
+    const svg = svgWithHeader(cy.svg({ full: true, bg: '#ffffff' }));
     const w = window.open('', '_blank');
     if (!w) return;
-    w.document.write('<!doctype html><title>Diagram</title>' + svg);
+    w.document.write('<!doctype html><title>' + (overlayTitle || 'Diagram') + '</title>' + svg);
     w.document.close();
     w.focus();
     w.print();
@@ -532,6 +635,8 @@ export function dispose() {
     if (menu) { try { menu.destroy(); } catch (e) { /* extension teardown */ } menu = null; }
     if (tip && tip.parentNode) tip.parentNode.removeChild(tip);
     tip = null;
+    if (overlayEl && overlayEl.parentNode) overlayEl.parentNode.removeChild(overlayEl);
+    overlayEl = null;
     if (cy) { cy.destroy(); cy = null; }
     dotNet = null;
     seedId = null;

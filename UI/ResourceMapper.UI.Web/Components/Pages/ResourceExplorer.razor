@@ -111,6 +111,15 @@
     private string? _diagramUid;
     private string? _shareId;
     private string _diagramName = string.Empty;
+    private string _seedName = string.Empty;
+
+    private async Task UpdateTitleAsync()
+    {
+        var title = !string.IsNullOrWhiteSpace(_diagramName) ? _diagramName
+                  : (!string.IsNullOrWhiteSpace(_seedName) ? _seedName : "Resource Explorer");
+        var subtitle = $"Dependency report · {DateTime.Now:yyyy-MM-dd}";
+        await SafeInvokeAsync("setTitle", title, subtitle);
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -135,6 +144,7 @@
             await LoadNodeAsync(ResourceUid ?? string.Empty, seed: true, expandFromUid: null);
         }
         await SafeInvokeAsync("fit");
+        await UpdateTitleAsync();
     }
 
     private async Task LoadNodeAsync(string uid, bool seed, string? expandFromUid)
@@ -146,6 +156,7 @@
             return;
         }
         var node = response.ApiResponse.Data;
+        if (seed) { _seedName = node.ResourceName; }
 
         var nodes = new List<object>
         {
@@ -239,6 +250,7 @@
             _shareId = resp.ApiResponse.Data.ShareId;
             _diagramName = name;
             _isReadOnly = false;
+            await UpdateTitleAsync();
             Snackbar.Add($"Saved “{name}”.", Severity.Success);
             StateHasChanged();
         }
@@ -282,6 +294,7 @@
         }
         _expanded.Clear();
         foreach (var u in expanded) _expanded.Add(u);
+        await UpdateTitleAsync();
 
         Snackbar.Add($"Opened “{model.Name}”.", Severity.Success);
         StateHasChanged();
@@ -315,6 +328,7 @@
         }
         _expanded.Clear();
         foreach (var u in expanded) _expanded.Add(u);
+        await UpdateTitleAsync();
         StateHasChanged();
     }
 
@@ -328,6 +342,7 @@
             _shareId = resp.ApiResponse.Data.ShareId;
             _diagramName = $"{_diagramName} (copy)";   // matches the server-side default name
             _isReadOnly = false;
+            await UpdateTitleAsync();
             Snackbar.Add("Saved a copy to your diagrams.", Severity.Success);
             StateHasChanged();
         }
