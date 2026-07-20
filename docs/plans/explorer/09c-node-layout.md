@@ -257,6 +257,71 @@ function cssId(id) { return id.replace(/[^a-zA-Z0-9_-]/g, m => '\\' + m); }
 
 ## Execution notes
 
-_(After execution — record the final tuned canvas values (bg positions, node size, bounds-expansion),
-whether `breadthfirst` gave acceptable layering (or if a layout extension was needed), the export check
-result, and commit hash(es). Then proceed to 9d.)_
+**Files changed:** `UI/ResourceMapper.UI.Web/wwwroot/js/explorer/explorer-canvas.js` (reworked per
+§1), `UI/ResourceMapper.UI.Web/Components/Pages/ResourceExplorer.razor` (per §2).
+
+**Final tuned node style** (differs from the brief's starting point — see "gotcha" below):
+```javascript
+'width': 46, 'height': 46,
+'background-width':  ['20px', '180px'],   // icon 20x20, caption 180x36 (was 220x40)
+'background-height': ['20px', '36px'],
+'background-position-x': ['50%', '50%'],
+'background-position-y': ['28%', '50px'], // icon: percent; caption: FIXED PX (see gotcha)
+'background-clip': ['none', 'none'],
+'background-image-containment': ['inside', 'over'],
+'bounds-expansion': [10, 75, 50, 75]      // [top, right, bottom, left] — asymmetric
+```
+`captionUri()` emits a 180×36 SVG (was 220×40) with text baselines at y=15/y=30.
+
+**Gotcha — `background-position-y` percent can't place a caption below the node.** Cytoscape's
+`background-position-*` percent is *not* "where the image center sits as a fraction of node size
+measured from node top" — empirically (verified by reading back `cy.svg()` node `<image>`
+`transform` coordinates while sweeping the percent from 0–200% via the live `cy` instance), the
+image's **top-left** lands at `nodeTop + (pct/100) * (nodeHeight - imageHeight)`. When the image is
+nearly as tall as the node (our 40px caption vs. a 46px node), `(nodeHeight - imageHeight)` is a
+tiny range (6px), so **no percentage value can move the caption meaningfully below the circle** —
+percentages this way stayed within ~14px of the node regardless of value (30% and 128% produced
+nearly identical positions), which is why the first pass rendered the caption directly on top of
+the node instead of below it. Fix: use a **fixed pixel value** for the caption's
+`background-position-y` (verified `topLeftY = nodeTop + pxValue` directly, no range-scaling for
+px units) — `'50px'` puts a clean ~4px gap below the 46px-tall circle. The icon still uses a
+percent (`'28%'`) since it comfortably fits within the node's own box.
+
+**`bounds-expansion` must be asymmetric.** The 180-wide caption overhangs the 46px node by ~67px
+each side (left/right), and extends ~44px below (bottom); the icon needs no extra room (top). Used
+`[10, 75, 50, 75]` (`[top, right, bottom, left]` — confirmed this order empirically the same way).
+Verified via `cy.elements().boundingBox()` vs. the exported SVG's outer `<svg width/height>` that
+nothing is clipped (the SVG-export's outer `<g transform="translate(-x1,-y1)">` normalizes model
+coordinates into the declared canvas size — confirmed no image exceeds it).
+
+**Layout: `breadthfirst` was adequate.** On the `DEMOEXP-checkout` demo graph (seed + up to 2
+levels), directed `breadthfirst` produced a clean radial/ring layout — seed centered, one-hop
+neighbors in a ring around it, deeper nodes further out — with no overlapping nodes/labels and
+minimal edge crossings for a graph this size. It renders as **concentric rings**, not a strict
+top-down/left-right tree grid (that's cytoscape's default `breadthfirst` circular arrangement,
+since no explicit direction was requested) — still "layered" in the sense the brief wants (BFS
+distance from the seed = ring), and legible. **No `cytoscape-dagre` fallback was needed** for this
+dataset. If a future graph is large/dense enough to make the radial rings cross more, the dagre
+vendor is the documented fallback (not added — YAGNI).
+
+**Export check result — PASS.** Both **Save PNG** and **Save SVG** were driven via Playwright
+against `/explore/DEMOEXP-checkout`; both output files were opened/rendered in a browser and
+visually confirmed to contain: the color circles, white type icons, white short codes (APP/SVC/
+DB/SBQ), the amber seed ring, dashed thin upstream-edge arrows, and the seed's "Checkout Service /
+Service" caption — pixel-for-pixel matching the live canvas. Note: the exported **SVG embeds each
+node's baked background as a rasterized `<image>` (base64 PNG data-URI)**, not literal SVG
+`<text>`/`<image xlink:href="data:image/svg+xml...">` — cytoscape-svg rasterizes canvas-drawn
+node content on export, so a text-search assertion on the SVG XML (e.g. `/Checkout Service/`) will
+not match even though the rendered pixels do contain it; verification must render the file (or
+inspect the decoded PNG) rather than grep its text.
+
+**Deviations from the brief:**
+- Caption image sized 180×36 (not 220×40) and `background-position-y`/`bounds-expansion` tuned to
+  fixed-px/asymmetric values (not the brief's percent/uniform starting points) — required by the
+  gotcha above.
+- `currentPresetValue()` (dead/unused export) was dropped along with `currentPreset` — not
+  referenced by the Razor page or persistence path (`_preset` on the C# side is retained,
+  independent of the JS canvas, purely for `SaveDiagramRequest.DisplayPreset` round-tripping).
+
+**Commit:** see `git log` on `home-page` — "feat(ui): slice #9c — node rendering + layered layout"
+(hash recorded at commit time).

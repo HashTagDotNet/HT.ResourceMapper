@@ -1,13 +1,74 @@
 // Explorer canvas — thin wrapper over Cytoscape (global `cytoscape`) + the cxtmenu extension.
 // One instance per page. Graph state lives in the browser; C# pushes graph batches (addGraph) and
 // receives node events (tap / menu) via the DotNetObjectReference.
+//
+// Node rendering is entirely canvas-drawn (background-color + background-image(s) + label) so it
+// is captured by cy.png()/cy.svg() exports — HTML-overlay nodes would not be. See
+// docs/plans/explorer/09c-node-layout.md for the technique.
 
 let cy = null;
 let dotNet = null;
 let seedId = null;
-let currentPreset = 'nameType';   // 'name' | 'nameType' | 'detailed'
 let tip = null;
 let menu = null;
+
+// ---- icon + color maps, data-URI helpers --------------------------------
+
+// White type-icon glyphs keyed by ResourceType.IconKey (from slice 9b). Minimal, schematic.
+const ICON_PATHS = {
+    web:      '<rect x="3" y="4" width="18" height="13" rx="2"/><rect x="8" y="19" width="8" height="2"/>',
+    apps:     '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+    settings: '<circle cx="12" cy="12" r="6" fill="none" stroke="#fff" stroke-width="2.4"/><circle cx="12" cy="12" r="2"/>',
+    insights: '<rect x="3" y="13" width="4" height="8"/><rect x="10" y="8" width="4" height="13"/><rect x="17" y="3" width="4" height="18"/>',
+    memory:   '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4,6 v12 a8,3 0 0 0 16,0 v-12" fill="none" stroke="#fff" stroke-width="2.2"/>',
+    database: '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4,6 v12 a8,3 0 0 0 16,0 v-12" fill="none" stroke="#fff" stroke-width="2.2"/>',
+    bus:      '<rect x="3" y="6" width="18" height="4" rx="1"/><rect x="3" y="14" width="18" height="4" rx="1"/>',
+    queue:    '<rect x="3" y="5" width="18" height="3"/><rect x="3" y="10.5" width="18" height="3"/><rect x="3" y="16" width="18" height="3"/>',
+    hub:      '<circle cx="12" cy="12" r="3"/><circle cx="4" cy="4" r="2.4"/><circle cx="20" cy="4" r="2.4"/><circle cx="4" cy="20" r="2.4"/><circle cx="20" cy="20" r="2.4"/>',
+    folder:   '<path d="M3,6 h6 l2,2 h10 v11 h-18 z"/>',
+    dns:      '<circle cx="12" cy="12" r="8" fill="none" stroke="#fff" stroke-width="2.2"/><path d="M4,12 h16 M12,4 a12,8 0 0 0 0,16 a12,8 0 0 0 0,-16" fill="none" stroke="#fff" stroke-width="1.6"/>'
+};
+
+const TYPE_COLORS = {
+    web:'#2563EB', apps:'#2563EB', insights:'#7c3aed', memory:'#dc2626', database:'#4338ca',
+    bus:'#ea580c', queue:'#ea580c', settings:'#0d9488', hub:'#0891b2', folder:'#64748b', dns:'#0d9488'
+};
+function nodeColor(iconKey) { return TYPE_COLORS[iconKey] || '#2563EB'; }
+
+function svgDataUri(svg) {
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+
+const TRANSPARENT_PX = svgDataUri('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>');
+
+// The white type icon (or a neutral dot if the key is unknown / missing).
+function iconUri(iconKey) {
+    const body = ICON_PATHS[iconKey] || '<circle cx="12" cy="12" r="4"/>';
+    return svgDataUri('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#fff">' + body + '</svg>');
+}
+
+// The name (14 bold) + type (12) caption drawn as an SVG image (export-safe, two font sizes).
+// Sized/positioned to sit BELOW the node circle — see the node style's background-position-y /
+// bounds-expansion (tuned empirically; cytoscape's background-position-y percent is a "travel
+// range" of (nodeHeight - imageHeight), which is too narrow to place a near-node-height image
+// below the node, hence the caption uses a fixed px offset instead of a percent).
+function captionUri(name, type) {
+    const w = 180, h = 36;
+    const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return svgDataUri(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
+        '<text x="' + (w/2) + '" y="15" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="#0f172a">' + esc(name) + '</text>' +
+        '<text x="' + (w/2) + '" y="30" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#64748b">' + esc(type) + '</text>' +
+        '</svg>');
+}
+
+// Recompute a node's bg images from its data + labeled state.
+function nodeBgImages(n) {
+    const d = n.data();
+    const caption = n.hasClass('labeled') ? captionUri(d.name, d.type) : TRANSPARENT_PX;
+    return [d._icon, caption];
+}
+function refreshNode(n) { n.data('bgImages', nodeBgImages(n)); }
 
 export function init(hostEl, dotNetRef) {
     dotNet = dotNetRef;
@@ -16,20 +77,34 @@ export function init(hostEl, dotNetRef) {
         elements: [],
         style: [
             { selector: 'node', style: {
-                'background-color': '#2563EB',
-                'label': 'data(label)',
-                'color': '#0f172a',
-                'font-size': '20px',
-                'text-valign': 'bottom',
+                'shape': 'ellipse',
+                'background-color': 'data(color)',
+                'width': 46, 'height': 46,
+                'border-width': 2, 'border-color': '#1e293b',
+                'label': 'data(code)',
+                'color': '#fff',
+                'font-size': '11px',
+                'font-weight': 700,
+                'text-valign': 'center',
                 'text-halign': 'center',
-                'text-margin-y': 4,
-                'text-wrap': 'wrap',
-                'text-max-width': '140px',
-                'width': 30, 'height': 30,
-                'border-width': 2, 'border-color': '#1e3a8a'
+                // two background images: [type icon (always), name/type caption (labeled only)].
+                // Position/size tuned in-browser (see docs/plans/explorer/09c-node-layout.md execution
+                // notes): icon centered-upper inside the circle; caption anchored by a fixed px offset
+                // (not percent — see captionUri's comment) so it sits just below the circle with a
+                // small gap. bounds-expansion is asymmetric [top,right,bottom,left] to fit the wide
+                // caption's left/right overhang and its below-node extent without clipping renders/exports.
+                'background-image': 'data(bgImages)',
+                'background-image-crossorigin': 'anonymous',
+                'background-width':  ['20px', '180px'],
+                'background-height': ['20px', '36px'],
+                'background-position-x': ['50%', '50%'],
+                'background-position-y': ['28%', '50px'],
+                'background-clip': ['none', 'none'],
+                'background-image-containment': ['inside', 'over'],
+                'bounds-expansion': [10, 75, 50, 75]
             }},
-            { selector: 'node.seed',     style: { 'background-color': '#f59e0b', 'border-color': '#b45309' }},
-            { selector: 'node.expanded', style: { 'border-color': '#16a34a', 'border-width': 3 }},
+            { selector: 'node.seed',     style: { 'border-color': '#f59e0b', 'border-width': 4 }},
+            { selector: 'node.expanded', style: { 'border-style': 'double' }},
             { selector: 'edge', style: {
                 'width': 1,
                 'line-color': '#94a3b8',
@@ -51,30 +126,24 @@ export function init(hostEl, dotNetRef) {
         dotNet.invokeMethodAsync('OnNodeTapped', evt.target.id());
     });
 
+    cy.on('mouseover', 'node', e => { cy.scratch('_hover', e.target.id()); applyLabeled(); });
+    cy.on('mouseout',  'node', () => { cy.scratch('_hover', null); applyLabeled(); });
+    cy.on('select unselect', 'node', () => applyLabeled());
+
     initTooltip(hostEl);
     initMenu();
 }
 
-// ---- labels / presets ---------------------------------------------------
+// ---- labeled state (caption visibility) ---------------------------------
 
-function labelFor(ele) {
-    const d = ele.data();
-    const glyph = ele.hasClass('expanded') ? '▾ ' : '▸ ';
-    let body;
-    switch (currentPreset) {
-        case 'name':
-            body = d.name || d.uid; break;
-        case 'detailed':
-            body = [d.key, d.name, d.type, d.domain].filter(Boolean).join('\n'); break;
-        case 'nameType':
-        default:
-            body = (d.name || d.uid) + (d.type ? '\n' + d.type : ''); break;
-    }
-    return glyph + body;
-}
-
-function applyLabels() {
-    cy.nodes().forEach(n => n.data('label', labelFor(n)));
+// Seed + hovered + selected nodes get the caption; everyone else just the code+icon.
+function applyLabeled() {
+    const hoverId = cy.scratch('_hover');
+    cy.nodes().forEach(n => {
+        const on = n.hasClass('seed') || n.selected() || n.id() === hoverId;
+        if (on) n.addClass('labeled'); else n.removeClass('labeled');
+        refreshNode(n);
+    });
 }
 
 // Dash "upstream" edges (things that depend on the seed). Recompute after any graph change.
@@ -84,11 +153,6 @@ function applyEdgeStyles() {
     const seed = cy.getElementById(seedId);
     if (seed.empty()) return;
     seed.predecessors('edge').addClass('upstream');   // edges leading INTO the seed = upstream
-}
-
-export function setPreset(preset) {
-    currentPreset = preset;
-    applyLabels();
 }
 
 // ---- tooltip (plain positioned div, XSS-safe via textContent) ------------
@@ -149,6 +213,20 @@ function initMenu() {
     });
 }
 
+// ---- layout: layered tidy + Re-tidy + auto-fit ---------------------------
+
+function cssId(id) { return id.replace(/[^a-zA-Z0-9_-]/g, m => '\\' + m); }
+
+function runTidy() {
+    cy.layout({
+        name: 'breadthfirst', directed: true, roots: seedId ? '#' + cssId(seedId) : undefined,
+        spacingFactor: 1.3, padding: 30, animate: false
+    }).run();
+    fit();
+}
+
+export function reTidy() { runTidy(); }
+
 // ---- graph mutation ------------------------------------------------------
 
 export function addGraph(nodes, edges, seedUid, expandFromUid) {
@@ -157,8 +235,13 @@ export function addGraph(nodes, edges, seedUid, expandFromUid) {
         if (cy.getElementById(n.uid).empty()) {
             added.push(n.uid);
             cy.add({ group: 'nodes', data: {
-                id: n.uid, uid: n.uid, name: n.name, key: n.key,
-                type: n.type, domain: n.domain, url: n.primaryUrl
+                id: n.uid, uid: n.uid, name: n.name, key: n.key, type: n.type,
+                domain: n.domain, url: n.primaryUrl,
+                shortCode: n.shortCode, iconKey: n.iconKey,
+                code: n.shortCode || (n.type ? n.type.substr(0,3).toUpperCase() : '?'),
+                color: nodeColor(n.iconKey),
+                _icon: iconUri(n.iconKey),
+                bgImages: [iconUri(n.iconKey), TRANSPARENT_PX]
             }});
         }
     }
@@ -171,11 +254,12 @@ export function addGraph(nodes, edges, seedUid, expandFromUid) {
     if (seedUid) { seedId = seedUid; cy.getElementById(seedUid).addClass('seed'); }
 
     if (!expandFromUid) {
-        cy.layout({ name: 'cose', animate: false, padding: 30 }).run();
+        runTidy();
     } else if (added.length) {
         placeAround(expandFromUid, added);
+        fit();
     }
-    applyLabels();
+    applyLabeled();
     applyEdgeStyles();
 }
 
@@ -197,7 +281,7 @@ export function markExpanded(uid, expanded) {
     const n = cy.getElementById(uid);
     if (n.empty()) return;
     if (expanded) n.addClass('expanded'); else n.removeClass('expanded');
-    applyLabels();
+    applyLabeled();
 }
 
 export function collapse(uid) {
@@ -207,7 +291,7 @@ export function collapse(uid) {
         n.degree(false) === 1 && !n.hasClass('seed') && !n.hasClass('expanded'));
     victims.remove();
     node.removeClass('expanded');
-    applyLabels();
+    applyLabeled();
     applyEdgeStyles();
 }
 
@@ -215,7 +299,7 @@ export function collapseAll() {
     if (!seedId) return [];
     cy.nodes().filter(n => n.id() !== seedId).remove();
     cy.getElementById(seedId).removeClass('expanded');
-    applyLabels();
+    applyLabeled();
     applyEdgeStyles();
     fit();
     return cy.nodes().map(n => n.id());
@@ -230,7 +314,7 @@ export function removeNode(uid) {
     if (seed.empty()) return cy.nodes().map(n => n.id());
     const keep = seed.component();
     cy.nodes().not(keep).remove();
-    applyLabels();
+    applyLabeled();
     applyEdgeStyles();
     return cy.nodes().map(n => n.id());
 }
@@ -252,13 +336,14 @@ export function panByDir(dx, dy) {
 function serialize() {
     return {
         seedUid: seedId,
-        preset: currentPreset,
         nodes: cy.nodes().map(n => {
             const p = n.position();
             const d = n.data();
             return {
                 uid: n.id(), name: d.name, key: d.key, type: d.type,
-                domain: d.domain, url: d.url, x: p.x, y: p.y,
+                domain: d.domain, url: d.url,
+                shortCode: d.shortCode, iconKey: d.iconKey,
+                x: p.x, y: p.y,
                 expanded: n.hasClass('expanded')
             };
         }),
@@ -280,12 +365,18 @@ export function loadJson(json) {
 
     cy.elements().remove();
     seedId = graph.seedUid || null;
-    currentPreset = graph.preset || 'nameType';
 
     const els = [];
     for (const n of graph.nodes || []) {
         els.push({ group: 'nodes',
-            data: { id: n.uid, uid: n.uid, name: n.name, key: n.key, type: n.type, domain: n.domain, url: n.url },
+            data: {
+                id: n.uid, uid: n.uid, name: n.name, key: n.key, type: n.type, domain: n.domain, url: n.url,
+                shortCode: n.shortCode, iconKey: n.iconKey,
+                code: n.shortCode || (n.type ? n.type.substr(0,3).toUpperCase() : '?'),
+                color: nodeColor(n.iconKey),
+                _icon: iconUri(n.iconKey),
+                bgImages: [iconUri(n.iconKey), TRANSPARENT_PX]
+            },
             position: { x: n.x, y: n.y } });
     }
     for (const e of graph.edges || []) {
@@ -297,14 +388,12 @@ export function loadJson(json) {
     for (const n of graph.nodes || []) {
         if (n.expanded) cy.getElementById(n.uid).addClass('expanded');
     }
-    applyLabels();
+    applyLabeled();
     applyEdgeStyles();
     fit();
 
     return (graph.nodes || []).filter(n => n.expanded).map(n => n.uid);
 }
-
-export function currentPresetValue() { return currentPreset; }
 
 // ---- export -------------------------------------------------------------
 

@@ -46,13 +46,8 @@
         </MudTooltip>
         <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
                    StartIcon="@Icons.Material.Outlined.UnfoldLess" OnClick="CollapseAllAsync">Collapse all</MudButton>
-        <MudSelect T="string" Value="_preset" ValueChanged="OnPresetChanged"
-                   Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined"
-                   Class="ml-2" Style="max-width:170px" Label="Display">
-            <MudSelectItem Value="@("name")">Name only</MudSelectItem>
-            <MudSelectItem Value="@("nameType")">Name + Type</MudSelectItem>
-            <MudSelectItem Value="@("detailed")">Detailed</MudSelectItem>
-        </MudSelect>
+        <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
+                   StartIcon="@Icons.Material.Outlined.AutoFixHigh" OnClick="ReTidyAsync">Re-tidy</MudButton>
         <MudSpacer />
         <MudText Typo="Typo.body2" Class="mr-3">
             @(string.IsNullOrWhiteSpace(_diagramName) ? "(unsaved)" : _diagramName)
@@ -126,7 +121,6 @@
             "import", "/js/explorer/explorer-canvas.js");
         _selfRef = DotNetObjectReference.Create(this);
         await SafeInvokeAsync("init", _canvasEl, _selfRef);
-        await SafeInvokeAsync("setPreset", _preset);
 
         _clientId = await ClientIdentity.GetOrCreateAsync(JS);
         StateHasChanged();
@@ -155,12 +149,12 @@
 
         var nodes = new List<object>
         {
-            NodePayload(node.ResourceUid, node.ResourceKey, node.ResourceName, node.ResourceType, node.Domain, node.PrimaryUrl)
+            NodePayload(node.ResourceUid, node.ResourceKey, node.ResourceName, node.ResourceType, node.Domain, node.PrimaryUrl, node.ShortCode, node.IconKey)
         };
         var edges = new List<object>();
         foreach (var n in node.Neighbors)
         {
-            nodes.Add(NodePayload(n.ResourceUid, n.ResourceKey, n.ResourceName, n.ResourceType, n.Domain, n.PrimaryUrl));
+            nodes.Add(NodePayload(n.ResourceUid, n.ResourceKey, n.ResourceName, n.ResourceType, n.Domain, n.PrimaryUrl, n.ShortCode, n.IconKey));
             var src = n.Direction == "DependsOn" ? node.ResourceUid : n.ResourceUid;
             var tgt = n.Direction == "DependsOn" ? n.ResourceUid : node.ResourceUid;
             edges.Add(new { source = src, target = tgt });
@@ -198,12 +192,6 @@
         _expanded.Clear();
     }
 
-    private async Task OnPresetChanged(string preset)
-    {
-        _preset = preset;
-        await SafeInvokeAsync("setPreset", preset);
-    }
-
     private async Task CopyClientIdAsync()
     {
         if (string.IsNullOrEmpty(_clientId)) return;
@@ -214,6 +202,7 @@
     private async Task FitAsync() => await SafeInvokeAsync("fit");
     private async Task ZoomAsync(double factor) => await SafeInvokeAsync("zoomBy", factor);
     private async Task PanAsync(double dx, double dy) => await SafeInvokeAsync("panByDir", dx, dy);
+    private async Task ReTidyAsync() => await SafeInvokeAsync("reTidy");
 
     private async Task SaveAsync()
     {
@@ -380,8 +369,8 @@
         return string.IsNullOrWhiteSpace(clean) ? "diagram" : clean;
     }
 
-    private static object NodePayload(string uid, string key, string name, string type, string? domain, string? url)
-        => new { uid, key, name, type, domain, primaryUrl = url };
+    private static object NodePayload(string uid, string key, string name, string type, string? domain, string? url, string? shortCode, string? iconKey)
+        => new { uid, key, name, type, domain, primaryUrl = url, shortCode, iconKey };
 
     private async Task SafeInvokeAsync(string identifier, params object?[] args)
     {
