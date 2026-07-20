@@ -40,7 +40,8 @@ Every task's requirements implicitly include these:
 | 6 | **Client identity (localStorage)** | `clientId` GUID **get-or-create in `localStorage` via JS interop** (deferred past prerender; matches `Home.razor`), exposed as a small reusable helper the explorer page uses; optional "copy recovery key". **Not** a cookie/middleware primitive (see design §7.1). | 2 | Planned |
 | 7 | **Persist / Open / Share UI** | Floating **toolbar**; serialize canvas ⇄ `DiagramJson`; **Save / Save-As / Open-Recent / Delete** (slice 5, passing `clientId` from slice 6); **share link** `/explore/shared/{ShareId}` → read-only load; **"Save a copy to mine"** (clone under caller's `clientId`). | 3,4,5,6 | Planned |
 | 8 | **Export** | **Copy PNG to clipboard**, **Save PNG** (`cy.png`), **Save SVG** (`cytoscape-svg`), and browser **Print → PDF**. | 2 | Planned |
-| 9 | **Client settings migration** *(last)* | `ClientSetting` table (`ClientId`, `SettingKey`, `SettingJson`) + sprocs + `IClientSettingsService`, reusing slice-6 `clientId`; migrate the **home grid filters/view** off ad-hoc `localStorage` (`Home.razor`) to the server. | 5,6 | Planned |
+| 9 | **UI polish** | Collect **the user's UI adjustments** (gathered when this slice starts — I ask for the list then) and apply them across the explorer UI: canvas chrome, spacing, colors, node styling, toolbar/menu layout, labels, and any visual refinements not tied to a feature slice. Placed late so the whole UI can be tuned holistically. | 2,3,4,7,8 | Planned |
+| 10 | **Client settings migration** *(last)* | `ClientSetting` table (`ClientId`, `SettingKey`, `SettingJson`) + sprocs + `IClientSettingsService`, reusing slice-6 `clientId`; migrate the **home grid filters/view** off ad-hoc `localStorage` (`Home.razor`) to the server. | 5,6 | Planned |
 
 ---
 
@@ -66,5 +67,6 @@ Carried from the design spec's non-goals — parked for future stories:
 - The DB project is `Database/HTResourceMapperDb`; app DB is `(localdb)\MSSQLLocalDB\ResourceMapper`. It builds in **VS/full MSBuild**, not `dotnet build`; publish **with `/p:DropObjectsNotInSource=True`**.
 - Sprocs/repos are verified by manual `sqlcmd` exercises + a throwaway in-process smoke test (deleted before commit), not committed DB integration tests — same as the editor slices.
 - Per-slice plan docs are added here as `NN-<slug>.md` and linked from the table **when each slice starts**.
+- **UI adjustments** the user raises before slice 9 are parked into **slice 9 (UI polish)** rather than applied ad-hoc mid-slice; I ask for the full list when that slice starts.
 - **Engine:** Cytoscape.js + MIT extensions, decided at plan time (see design spec §10). Vendored under `wwwroot/js/explorer/` — **no CDN scripts** (the app loads only local `_content`/`_framework` scripts today; the one external ref is a Google Fonts stylesheet).
 - End each slice by moving its plan doc into place, flipping status in this table, and committing.
