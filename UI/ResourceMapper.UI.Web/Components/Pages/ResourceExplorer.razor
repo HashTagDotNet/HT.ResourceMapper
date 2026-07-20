@@ -1,0 +1,103 @@
+@page "/explore/{ResourceUid}"
+@using Microsoft.JSInterop
+@using ResourceMapper.Common.Server.Explorer.Interfaces
+@using ResourceMapper.Common.Shared.Explorer
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject IExplorerService ExplorerService
+
+<PageTitle>Explorer</PageTitle>
+
+<div class="rm-explorer-host">
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="ma-2">@_error</MudAlert>
+    }
+    <div class="rm-explorer-canvas" @ref="_canvasEl"></div>
+</div>
+
+@code {
+    [Parameter] public string ResourceUid { get; set; } = string.Empty;
+
+    private ElementReference _canvasEl;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<ResourceExplorer>? _selfRef;
+    private readonly HashSet<string> _expanded = new();
+    private string? _error;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+
+        // Absolute path so the module resolves the same from any /explore/{uid} route.
+        _module = await JS.InvokeAsync<IJSObjectReference>(
+            "import", "/js/explorer/explorer-canvas.js");
+        _selfRef = DotNetObjectReference.Create(this);
+        await _module.InvokeVoidAsync("init", _canvasEl, _selfRef);
+
+        await LoadNodeAsync(ResourceUid, seed: true);
+        await _module.InvokeVoidAsync("fit");
+    }
+
+    private async Task LoadNodeAsync(string uid, bool seed)
+    {
+        var response = await ExplorerService.GetNodeAsync(uid);
+        if (!response.IsSuccess() || response.ApiResponse.Data is null)
+        {
+            if (seed) { _error = $"Resource '{uid}' not found."; StateHasChanged(); }
+            return;
+        }
+        var node = response.ApiResponse.Data;
+
+        var nodes = new List<object>
+        {
+            NodePayload(node.ResourceUid, node.ResourceKey, node.ResourceName, node.ResourceType, node.Domain, node.PrimaryUrl)
+        };
+        var edges = new List<object>();
+        foreach (var n in node.Neighbors)
+        {
+            nodes.Add(NodePayload(n.ResourceUid, n.ResourceKey, n.ResourceName, n.ResourceType, n.Domain, n.PrimaryUrl));
+            // Edge points dependent -> dependency.
+            var src = n.Direction == "DependsOn" ? node.ResourceUid : n.ResourceUid;
+            var tgt = n.Direction == "DependsOn" ? n.ResourceUid : node.ResourceUid;
+            edges.Add(new { source = src, target = tgt });
+        }
+
+        await _module!.InvokeVoidAsync("addGraph", nodes, edges, seed ? uid : null);
+        _expanded.Add(uid);
+        await _module.InvokeVoidAsync("markExpanded", uid, true);
+    }
+
+    [JSInvokable]
+    public async Task OnNodeTapped(string uid)
+    {
+        if (_expanded.Contains(uid))
+        {
+            await _module!.InvokeVoidAsync("collapse", uid);
+            _expanded.Remove(uid);
+        }
+        else
+        {
+            await LoadNodeAsync(uid, seed: false);
+        }
+    }
+
+    private static object NodePayload(string uid, string key, string name, string type, string? domain, string? url)
+        => new { uid, key, name, type, domain, primaryUrl = url };
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_module is not null)
+            {
+                await _module.InvokeVoidAsync("dispose");
+                await _module.DisposeAsync();
+            }
+        }
+        catch { /* circuit already torn down — nothing to clean up */ }
+        _selfRef?.Dispose();
+    }
+}

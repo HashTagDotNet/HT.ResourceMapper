@@ -284,3 +284,18 @@ html, body {
 .rm-deps-picker {
     max-width: 400px;
 }
+
+/* Resource Explorer canvas */
+.rm-explorer-host {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+.rm-explorer-canvas {
+    width: 100%;
+    height: calc(100vh - 180px);
+    min-height: 420px;
+    border: 1px solid var(--mud-palette-lines-default, #e2e8f0);
+    border-radius: 8px;
+    background: #f8fafc;
+}

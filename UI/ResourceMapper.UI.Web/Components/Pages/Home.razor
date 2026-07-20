@@ -99,6 +99,11 @@
                                        aria-label="Open details"
                                        OnClick="@(() => OpenDetails(context.Item.ResourceUid))" />
                     </MudTooltip>
+                    <MudTooltip Text="Explore dependencies">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Schema" Size="Size.Small"
+                                       aria-label="Explore dependencies"
+                                       OnClick="@(() => Explore(context.Item.ResourceUid))" />
+                    </MudTooltip>
                     <MudTooltip Text="Copy details link">
                         <MudIconButton Icon="@Icons.Material.Outlined.Share" Size="Size.Small"
                                        aria-label="Copy details link"
@@ -330,6 +335,9 @@
 
     private void OpenDetails(string uid) =>
         Navigation.NavigateTo($"{DetailRoute}/{uid}");
+
+    private void Explore(string uid) =>
+        Navigation.NavigateTo($"/explore/{uid}");
 
     private async Task CopyDetailsLink(string uid)
     {
