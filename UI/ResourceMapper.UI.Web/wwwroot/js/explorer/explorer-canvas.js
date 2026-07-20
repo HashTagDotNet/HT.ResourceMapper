@@ -106,11 +106,11 @@ export function init(hostEl, dotNetRef) {
             { selector: 'node.seed',     style: { 'border-color': '#f59e0b', 'border-width': 4 }},
             { selector: 'node.expanded', style: { 'border-style': 'double' }},
             { selector: 'edge', style: {
-                'width': 1,
+                'width': 2,
                 'line-color': '#94a3b8',
                 'target-arrow-color': '#94a3b8',
                 'target-arrow-shape': 'triangle',
-                'arrow-scale': 0.5,
+                'arrow-scale': 1.3,
                 'curve-style': 'bezier'
             }},
             { selector: 'edge.upstream', style: {
@@ -155,39 +155,88 @@ function applyEdgeStyles() {
     seed.predecessors('edge').addClass('upstream');   // edges leading INTO the seed = upstream
 }
 
-// ---- tooltip (plain positioned div, XSS-safe via textContent) ------------
+// ---- tooltip (interactive card: metadata + action links; XSS-safe) -------
+// Node hover -> metadata + clickable "Open in Azure" / "Open in Resource Mapper" (real anchors:
+// discoverable, launch reliably without popup-block, open new tabs so the explorer stays put).
+// Edge hover -> 3-line "source / depends on / target". The card is interactive: it lingers while
+// the cursor is on it (delayed hide) so links are clickable.
+
+let tipHideTimer = null;
 
 function initTooltip(container) {
     tip = document.createElement('div');
     tip.className = 'rm-explorer-tip';
     tip.style.display = 'none';
     container.appendChild(tip);
-    cy.on('mouseover', 'node', evt => showTip(evt.target));
-    cy.on('mouseout', 'node', hideTip);
+    cy.on('mouseover', 'node', evt => showNodeTip(evt.target));
+    cy.on('mouseout', 'node', scheduleHideTip);
+    cy.on('mouseover', 'edge', evt => showEdgeTip(evt.target, evt.renderedPosition));
+    cy.on('mouseout', 'edge', scheduleHideTip);
     cy.on('pan zoom drag', hideTip);
+    tip.addEventListener('mouseenter', cancelHideTip);
+    tip.addEventListener('mouseleave', hideTip);
 }
 
-function showTip(node) {
+function tipLine(text, cls) {
+    const d = document.createElement('div');
+    if (cls) d.className = cls;
+    d.textContent = text;
+    return d;
+}
+
+function tipLink(label, href) {
+    const a = document.createElement('a');
+    a.textContent = label;
+    a.setAttribute('href', href);
+    a.setAttribute('target', '_blank');
+    a.setAttribute('rel', 'noopener noreferrer');
+    a.className = 'rm-tip-link';
+    return a;
+}
+
+function showNodeTip(node) {
     if (!tip) return;
+    cancelHideTip();
     const d = node.data();
     tip.textContent = '';
-    const rows = [['Name', d.name], ['Key', d.key], ['Type', d.type], ['Domain', d.domain], ['Link', d.url]];
-    for (const [k, v] of rows) {
+    tip.appendChild(tipLine(d.name || d.uid, 'rm-tip-name'));
+    for (const [k, v] of [['Type', d.type], ['Key', d.key], ['Domain', d.domain]]) {
         if (!v) continue;
         const row = document.createElement('div');
-        const b = document.createElement('strong');
-        b.textContent = k + ': ';
-        row.appendChild(b);
-        row.appendChild(document.createTextNode(v));
+        row.className = 'rm-tip-meta';
+        const b = document.createElement('strong'); b.textContent = k + ': ';
+        row.appendChild(b); row.appendChild(document.createTextNode(v));
         tip.appendChild(row);
     }
-    const p = node.renderedPosition();
-    tip.style.left = (p.x + 16) + 'px';
-    tip.style.top = (p.y + 16) + 'px';
+    const actions = document.createElement('div');
+    actions.className = 'rm-tip-actions';
+    if (isHttpUrl(d.url)) actions.appendChild(tipLink('Open in Azure ↗', d.url));
+    actions.appendChild(tipLink('Open in Resource Mapper ↗', '/resources/' + encodeURIComponent(d.uid)));
+    tip.appendChild(actions);
+    positionTip(node.renderedPosition());
+}
+
+function showEdgeTip(edge, pos) {
+    if (!tip) return;
+    cancelHideTip();
+    const s = cy.getElementById(edge.data('source'));
+    const t = cy.getElementById(edge.data('target'));
+    tip.textContent = '';
+    tip.appendChild(tipLine(!s.empty() ? (s.data('name') || edge.data('source')) : edge.data('source'), 'rm-tip-name'));
+    tip.appendChild(tipLine('depends on', 'rm-tip-rel'));
+    tip.appendChild(tipLine(!t.empty() ? (t.data('name') || edge.data('target')) : edge.data('target'), 'rm-tip-name'));
+    positionTip(pos || edge.renderedMidpoint());
+}
+
+function positionTip(p) {
+    tip.style.left = (p.x + 14) + 'px';
+    tip.style.top = (p.y + 14) + 'px';
     tip.style.display = 'block';
 }
 
-function hideTip() { if (tip) tip.style.display = 'none'; }
+function scheduleHideTip() { cancelHideTip(); tipHideTimer = setTimeout(hideTip, 240); }
+function cancelHideTip() { if (tipHideTimer) { clearTimeout(tipHideTimer); tipHideTimer = null; } }
+function hideTip() { cancelHideTip(); if (tip) tip.style.display = 'none'; }
 
 // ---- right-click menu ----------------------------------------------------
 
@@ -263,16 +312,30 @@ export function addGraph(nodes, edges, seedUid, expandFromUid) {
     applyEdgeStyles();
 }
 
+// Fan newly-added neighbours out AWAY from the graph (outward from the seed through the parent),
+// spaced so they don't stack on one line; radius grows with count.
 function placeAround(parentUid, newUids) {
     const parent = cy.getElementById(parentUid);
     if (parent.empty()) return;
+    const count = newUids.length;
+    if (!count) return;
     const p = parent.position();
-    const radius = 150;
-    const count = Math.max(newUids.length, 1);
+
+    // Outward direction: from the seed toward the parent (so new nodes push away from the graph).
+    let base = -Math.PI / 2;
+    const seed = seedId ? cy.getElementById(seedId) : null;
+    if (seed && !seed.empty() && seed.id() !== parentUid) {
+        const sp = seed.position();
+        if (sp.x !== p.x || sp.y !== p.y) base = Math.atan2(p.y - sp.y, p.x - sp.x);
+    }
+
+    const radius = 150 + count * 26;                         // more neighbours -> push further out
+    const span = Math.min(Math.PI * 1.5, (count - 1) * (Math.PI / 7)); // fan up to ~270°, ~26° apart
+    const start = base - span / 2;
     newUids.forEach((uid, i) => {
         const node = cy.getElementById(uid);
         if (node.empty()) return;
-        const angle = (2 * Math.PI * i) / count - Math.PI / 2;
+        const angle = count === 1 ? base : start + (span * i) / (count - 1);
         node.position({ x: p.x + radius * Math.cos(angle), y: p.y + radius * Math.sin(angle) });
     });
 }
