@@ -27,6 +27,8 @@ BEGIN
         r.ResourceKey,
         r.ResourceName,
         rt.TypeName    AS ResourceType,
+        rt.ShortCode   AS ShortCode,
+        rt.IconKey     AS IconKey,
         dt.TagValue    AS Domain,
         purl.TagValue  AS PrimaryUrl
     FROM [HTResourceMapper].[Resource] r
@@ -46,6 +48,8 @@ BEGIN
         other.ResourceKey,
         other.ResourceName,
         rt.TypeName    AS ResourceType,
+        rt.ShortCode   AS ShortCode,
+        rt.IconKey     AS IconKey,
         dt.TagValue    AS Domain,
         purl.TagValue  AS PrimaryUrl
     FROM [HTResourceMapper].[ResourceRelationship] rel
@@ -66,6 +70,8 @@ BEGIN
         other.ResourceKey,
         other.ResourceName,
         rt.TypeName    AS ResourceType,
+        rt.ShortCode   AS ShortCode,
+        rt.IconKey     AS IconKey,
         dt.TagValue    AS Domain,
         purl.TagValue  AS PrimaryUrl
     FROM [HTResourceMapper].[ResourceRelationship] rel

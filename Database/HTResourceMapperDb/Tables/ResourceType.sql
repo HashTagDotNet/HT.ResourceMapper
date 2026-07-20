@@ -7,7 +7,9 @@
     ,TypeName NVARCHAR(250) NOT NULL
         CONSTRAINT [UK_ResourceType_TypeName] UNIQUE
     ,AllowCustomTags BIT NOT NULL
-        CONSTRAINT [DF_ResourceType_AllowCustomTags] DEFAULT (1)    
+        CONSTRAINT [DF_ResourceType_AllowCustomTags] DEFAULT (1)
+    ,[ShortCode] VARCHAR(10) NULL
+    ,[IconKey] VARCHAR(40) NULL
     ,[CreatedOn] DateTime2(0) NOT NULL
         CONSTRAINT [DF_ResourceType_CreatedOn] DEFAULT  (SYSUTCDATETIME())
     ,[UpdatedOn] DateTime2(0) NULL

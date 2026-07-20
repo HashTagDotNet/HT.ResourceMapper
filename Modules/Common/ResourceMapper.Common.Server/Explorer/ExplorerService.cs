@@ -44,6 +44,8 @@ namespace ResourceMapper.Common.Server.Explorer
                     ResourceKey = self.ResourceKey,
                     ResourceName = self.ResourceName,
                     ResourceType = self.ResourceType,
+                    ShortCode = self.ShortCode,
+                    IconKey = self.IconKey,
                     Domain = self.Domain,
                     PrimaryUrl = self.PrimaryUrl,
                     Neighbors = rows
@@ -55,6 +57,8 @@ namespace ResourceMapper.Common.Server.Explorer
                             ResourceKey = r.ResourceKey,
                             ResourceName = r.ResourceName,
                             ResourceType = r.ResourceType,
+                            ShortCode = r.ShortCode,
+                            IconKey = r.IconKey,
                             Domain = r.Domain,
                             PrimaryUrl = r.PrimaryUrl
                         })

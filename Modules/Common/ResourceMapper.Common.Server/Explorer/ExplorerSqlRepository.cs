@@ -29,6 +29,8 @@ namespace ResourceMapper.Common.Server.Explorer
                 ResourceKey = dr.ReadString("ResourceKey"),
                 ResourceName = dr.ReadString("ResourceName"),
                 ResourceType = dr.ReadString("ResourceType"),
+                ShortCode = dr.ReadString("ShortCode"),
+                IconKey = dr.ReadString("IconKey"),
                 Domain = dr.ReadString("Domain"),
                 PrimaryUrl = dr.ReadString("PrimaryUrl")
             }, cancellationToken: cancellationToken);

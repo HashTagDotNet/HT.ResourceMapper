@@ -55,7 +55,7 @@ namespace ResourceMapper.Common.Server.Tests.Explorer
             _repo.Setup(r => r.GetForExplorerAsync("root", It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<ExplorerNodeRow>
                 {
-                    Row("Self", "root", "root-key", "Root", "Service", "prod", "https://portal/root"),
+                    Row("Self", "root", "root-key", "Root", "Service", "prod", "https://portal/root", "APP", "web"),
                     Row("DependsOn", "dep1", "dep1-key", "Dep One", "Queue", "prod", "https://portal/dep1"),
                     Row("DependentOn", "up1", "up1-key", "Upstream One", "App", null, null)
                 });
@@ -66,6 +66,8 @@ namespace ResourceMapper.Common.Server.Tests.Explorer
             var data = response.ApiResponse.Data!;
             data.ResourceUid.Should().Be("root", "because the Self row is the center node");
             data.PrimaryUrl.Should().Be("https://portal/root", "because the center node's primary url is projected");
+            data.ShortCode.Should().Be("APP", "because the center node's type short code is projected");
+            data.IconKey.Should().Be("web", "because the center node's type icon key is projected");
             data.Neighbors.Should().HaveCount(2, "because both non-Self rows become neighbours");
             data.Neighbors.Should().Contain(n => n.ResourceUid == "dep1" && n.Direction == "DependsOn",
                 "because out-edges are DependsOn neighbours");
@@ -93,13 +95,15 @@ namespace ResourceMapper.Common.Server.Tests.Explorer
         #region helpers
 
         private static ExplorerNodeRow Row(string direction, string uid, string key, string name,
-            string type, string? domain, string? primaryUrl) => new()
+            string type, string? domain, string? primaryUrl, string? shortCode = null, string? iconKey = null) => new()
         {
             Direction = direction,
             ResourceUid = uid,
             ResourceKey = key,
             ResourceName = name,
             ResourceType = type,
+            ShortCode = shortCode,
+            IconKey = iconKey,
             Domain = domain,
             PrimaryUrl = primaryUrl
         };

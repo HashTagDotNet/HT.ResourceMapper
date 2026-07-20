@@ -11,6 +11,8 @@ namespace ResourceMapper.Common.Shared.Explorer
         public string ResourceKey { get; set; } = string.Empty;
         public string ResourceName { get; set; } = string.Empty;
         public string ResourceType { get; set; } = string.Empty;
+        public string? ShortCode { get; set; }
+        public string? IconKey { get; set; }
         public string? Domain { get; set; }
         public string? PrimaryUrl { get; set; }
     }

@@ -110,6 +110,7 @@
     <None Include="Scripts\02_Seed_PropertyTypes.sql" />
     <None Include="Scripts\03_Seed_SystemTags.sql" />
     <None Include="Scripts\04_Seed_All.sql" />
+    <None Include="Scripts\05_Seed_ResourceTypeCodes.sql" />
     <None Include="Scripts\Demo_Insert_ResourceItemsForGrid.sql" />
     <None Include="Scripts\Demo_Purge_ResourceItemsForGrid.sql" />
     <None Include="Scripts\Demo_Insert_ExplorerGraph.sql" />
