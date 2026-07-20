@@ -1,0 +1,109 @@
+<h2>Full page — everything assembled</h2>
+<p class="subtitle">
+  The whole explorer with every decision applied: <b>B nodes</b> (icon + code, color by type),
+  <b>tidy layered layout</b> (upstream-left <b>dashed</b> "depends on seed" → seed → downstream-right <b>solid</b>),
+  <b>floating title + date overlay</b>, thin toolbar, one <b>hovered</b> node showing its name/type,
+  an <b>edge hover "depends on"</b> tooltip, and the zoom/pan pad. This is the target look — "polished, just enough chrome."
+</p>
+
+<style>
+  .fp { width:100%; height:600px; display:block; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; }
+  .fcode{font:700 12px system-ui,sans-serif;fill:#fff;letter-spacing:.4px;}
+  .fttl{font:800 20px system-ui,sans-serif;fill:#0f172a;}
+  .fmeta{font:500 12px system-ui,sans-serif;fill:#64748b;}
+  .fnm{font:700 14px system-ui,sans-serif;fill:#0f172a;}
+  .fty{font:400 12px system-ui,sans-serif;fill:#64748b;}
+  .fbtn{font:600 10px system-ui,sans-serif;fill:#475569;}
+  .ftip{font:600 11px system-ui,sans-serif;fill:#fff;}
+</style>
+
+<div class="mockup">
+  <div class="mockup-header">Preview · Resource Explorer — full page</div>
+  <div class="mockup-body" style="padding:0">
+    <svg class="fp" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <marker id="fa" markerWidth="7" markerHeight="7" refX="6" refY="2.5" orient="auto"><path d="M0,0 L6,2.5 L0,5 z" fill="#94a3b8"/></marker>
+      </defs>
+
+      <!-- ===== toolbar ===== -->
+      <rect x="0" y="0" width="1000" height="34" fill="#fff" stroke="#e2e8f0"/>
+      <rect x="12" y="8" width="42" height="18" rx="4" fill="#2563EB"/><text x="33" y="20" text-anchor="middle" class="fbtn" fill="#fff">Save</text>
+      <rect x="60" y="8" width="52" height="18" rx="4" fill="#f1f5f9"/><text x="86" y="20" text-anchor="middle" class="fbtn">Save As</text>
+      <rect x="118" y="8" width="42" height="18" rx="4" fill="#f1f5f9"/><text x="139" y="20" text-anchor="middle" class="fbtn">Open</text>
+      <rect x="166" y="8" width="44" height="18" rx="4" fill="#f1f5f9"/><text x="188" y="20" text-anchor="middle" class="fbtn">Share</text>
+      <rect x="216" y="8" width="50" height="18" rx="4" fill="#f1f5f9"/><text x="241" y="20" text-anchor="middle" class="fbtn">Export ▾</text>
+      <line x1="278" y1="8" x2="278" y2="26" stroke="#e2e8f0"/>
+      <rect x="288" y="8" width="52" height="18" rx="4" fill="#f1f5f9"/><text x="314" y="20" text-anchor="middle" class="fbtn">Re-tidy</text>
+      <rect x="346" y="8" width="66" height="18" rx="4" fill="#f1f5f9"/><text x="379" y="20" text-anchor="middle" class="fbtn">Collapse all</text>
+      <rect x="418" y="8" width="34" height="18" rx="4" fill="#f1f5f9"/><text x="435" y="20" text-anchor="middle" class="fbtn">Fit</text>
+      <rect x="458" y="8" width="78" height="18" rx="4" fill="#f1f5f9"/><text x="497" y="20" text-anchor="middle" class="fbtn">Display: Icon+code ▾</text>
+      <text x="988" y="21" text-anchor="end" class="fbtn" fill="#94a3b8">Client: a1b2c3d4…  ⧉</text>
+
+      <!-- ===== floating title + date overlay ===== -->
+      <text x="22" y="66" class="fttl">Production Web App</text>
+      <text x="22" y="86" class="fmeta">Dependency report · 2026-07-20 · 9 resources</text>
+
+      <!-- ===== edges (dashed = upstream/into seed ; solid = downstream) ===== -->
+      <!-- far-upstream MON -> AI -->
+      <line x1="118" y1="200" x2="240" y2="210" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#fa)"/>
+      <!-- upstream -> seed -->
+      <line x1="300" y1="210" x2="430" y2="300" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#fa)"/>
+      <line x1="300" y1="320" x2="430" y2="320" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#fa)"/>
+      <line x1="300" y1="430" x2="430" y2="340" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#fa)"/>
+      <!-- seed -> downstream -->
+      <line x1="522" y1="300" x2="650" y2="215" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#fa)"/>
+      <line x1="524" y1="322" x2="650" y2="322" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#fa)"/>
+      <line x1="522" y1="342" x2="650" y2="428" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#fa)"/>
+      <!-- downstream chain APC -> KV -->
+      <line x1="720" y1="322" x2="838" y2="322" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#fa)"/>
+
+      <!-- edge-hover tooltip on seed->RDS edge -->
+      <g transform="translate(560,238)">
+        <rect x="-38" y="-13" width="76" height="20" rx="5" fill="#334155"/>
+        <text x="0" y="1" text-anchor="middle" class="ftip">depends on</text>
+      </g>
+
+      <!-- ===== nodes (icon+code circles, color by type) ===== -->
+      <!-- far upstream: Monitoring -->
+      <circle cx="96" cy="200" r="24" fill="#7c3aed"/><g transform="translate(88,187)" fill="#fff"><rect x="0" y="7" width="3" height="6"/><rect x="5" y="3" width="3" height="10"/><rect x="10" y="0" width="3" height="13"/></g><text x="96" y="212" text-anchor="middle" class="fcode" style="font-size:10px">MON</text>
+      <!-- upstream 1: App Insights (hovered look could go here; keep clean) -->
+      <circle cx="272" cy="210" r="24" fill="#7c3aed"/><g transform="translate(264,197)" fill="#fff"><rect x="0" y="7" width="3" height="6"/><rect x="5" y="3" width="3" height="10"/><rect x="10" y="0" width="3" height="13"/></g><text x="272" y="222" text-anchor="middle" class="fcode" style="font-size:10px">AI</text>
+      <!-- upstream 2: Service Bus Queue -->
+      <circle cx="272" cy="322" r="24" fill="#ea580c"/><g transform="translate(264,312)" fill="#fff"><rect x="0" y="0" width="14" height="3"/><rect x="0" y="5" width="14" height="3"/><rect x="0" y="10" width="14" height="3"/></g><text x="272" y="334" text-anchor="middle" class="fcode" style="font-size:10px">SBQ</text>
+      <!-- upstream 3: another App -->
+      <circle cx="272" cy="432" r="24" fill="#2563EB"/><g transform="translate(264,417)" fill="#fff"><rect x="0" y="0" width="14" height="11" rx="1.5"/></g><text x="272" y="444" text-anchor="middle" class="fcode" style="font-size:10px">APP</text>
+
+      <!-- seed (amber ring) + always-on label -->
+      <circle cx="476" cy="320" r="28" fill="#2563EB" stroke="#f59e0b" stroke-width="4"/><g transform="translate(467,303)" fill="#fff"><rect x="0" y="0" width="15" height="12" rx="1.5"/></g><text x="476" y="332" text-anchor="middle" class="fcode" style="font-size:11px">APP</text>
+      <text x="476" y="366" text-anchor="middle" class="fnm">Production Web App</text><text x="476" y="382" text-anchor="middle" class="fty">Azure App Service</text>
+
+      <!-- downstream 1: Redis (HOVERED — highlight ring + label) -->
+      <circle cx="676" cy="212" r="27" fill="#dc2626" stroke="#1e293b" stroke-width="2" opacity="1"/>
+      <g transform="translate(669,197)" fill="#fff"><ellipse cx="7" cy="2" rx="7" ry="2.5"/><path d="M0,2 v11 a7,2.5 0 0 0 14,0 v-11" fill="none" stroke="#fff" stroke-width="1.6"/></g>
+      <text x="676" y="224" text-anchor="middle" class="fcode" style="font-size:10px">RDS</text>
+      <text x="676" y="255" text-anchor="middle" class="fnm">Session Cache</text><text x="676" y="271" text-anchor="middle" class="fty">Azure Redis</text>
+
+      <!-- downstream 2: App Config -->
+      <circle cx="696" cy="322" r="24" fill="#0d9488"/><g transform="translate(688,310)" fill="#fff"><circle cx="7" cy="7" r="6" fill="none" stroke="#fff" stroke-width="1.6"/><circle cx="7" cy="7" r="1.6"/></g><text x="696" y="334" text-anchor="middle" class="fcode" style="font-size:10px">APC</text>
+      <!-- downstream 3: SQL -->
+      <circle cx="676" cy="432" r="24" fill="#4338ca"/><g transform="translate(669,420)" fill="#fff"><ellipse cx="7" cy="2" rx="7" ry="2.5"/><path d="M0,2 v10 a7,2.5 0 0 0 14,0 v-10" fill="none" stroke="#fff" stroke-width="1.5"/></g><text x="676" y="444" text-anchor="middle" class="fcode" style="font-size:10px">SQL</text>
+      <!-- far downstream: Key Vault -->
+      <circle cx="862" cy="322" r="24" fill="#64748b"/><g transform="translate(855,311)" fill="#fff"><circle cx="5" cy="4" r="3.5" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M7,6 l5,5 m-2,-2 l2,2 m-4,0 l2,2" stroke="#fff" stroke-width="1.6" fill="none"/></g><text x="862" y="334" text-anchor="middle" class="fcode" style="font-size:9px">KV</text>
+
+      <!-- ===== zoom / pan pad ===== -->
+      <rect x="940" y="470" width="44" height="112" rx="8" fill="#fff" stroke="#e2e8f0"/>
+      <text x="962" y="490" text-anchor="middle" class="fbtn" style="font-size:16px">+</text>
+      <text x="962" y="510" text-anchor="middle" class="fbtn" style="font-size:16px">−</text>
+      <text x="962" y="536" text-anchor="middle" class="fbtn" style="font-size:12px">▲</text>
+      <text x="951" y="552" text-anchor="middle" class="fbtn" style="font-size:12px">◀</text>
+      <text x="973" y="552" text-anchor="middle" class="fbtn" style="font-size:12px">▶</text>
+      <text x="962" y="568" text-anchor="middle" class="fbtn" style="font-size:12px">▼</text>
+    </svg>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">
+  Legend: <b>amber ring</b> = seed · <b>dashed</b> = upstream (depends on the seed) · <b>solid</b> = downstream ·
+  hovered node (RDS) shows its name/type + an <b>edge "depends on"</b> pill on the line under the cursor.
+  Tell me what to adjust — node size, colors, the metadata text, spacing — or say it's the target and I'll write it up as the polish plan.
+</p>

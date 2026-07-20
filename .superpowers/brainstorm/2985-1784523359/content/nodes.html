@@ -1,0 +1,137 @@
+<h2>Node design — code inside, name on hover</h2>
+<p class="subtitle">
+  Same 3-node slice in three styles: an <b>upstream</b> node (dashed arrow, "depends on the seed")
+  → the <b>seed</b> (amber ring) → a <b>downstream</b> node (solid, "seed depends on it").
+  The short <b>code is always shown inside</b> the node; the full <b>name (14px)</b> + <b>type (12px)</b>
+  appear only for the seed / hovered / selected node (the middle node shows its label here to demonstrate).
+  Thinner arrows + dashed upstream edges apply to all three. Pick the node style that reads best.
+</p>
+
+<style>
+  .nodesvg { width: 100%; height: 210px; display:block; }
+  .nlabel-name { font: 700 14px system-ui, sans-serif; fill:#0f172a; }
+  .nlabel-type { font: 400 12px system-ui, sans-serif; fill:#64748b; }
+  .ncode { font: 700 13px system-ui, sans-serif; fill:#fff; letter-spacing:.5px; }
+  .ncode-dark { font: 700 13px system-ui, sans-serif; fill:#0f172a; letter-spacing:.5px; }
+  .hint { font: 500 11px system-ui, sans-serif; fill:#94a3b8; }
+</style>
+
+<div class="cards">
+
+  <!-- ============ A · Coded circle ============ -->
+  <div class="card" data-choice="A" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <svg class="nodesvg" viewBox="0 0 360 210">
+        <defs>
+          <marker id="arrA" markerWidth="7" markerHeight="7" refX="6" refY="2.5" orient="auto">
+            <path d="M0,0 L6,2.5 L0,5 z" fill="#94a3b8"/>
+          </marker>
+        </defs>
+        <!-- edges -->
+        <line x1="86" y1="80" x2="146" y2="80" stroke="#94a3b8" stroke-width="1.5"
+              stroke-dasharray="5 3" marker-end="url(#arrA)"/>
+        <line x1="214" y1="80" x2="274" y2="80" stroke="#94a3b8" stroke-width="1.5"
+              marker-end="url(#arrA)"/>
+        <text x="116" y="72" text-anchor="middle" class="hint">depends on</text>
+        <text x="244" y="72" text-anchor="middle" class="hint">depends on</text>
+        <!-- upstream node (quiet: code only) -->
+        <circle cx="58" cy="80" r="27" fill="#7c3aed"/>
+        <text x="58" y="85" text-anchor="middle" class="ncode">AI</text>
+        <!-- seed -->
+        <circle cx="180" cy="80" r="29" fill="#2563EB" stroke="#f59e0b" stroke-width="4"/>
+        <text x="180" y="85" text-anchor="middle" class="ncode">APP</text>
+        <text x="180" y="126" text-anchor="middle" class="nlabel-name">Production Web App</text>
+        <text x="180" y="143" text-anchor="middle" class="nlabel-type">Azure App Service</text>
+        <!-- downstream node (quiet) -->
+        <circle cx="302" cy="80" r="27" fill="#dc2626"/>
+        <text x="302" y="85" text-anchor="middle" class="ncode">RDS</text>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>A · Coded circle</h3>
+      <p>Solid color-by-type circle, bold code inside. Quietest &amp; densest — color carries the type cue.</p>
+    </div>
+  </div>
+
+  <!-- ============ B · Icon + code circle ============ -->
+  <div class="card" data-choice="B" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <svg class="nodesvg" viewBox="0 0 360 210">
+        <defs>
+          <marker id="arrB" markerWidth="7" markerHeight="7" refX="6" refY="2.5" orient="auto">
+            <path d="M0,0 L6,2.5 L0,5 z" fill="#94a3b8"/>
+          </marker>
+        </defs>
+        <line x1="88" y1="80" x2="146" y2="80" stroke="#94a3b8" stroke-width="1.5"
+              stroke-dasharray="5 3" marker-end="url(#arrB)"/>
+        <line x1="216" y1="80" x2="274" y2="80" stroke="#94a3b8" stroke-width="1.5"
+              marker-end="url(#arrB)"/>
+        <!-- upstream -->
+        <circle cx="58" cy="80" r="29" fill="#7c3aed"/>
+        <!-- chart icon -->
+        <g transform="translate(50,64)" fill="#fff">
+          <rect x="0" y="8" width="3" height="6"/><rect x="5" y="4" width="3" height="10"/><rect x="10" y="0" width="3" height="14"/>
+        </g>
+        <text x="58" y="94" text-anchor="middle" class="ncode" style="font-size:11px">AI</text>
+        <!-- seed -->
+        <circle cx="180" cy="80" r="31" fill="#2563EB" stroke="#f59e0b" stroke-width="4"/>
+        <g transform="translate(171,62)" fill="#fff"><rect x="0" y="0" width="14" height="11" rx="1.5"/><rect x="3" y="13" width="8" height="2.5"/></g>
+        <text x="180" y="93" text-anchor="middle" class="ncode" style="font-size:11px">APP</text>
+        <text x="180" y="130" text-anchor="middle" class="nlabel-name">Production Web App</text>
+        <text x="180" y="147" text-anchor="middle" class="nlabel-type">Azure App Service</text>
+        <!-- downstream -->
+        <circle cx="302" cy="80" r="29" fill="#dc2626"/>
+        <g transform="translate(295,64)" fill="#fff"><ellipse cx="7" cy="2" rx="7" ry="2.5"/><path d="M0,2 v10 a7,2.5 0 0 0 14,0 v-10" fill="none" stroke="#fff" stroke-width="1.6"/></g>
+        <text x="302" y="94" text-anchor="middle" class="ncode" style="font-size:11px">RDS</text>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>B · Icon + code circle</h3>
+      <p>Type icon above the code, inside a color-by-type circle. Strongest at-a-glance type recognition; needs slightly bigger nodes.</p>
+    </div>
+  </div>
+
+  <!-- ============ C · Rounded chip ============ -->
+  <div class="card" data-choice="C" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <svg class="nodesvg" viewBox="0 0 360 210">
+        <defs>
+          <marker id="arrC" markerWidth="7" markerHeight="7" refX="6" refY="2.5" orient="auto">
+            <path d="M0,0 L6,2.5 L0,5 z" fill="#94a3b8"/>
+          </marker>
+        </defs>
+        <line x1="92" y1="80" x2="140" y2="80" stroke="#94a3b8" stroke-width="1.5"
+              stroke-dasharray="5 3" marker-end="url(#arrC)"/>
+        <line x1="220" y1="80" x2="268" y2="80" stroke="#94a3b8" stroke-width="1.5"
+              marker-end="url(#arrC)"/>
+        <!-- upstream chip -->
+        <rect x="20" y="64" width="70" height="32" rx="8" fill="#fff" stroke="#7c3aed" stroke-width="2"/>
+        <rect x="20" y="64" width="8" height="32" rx="4" fill="#7c3aed"/>
+        <g transform="translate(34,74)" fill="#7c3aed"><rect x="0" y="8" width="3" height="6"/><rect x="5" y="4" width="3" height="10"/><rect x="10" y="0" width="3" height="14"/></g>
+        <text x="68" y="85" text-anchor="middle" class="ncode-dark">AI</text>
+        <!-- seed chip -->
+        <rect x="142" y="60" width="76" height="40" rx="9" fill="#eff6ff" stroke="#f59e0b" stroke-width="3"/>
+        <rect x="142" y="60" width="9" height="40" rx="4" fill="#2563EB"/>
+        <g transform="translate(158,73)" fill="#2563EB"><rect x="0" y="0" width="13" height="10" rx="1.5"/></g>
+        <text x="188" y="85" text-anchor="middle" class="ncode-dark">APP</text>
+        <text x="180" y="130" text-anchor="middle" class="nlabel-name">Production Web App</text>
+        <text x="180" y="147" text-anchor="middle" class="nlabel-type">Azure App Service</text>
+        <!-- downstream chip -->
+        <rect x="270" y="64" width="70" height="32" rx="8" fill="#fff" stroke="#dc2626" stroke-width="2"/>
+        <rect x="270" y="64" width="8" height="32" rx="4" fill="#dc2626"/>
+        <g transform="translate(285,72)" fill="#dc2626"><ellipse cx="6" cy="2" rx="6" ry="2"/><path d="M0,2 v9 a6,2 0 0 0 12,0 v-9" fill="none" stroke="#dc2626" stroke-width="1.4"/></g>
+        <text x="315" y="85" text-anchor="middle" class="ncode-dark">RDS</text>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>C · Rounded chip</h3>
+      <p>Pill node with a colored accent bar + icon + code. Most "diagram-like"; wider, so fewer fit per row but each is very legible.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:18px">
+  Click the style you prefer (or tell me in the terminal). Next I'll show the <b>hover/selected label</b>
+  treatment and the <b>page title + date</b> chrome. Colors shown are a restrained per-type palette — we can tune those separately.
+</p>
