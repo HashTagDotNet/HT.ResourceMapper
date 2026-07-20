@@ -65,6 +65,10 @@
   </ItemGroup>
   <ItemGroup>
     <Build Include="Security\HTResourceMapper.sql" />
+    <Build Include="Stored Procedures\Diagram_Delete.sql" />
+    <Build Include="Stored Procedures\Diagram_GetByShareId.sql" />
+    <Build Include="Stored Procedures\Diagram_ListForClient.sql" />
+    <Build Include="Stored Procedures\Diagram_Upsert.sql" />
     <Build Include="Stored Procedures\PlaceholderStoredProcedure.sql" />
     <Build Include="Stored Procedures\ResourceRelationship_Add.sql" />
     <Build Include="Stored Procedures\ResourceRelationship_GetForResource.sql" />
@@ -87,6 +91,7 @@
     <Build Include="Stored Procedures\ResourceTypeTag_GetAll.sql" />
     <Build Include="Stored Procedures\TagDefinition_GetAll.sql" />
     <Build Include="Stored Procedures\TagDefinition_Upsert.sql" />
+    <Build Include="Tables\Diagram.sql" />
     <Build Include="Tables\Resource.sql" />
     <Build Include="Tables\ResourceRelationship.sql" />
     <Build Include="Tables\ResourceTag.sql" />

@@ -26,6 +26,8 @@ namespace ResourceMapper.Common.Server.Utils
             services.TryAddScoped<IResourceService,ResourceService>();
             services.TryAddScoped<IExplorerRepository, ExplorerSqlRepository>();
             services.TryAddScoped<IExplorerService, ExplorerService>();
+            services.TryAddScoped<IDiagramRepository, DiagramSqlRepository>();
+            services.TryAddScoped<IDiagramService, DiagramService>();
             services.TryAddScoped<IImportRepository,ImportSqlRepository>();
             services.TryAddScoped<IImportService,ImportService>();
         }

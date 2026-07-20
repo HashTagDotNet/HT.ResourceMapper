@@ -929,6 +929,35 @@ namespace ResourceMapper.Common.Server.Tests.Explorer
 
 ## Execution notes
 
-_(Written after execution — record the `sqlcmd` exercises + outputs, any reader/parameter-helper
-reconciliations against `ResourceSqlRepository.cs`, test results, and commit hash(es). Then mark
-slice #5 **Done** ✓ / slice #6 **Next** in the master list, and commit.)_
+- **Reconciliation:** the brief's repo code (readers/param helpers, `_db.RO`/`_db.RW.SprocCommand`,
+  `ExecuteQueryAsync`) matched `ResourceSqlRepository.cs`/`ExplorerSqlRepository.cs` verbatim — no
+  changes needed. One required deviation: `ApiServiceResponse<TApiPayload>` is constrained
+  `where TApiPayload : class, new()`, so the brief's `ApiServiceResponse<bool>` for `DeleteAsync`
+  did not compile (CS0452). Fixed by following the existing `IResourceService.DeleteResourceAsync`
+  pattern: `DeleteAsync` returns `ApiServiceResponse<object>`, with `builder.Data.Set(new object())`
+  on success. No test changes were needed (the delete tests only assert `IsSuccess()`).
+- **Build:** `dotnet build` clean across all C# projects; only the expected `MSB4278` on
+  `HTResourceMapperDb.sqlproj` (old-style SSDT, not built via `dotnet build`).
+- **Tests:** targeted filter → 9/9 new `DiagramServiceTests` pass. Full `dotnet test` → no
+  regressions; the only failures are the 2 pre-existing, out-of-scope
+  `HT.Api.Service.Contracts.Tests.BuildersOfTTests` failures.
+- **DB apply + sqlcmd exercise** against `(localdb)\MSSQLLocalDB\ResourceMapper`:
+  - Table applied via guarded `IF OBJECT_ID(...) IS NULL` `CREATE TABLE` + index; sprocs applied as
+    `CREATE OR ALTER PROCEDURE`. All 5 objects confirmed present in `sys.objects`.
+  - `Diagram_Upsert` create (`DiagramUid='test-diag-uid-001'`) → `Result='created'` +
+    `ShareId='test-share-id-001'`.
+  - `Diagram_Upsert` again, same `DiagramUid`/`ClientId`, changed `Name`/`DisplayPreset`/`DiagramJson`,
+    and a deliberately **different bogus** `@ShareId` passed in → `Result='updated'`, and the
+    **same** `ShareId='test-share-id-001'` returned (the sproc correctly ignored the bogus input
+    ShareId on update and selected the authoritative row back).
+  - `Diagram_ListForClient('test-client-001')` → the renamed row (metadata only, no `DiagramJson`).
+  - `Diagram_GetByShareId('test-share-id-001')` → full row incl. `DiagramJson`.
+  - `Diagram_Delete` with wrong `ClientId` → `Deleted=0` (row confirmed still present); with the
+    correct `ClientId` → `Deleted=1` (row confirmed gone). This same call served as cleanup — the
+    table was confirmed empty (`COUNT(*) = 0`) afterward, no separate cleanup needed.
+- Full transcript of every command + output is in the task's scratch report
+  (`task-5-report.md`), including the connectivity check and object-listing query.
+
+Commit: see repository log for slice #5's commit hash on `home-page`.
+
+Slice #5 **Done** ✓ / slice #6 **Next**.
