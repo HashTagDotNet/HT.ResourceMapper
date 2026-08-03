@@ -297,6 +297,45 @@ produce data the app can actually be judged on. Extend the demo seed with a real
 vocabulary (owner, environment, cost-centre, runbook link, on-call) plus per-type entry-point
 templates. **S/M, and it gates any credible demo.**
 
+### PL-49 — import silently resets tag-definition flags, clearing `IsDomainTag` ⚑
+
+**Data-integrity defect, found while building export.** `ImportSqlRepository.UpsertTagDefinitionAsync`
+does not pass `@DisplayName`, `@RequirementLevel`, `@IsDomainTag`, `@IsSystemTag` or `@DisplayOrder`.
+On the **update** path `TagDefinition_Upsert` therefore resets them to defaults — including
+**`IsDomainTag = 0`**.
+
+The Domain tag is the identity anchor: resource identity is `(Domain + Type + Key)`. Clearing that
+flag breaks identity resolution catalog-wide, and nothing in the UI would show it happening.
+Reachable today by importing any document containing a `tagDefinitions` section that names an
+existing tag.
+
+Export ships its `tagDefinitions` section **opt-in** specifically to avoid tripping this, so the
+workaround is in place but the bug is live. Fix the repository call to pass all five, and add a
+guard so `IsDomainTag`/`IsSystemTag` can never be cleared by import. **S — but high severity.**
+
+### PL-50 — cross-domain dependency edges cannot round-trip
+
+`ImportService.ValidateAndResolveDependencies` resolves a bare dependency key **scoped to the
+dependent's own domain**, and the import format has no syntax for a cross-domain target. Two of the
+20 demo edges are cross-domain, so export omits them (with a warning) rather than emitting something
+that would fail validation and abort the whole import.
+
+Import is additive for relationships, so re-importing never *deletes* the live edges — but a
+backup/restore built on export would lose them. Needs a format addition (e.g. a qualified
+`domain/key` target). **M**
+
+### PL-51 — `ImportExportApiDesign.md` has drifted from the shipped import
+
+The doc is no longer a reliable spec. Confirmed drift: identity is `(Domain+Type+Key)` not bare
+`key`; `type` is required (doc said optional); `contentType` is a constrained `Text|Link` set (doc
+decision #13 said free-form with auto-registration); the summary has a 4th `resourceRelationships`
+section; and `ResourceDependency_SetForResource`, `Resource_GetKeysByKeys` and the `ResourceKeyList`
+TVP described in the doc were never built. Its controller premise also targets
+`UI/ResourceMapper.UI.Server` hosting Blazor WASM — a project that no longer exists.
+
+`ImportService.cs` is the de-facto source of truth. Either update the doc or mark it historical.
+Leaving it as-is will mislead the next person. **S**
+
 ### PL-46 — two tag definitions share the DisplayName "Portal URL"
 
 Introduced by PL-45 and confirmed in the live DB (`duplicateDisplayNames = 1`):
