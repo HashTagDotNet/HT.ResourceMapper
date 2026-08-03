@@ -248,6 +248,74 @@ likely higher yield per hour than fixing these one at a time.
 
 ---
 
+## Browser verification pass — 2026-08-03
+
+Driven live at 1600×1000 against the merged build. All 5 routes returned 200.
+
+**Confirmed fixed (seen, not inferred):**
+
+| Item | Evidence |
+|---|---|
+| PL-A1 | Header reads **"Showing 85 of 85"** against 85 rendered rows |
+| PL-08 | Title is an `<a href="/">`; Home + Resource Types in the menu |
+| PL-37 | Node icon now sits **above** the short code — `APP`/`SVC`/`DB`/`SBQ` all legible, no overlap glyph |
+| PL-42 | **Dashed edges now render between two non-seed nodes** on `/explore/DEMOEXP-checkout` — exactly the neighbour-to-neighbour case that never drew before |
+| PL-41 | Legend ("Focus depends on" / "Depends on focus") renders inside the canvas, so it composites into exports |
+| PL-39 | No longer one degenerate row — sources top, seed mid, sinks bottom |
+| **PL-40** | **RESOLVED — was never a styling bug.** Arrowheads are clearly visible on every edge. It was a PL-39 layout artifact. The agent was right to refuse to call it from code alone. |
+| PL-43 | Delete control present in the explorer toolbar |
+| PL-25a | Domain renders on every grid row with a real prod/non-prod mix |
+| PL-28 | `/resource-types` lists 12 types with live node previews, usage counts, delete disabled while in use |
+
+**PL-20 — earlier diagnosis was WRONG.** I attributed the empty add-tag dropdown to slice #7
+pre-seeding every applicable entry-point row. Measured reality:
+
+```
+tagDefinitions = 2      Domain (system+domain, correctly filtered out)
+                        DemoExplorerPrimaryUrl
+resourceTypeTag rows = 0
+```
+
+Nothing is pre-seeded — there are **zero** type templates. The dropdown is empty because the catalog
+contains exactly **one** usable tag definition, and once it is on a resource there is nothing left to
+offer. The PL-20 fix (hide the control when there are no candidates) is still correct behaviour, but
+it was fixing a symptom of empty data, not of over-seeding.
+
+### PL-45 — seed data does not exercise the app's headline feature ⚑
+
+**2 tag definitions and 0 type templates** across the whole catalog. Tagging is the product's core
+value proposition (UX-Plan-V2: *"Tags provide a mechanism for associating meta data with a
+resource… Tags can have links"*), and the demo data barely touches it:
+
+- multi-valued tags, controlled vocabularies, `AllowCustomValue`, Link-vs-Text content types, and
+  primary-tag selection are all **undemonstrable and effectively untested** against real data
+- the `ResourceTypeTag` entry-point template feature has **never been exercised** — 0 rows
+- a demo of this app cannot show its main differentiator over the wiki it is meant to replace
+
+This is the seed-currency rule biting again, the same class as PL-25a: seed scripts that don't
+produce data the app can actually be judged on. Extend the demo seed with a realistic tag
+vocabulary (owner, environment, cost-centre, runbook link, on-call) plus per-type entry-point
+templates. **S/M, and it gates any credible demo.**
+
+### PL-46 — two tag definitions share the DisplayName "Portal URL"
+
+Introduced by PL-45 and confirmed in the live DB (`duplicateDisplayNames = 1`):
+
+| Key | DisplayName | Owner |
+|---|---|---|
+| `DemoExplorerPrimaryUrl` | Portal URL | explorer seed (`Demo_Insert_ExplorerGraph.sql`) |
+| `PortalUrl` | Portal URL | new vocabulary seed |
+
+Keys differ so the DB is satisfied, but the **editor labels both rows identically** — a resource
+carrying both would show two indistinguishable "Portal URL" rows. The seed sidesteps it today by
+skipping `PortalUrl` on the 8 resources that already hold `DemoExplorerPrimaryUrl`, so no resource
+currently has both. That is a workaround, not a fix: a user adding Portal URL to any of those 8 hits
+it immediately.
+
+**Resolution: retire `DemoExplorerPrimaryUrl`** and migrate its 8 resources (and their
+`PrimaryTagDefinitionId`) to `PortalUrl`. It exists only because the explorer seed predated a real
+vocabulary. Touches `Demo_Insert_ExplorerGraph.sql` and needs a data migration for the 8. **S**
+
 ## Coverage gaps in this capture
 
 Findings here are only as good as what was exercised. Not covered:
