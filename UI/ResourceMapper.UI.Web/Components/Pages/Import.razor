@@ -1,18 +1,74 @@
 @page "/import"
+@page "/export"
 @using System.Text.Json
 @using ResourceMapper.Common.Server.Resources.Interfaces
+@using ResourceMapper.Common.Shared.Export.Contracts
 @using ResourceMapper.Common.Shared.Import.Contracts
+@implements IAsyncDisposable
 @inject IImportService ImportService
+@inject IExportService ExportService
+@inject IJSRuntime JS
 @inject ISnackbar Snackbar
 
-<PageTitle>Import — Hashtag Resource Mapper</PageTitle>
+<PageTitle>Import / Export — Hashtag Resource Mapper</PageTitle>
 
-<MudText Typo="Typo.h5" Style="font-weight:600;">Import</MudText>
+<MudText Typo="Typo.h5" Style="font-weight:600;">Import / Export</MudText>
 <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
-    Import resources from a JSON file in the import-contract format.
+    Move the catalog in and out as JSON. Both directions use the same document format, so an
+    exported file can be re-imported unchanged.
 </MudText>
 
 <MudPaper Elevation="0" Class="pa-6 mb-4" Style="border:1px solid var(--mud-palette-divider);">
+    <MudText Typo="Typo.subtitle1" Style="font-weight:600;" Class="mb-1">Export</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+        Downloads the whole catalog — every resource with its type, domain, tags and dependencies —
+        as a JSON file in the import format. Each resource also carries its <code>uid</code>, which
+        import ignores.
+    </MudText>
+
+    <MudSwitch T="bool" @bind-Value="_includeTagDefinitions" Color="Color.Primary" Class="mb-1"
+               Label="Include tag definitions (for seeding an empty database)" />
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+        Off by default. The import format cannot carry a tag definition's display name, requirement
+        level, domain-tag flag or display order, so re-importing this section into a populated
+        database resets those to defaults.
+    </MudText>
+
+    <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@_exporting"
+               StartIcon="@Icons.Material.Filled.Download" OnClick="RunExport">
+        @(_exporting ? "Exporting…" : "Export catalog")
+    </MudButton>
+
+    @if (_exporting)
+    {
+        <MudProgressLinear Indeterminate="true" Class="mt-3" />
+    }
+
+    @if (_exportSummary is not null)
+    {
+        <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+            @_exportSummary
+        </MudAlert>
+    }
+
+    @if (_exportWarnings is { Count: > 0 })
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+            <MudText Typo="Typo.body2" Style="font-weight:600;" Class="mb-1">
+                @_exportWarnings.Count item(s) could not be represented in the import format:
+            </MudText>
+            <ul style="margin:0;padding-left:1.1rem;">
+                @foreach (var w in _exportWarnings)
+                {
+                    <li><MudText Typo="Typo.caption">@w</MudText></li>
+                }
+            </ul>
+        </MudAlert>
+    }
+</MudPaper>
+
+<MudPaper Elevation="0" Class="pa-6 mb-4" Style="border:1px solid var(--mud-palette-divider);">
+    <MudText Typo="Typo.subtitle1" Style="font-weight:600;" Class="mb-1">Import</MudText>
     <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">Choose a JSON file to import:</MudText>
     <InputFile OnChange="OnInputFileChange" accept=".json" />
 
@@ -79,6 +135,61 @@
     private List<ImportError>? _errors;
     private string? _message;
     private Severity _messageSeverity = Severity.Info;
+
+    private bool _exporting;
+    private bool _includeTagDefinitions;
+    private string? _exportSummary;
+    private List<string>? _exportWarnings;
+    private IJSObjectReference? _downloadModule;
+
+    // ---------------- export ----------------
+
+    private async Task RunExport()
+    {
+        _exporting = true;
+        _exportSummary = null;
+        _exportWarnings = null;
+        try
+        {
+            var options = new ExportOptions
+            {
+                IncludeResourceTypes = true,
+                IncludeTagDefinitions = _includeTagDefinitions
+            };
+
+            var response = await ExportService.ExportAsync(options, CancellationToken.None);
+            var data = response.ApiResponse.Data;
+
+            if (!response.IsSuccess() || data is null)
+            {
+                Snackbar.Add("Export failed", Severity.Error);
+                _exportSummary = null;
+                return;
+            }
+
+            var json = ExportJson.Serialize(data.Document);
+            var fileName = $"resourcemapper-catalog-{DateTime.Now:yyyyMMdd-HHmmss}.json";
+
+            _downloadModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/file-download.js");
+            await _downloadModule.InvokeVoidAsync("downloadText", fileName, json, "application/json");
+
+            _exportSummary =
+                $"Exported {data.ResourceCount} resource(s) and {data.DependencyCount} dependency link(s) to {fileName}.";
+            _exportWarnings = data.Warnings.Count > 0 ? data.Warnings : null;
+
+            Snackbar.Add("Export ready", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _exporting = false;
+        }
+    }
+
+    // ---------------- import ----------------
 
     private async Task OnInputFileChange(InputFileChangeEventArgs e)
     {
@@ -151,5 +262,18 @@
     {
         _message = message;
         _messageSeverity = severity;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_downloadModule is null) return;
+        try
+        {
+            await _downloadModule.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit already gone (browser closed / navigated away) — nothing to release.
+        }
     }
 }

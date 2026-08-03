@@ -32,6 +32,8 @@ namespace ResourceMapper.Common.Server.Utils
             services.TryAddScoped<IDiagramService, DiagramService>();
             services.TryAddScoped<IImportRepository,ImportSqlRepository>();
             services.TryAddScoped<IImportService,ImportService>();
+            services.TryAddScoped<IExportRepository,ExportSqlRepository>();
+            services.TryAddScoped<IExportService,ExportService>();
             services.TryAddScoped<IClientSettingsRepository, ClientSettingsSqlRepository>();
             services.TryAddScoped<IClientSettingsService, ClientSettingsService>();
         }
