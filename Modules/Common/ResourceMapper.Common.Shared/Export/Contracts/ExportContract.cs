@@ -26,10 +26,12 @@ namespace ResourceMapper.Common.Shared.Export.Contracts
         public Dictionary<string, ExportResourceTypeDefinition>? ResourceTypes { get; set; }
 
         /// <summary>
-        /// Optional reference section, <b>off by default</b>. The import contract cannot carry
-        /// DisplayName / RequirementLevel / IsDomainTag / IsSystemTag / DisplayOrder, so re-importing
-        /// this section resets those columns to <c>TagDefinition_Upsert</c>'s defaults — which would
-        /// clear the IsDomainTag designation the whole identity model depends on.
+        /// Optional reference section, <b>off by default</b>. The import contract still cannot carry
+        /// DisplayName / RequirementLevel / IsDomainTag / IsSystemTag / DisplayOrder, so a round-trip
+        /// through this section does not restore them — but it no longer <i>destroys</i> them either:
+        /// <c>TagDefinition_Upsert</c> now treats those five as "preserve on update" (PL-49), so the
+        /// IsDomainTag designation the identity model depends on survives a re-import.
+        /// Kept off by default because the section is lossy, not because it is dangerous.
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public Dictionary<string, ExportTagDefinitionModel>? TagDefinitions { get; set; }

@@ -10,9 +10,12 @@
 --  - A Domain tag ('prod') on every resource, using the existing system Domain
 --    TagDefinition (TagDefinitionKey = 'Domain') -- NOT a new one; there can only
 --    ever be one IsDomainTag=1 row.
---  - A primary-URL Link tag on most resources, via a demo-owned TagDefinition
---    (TagContentTypeId = 2 / Link), with Resource.PrimaryTagDefinitionId pointed at
---    it, so "Open link" has somewhere to go in the explorer.
+--  - A primary-URL Link tag on most resources, using the shared 'PortalUrl' Link
+--    TagDefinition owned by Demo_Insert_TagVocabulary.sql, with
+--    Resource.PrimaryTagDefinitionId pointed at it, so "Open link" has somewhere to
+--    go in the explorer. Created here only if absent, never updated, so this script
+--    still stands alone. (PL-46 retired the old demo-owned 'DemoExplorerPrimaryUrl',
+--    which duplicated the "Portal URL" display name; the migration is inline below.)
 --
 --Resources use stable, readable, DEMOEXP-prefixed ResourceUids (not random GUIDs) so
 --this script is idempotent (keyed by ResourceUid/TagDefinitionKey/ResourceTypeUid,
@@ -194,43 +197,76 @@ EXEC #SeedExp_ResourceType @ResourceTypeUid = @Type_Service, @TypeName = 'Servic
 EXEC #SeedExp_ResourceType @ResourceTypeUid = @Type_Database, @TypeName = 'Database'
 EXEC #SeedExp_ResourceType @ResourceTypeUid = @Type_Queue, @TypeName = 'Queue'
 
--- Demo-owned primary-URL Link tag definition. NOTE: the Domain tag is NOT created here --
--- it already exists as the one system-wide IsDomainTag=1 row (TagDefinitionKey = 'Domain',
--- seeded by Script.PostDeployment1.sql) and is reused below by key.
-DECLARE @UrlTagKey NVARCHAR(50) = 'DemoExplorerPrimaryUrl'
+-- Primary-URL Link tag. NOTE: the Domain tag is NOT created here -- it already exists as the
+-- one system-wide IsDomainTag=1 row (TagDefinitionKey = 'Domain', seeded by
+-- Script.PostDeployment1.sql) and is reused below by key.
+--
+-- PL-46: this script used to own its own 'DemoExplorerPrimaryUrl' definition whose DisplayName
+-- was also 'Portal URL', colliding with the vocabulary seed's 'PortalUrl'. Distinct keys, so
+-- the DB was satisfied, but the editor labelled both rows identically and a resource carrying
+-- both showed two indistinguishable "Portal URL" rows. The duplicate is retired: this script
+-- now uses the shared 'PortalUrl' definition owned by Demo_Insert_TagVocabulary.sql.
+DECLARE @UrlTagKey NVARCHAR(50) = 'PortalUrl'
 
-MERGE [HTResourceMapper].[TagDefinition] AS target
-USING (SELECT
-        [TagDefinitionUid] = 'DEMOEXP-tagdef-url'
-       ,[TagDefinitionKey] = 'DemoExplorerPrimaryUrl'
-       ,[DisplayName]      = 'Portal URL'
-       ,[TagContentTypeId] = 2               -- Link
-       ,[AllowCustomValue] = CAST(1 AS BIT)
-       ,[IsMultiValued]    = CAST(0 AS BIT)
-       ,[RequirementLevel] = 'Optional'
-       ,[IsDomainTag]      = CAST(0 AS BIT)
-       ,[IsSystemTag]      = CAST(0 AS BIT)
-       ,[DisplayOrder]     = 20
-      ) AS source
-    ON target.[TagDefinitionKey] = source.[TagDefinitionKey]
-WHEN MATCHED THEN
-    UPDATE SET
-         target.[DisplayName]      = source.[DisplayName]
-        ,target.[TagContentTypeId] = source.[TagContentTypeId]
-        ,target.[AllowCustomValue] = source.[AllowCustomValue]
-        ,target.[IsMultiValued]    = source.[IsMultiValued]
-        ,target.[RequirementLevel] = source.[RequirementLevel]
-        ,target.[IsDomainTag]      = source.[IsDomainTag]
-        ,target.[IsSystemTag]      = source.[IsSystemTag]
-        ,target.[DisplayOrder]     = source.[DisplayOrder]
-        ,target.[UpdatedOn]        = SYSUTCDATETIME()
-WHEN NOT MATCHED BY TARGET THEN
-    INSERT ([TagDefinitionUid], [TagDefinitionKey], [DisplayName], [TagContentTypeId]
-           ,[AllowCustomValue], [IsMultiValued], [RequirementLevel]
-           ,[IsDomainTag], [IsSystemTag], [DisplayOrder])
-    VALUES (source.[TagDefinitionUid], source.[TagDefinitionKey], source.[DisplayName], source.[TagContentTypeId]
-           ,source.[AllowCustomValue], source.[IsMultiValued], source.[RequirementLevel]
-           ,source.[IsDomainTag], source.[IsSystemTag], source.[DisplayOrder]);
+-- ------------------------------------------------------------------------------------------
+-- PL-46 migration: fold any pre-existing 'DemoExplorerPrimaryUrl' data into 'PortalUrl'.
+-- A no-op once the retired definition is gone, so re-running this script stays idempotent.
+-- ------------------------------------------------------------------------------------------
+DECLARE @RetiredUrlTagId INT =
+    (SELECT TagDefinitionId FROM [HTResourceMapper].TagDefinition WHERE TagDefinitionKey = 'DemoExplorerPrimaryUrl')
+DECLARE @PortalUrlTagId INT =
+    (SELECT TagDefinitionId FROM [HTResourceMapper].TagDefinition WHERE TagDefinitionKey = @UrlTagKey)
+
+IF @RetiredUrlTagId IS NOT NULL AND @PortalUrlTagId IS NOT NULL
+BEGIN
+    -- ResourceTag has no unique constraint on (ResourceId, TagDefinitionId) (PL-A5), so a blind
+    -- repoint could double up a single-valued tag. Where a resource already holds PortalUrl,
+    -- drop that row and keep the explorer's value -- it is the one wired as the resource's
+    -- PrimaryTagDefinitionId, and this script re-asserts that value below regardless.
+    DELETE p
+    FROM [HTResourceMapper].ResourceTag p
+    WHERE p.TagDefinitionId = @PortalUrlTagId
+      AND EXISTS (SELECT 1 FROM [HTResourceMapper].ResourceTag e
+                  WHERE e.ResourceId = p.ResourceId AND e.TagDefinitionId = @RetiredUrlTagId)
+
+    UPDATE [HTResourceMapper].ResourceTag
+    SET TagDefinitionId = @PortalUrlTagId, UpdatedOn = SYSUTCDATETIME()
+    WHERE TagDefinitionId = @RetiredUrlTagId
+
+    UPDATE [HTResourceMapper].[Resource]
+    SET PrimaryTagDefinitionId = @PortalUrlTagId
+    WHERE PrimaryTagDefinitionId = @RetiredUrlTagId
+
+    DELETE FROM [HTResourceMapper].TagDefinition WHERE TagDefinitionId = @RetiredUrlTagId
+END
+ELSE IF @RetiredUrlTagId IS NOT NULL
+BEGIN
+    -- PortalUrl not seeded yet: rename the retired row in place rather than discarding data.
+    -- The ensure-block below then finds it by key and leaves it alone.
+    UPDATE [HTResourceMapper].TagDefinition
+    SET TagDefinitionKey = @UrlTagKey, UpdatedOn = SYSUTCDATETIME()
+    WHERE TagDefinitionId = @RetiredUrlTagId
+END
+
+-- ------------------------------------------------------------------------------------------
+-- Ensure 'PortalUrl' exists. Demo_Insert_TagVocabulary.sql is its OWNER -- this block only
+-- creates it when absent (so the explorer seed still stands alone) and never updates it, so
+-- the two scripts cannot fight over RequirementLevel / DisplayOrder whatever the run order.
+-- Values deliberately mirror the vocabulary seed's definition.
+-- ------------------------------------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM [HTResourceMapper].TagDefinition WHERE TagDefinitionKey = @UrlTagKey)
+BEGIN
+    INSERT INTO [HTResourceMapper].[TagDefinition]
+        ([TagDefinitionUid], [TagDefinitionKey], [DisplayName], [TagContentTypeId]
+        ,[AllowCustomValue], [IsMultiValued], [RequirementLevel]
+        ,[IsDomainTag], [IsSystemTag], [DisplayOrder])
+    -- Content type resolved by TagCode, never a hardcoded id.
+    SELECT 'DEMOVOCAB-tagdef-portalurl', @UrlTagKey, N'Portal URL', tct.TagContentTypeId
+          ,CAST(1 AS BIT), CAST(0 AS BIT), N'Suggested'
+          ,CAST(0 AS BIT), CAST(0 AS BIT), 100
+    FROM [HTResourceMapper].TagContentType tct
+    WHERE tct.TagCode = 'Link'
+END
 
 DECLARE @DomainTagKey NVARCHAR(50) =
     (SELECT TagDefinitionKey FROM [HTResourceMapper].TagDefinition WHERE IsDomainTag = 1)

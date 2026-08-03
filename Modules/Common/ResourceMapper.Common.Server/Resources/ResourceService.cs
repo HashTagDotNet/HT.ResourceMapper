@@ -1298,6 +1298,7 @@ namespace ResourceMapper.Common.Server.Resources
             {
                 TagUid = tag.TagUid ?? string.Empty,
                 TagKey = tag.TagKey ?? string.Empty,
+                TagDisplayName = tag.TagDisplayName ?? tag.TagKey ?? string.Empty,
                 ContentType = tag.ContentType ?? string.Empty,
                 TagValue = tag.TagValue ?? string.Empty
             };

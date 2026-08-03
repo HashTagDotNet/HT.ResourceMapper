@@ -3,7 +3,8 @@
 --Demo Data Insert Script for the tag vocabulary (IDEMPOTENT)
 --=============================================
 --Tagging is the product's headline feature, but the demo catalog only ever had two
---TagDefinitions ('Domain' + 'DemoExplorerPrimaryUrl') and ZERO ResourceTypeTag rows.
+--TagDefinitions ('Domain' + the explorer seed's own primary-URL tag, since retired by
+--PL-46) and ZERO ResourceTypeTag rows.
 --That left multi-valued tags, controlled vocabularies, Link-vs-Text content types,
 --primary-tag selection and the whole per-type entry-point template feature with no
 --data to demonstrate or test against.
@@ -23,9 +24,11 @@
 --NOT touched (owned elsewhere):
 --  - 'Domain'                 -- the single system IsDomainTag = 1 row (Script.PostDeployment1.sql).
 --                                Resolved by lookup here, never created or modified.
---  - 'DemoExplorerPrimaryUrl' -- owned by Demo_Insert_ExplorerGraph.sql. Resources that
---                                already carry it keep it as their primary entry point.
 --  - TagContentType rows      -- resolved by TagCode ('Text' / 'Link').
+--
+--SHARED with Demo_Insert_ExplorerGraph.sql: 'PortalUrl' is defined here (this script is its
+--owner) and merely ensured-if-absent there. That script owns the portal URL VALUES of its
+--DEMOEXP-* resources, which this one therefore leaves alone -- see section 3.
 --
 --IDEMPOTENT: safe to run multiple times -- will not create duplicate rows.
 --WARNING: [HTResourceMapper].[ResourceTag] has NO unique constraint on
@@ -194,9 +197,8 @@ BEGIN TRANSACTION
 -- =========================================================================================
 -- 1. Tag definitions
 --
---    DisplayOrder leaves 10 (Domain) and 20 (DemoExplorerPrimaryUrl) alone and runs
---    100..190: entry-point links first, then ownership, then classification, then the
---    multi-valued documentation tags last.
+--    DisplayOrder leaves 10 (Domain) alone and runs 100..190: entry-point links first,
+--    then ownership, then classification, then the multi-valued documentation tags last.
 -- =========================================================================================
 EXEC #SeedVocab_TagDefinition
      @TagDefinitionUid = 'DEMOVOCAB-tagdef-portalurl'
@@ -418,10 +420,6 @@ DECLARE @TagId_Component     INT = (SELECT TagDefinitionId FROM [HTResourceMappe
 DECLARE @TagId_Runbook       INT = (SELECT TagDefinitionId FROM [HTResourceMapper].TagDefinition WHERE TagDefinitionKey = N'Runbook')
 DECLARE @TagId_Documentation INT = (SELECT TagDefinitionId FROM [HTResourceMapper].TagDefinition WHERE TagDefinitionKey = N'Documentation')
 
--- The explorer seed's own primary-URL tag. Resources that already carry it keep it as their
--- entry point and are skipped for PortalUrl, so the editor never shows two "Portal URL" rows.
-DECLARE @TagId_ExplorerUrl   INT = (SELECT TagDefinitionId FROM [HTResourceMapper].TagDefinition WHERE TagDefinitionKey = N'DemoExplorerPrimaryUrl')
-
 -- ---------------------------------------------------------------------------------------
 -- Projection of the catalog with the deterministic derivations used below.
 -- ---------------------------------------------------------------------------------------
@@ -470,8 +468,14 @@ SELECT v.ResourceId, @TagId_Owner, v.Team, 0
 FROM #VocabRes v
 
 -- Entry-point link (Portal URL or Source Repository, per the type template).
--- Skipped for ABS(ResourceId) % 17 = 0 so the "no primary entry point" case still exists,
--- and skipped where the explorer seed already owns the resource's portal URL.
+-- Skipped for ABS(ResourceId) % 17 = 0 so the "no primary entry point" case still exists.
+--
+-- Since PL-46 the explorer seed shares this same 'PortalUrl' definition rather than owning a
+-- duplicate, so the two scripts could now fight over the same (resource, tag) value. Ownership
+-- rule: Demo_Insert_ExplorerGraph.sql owns the portal URLs of its DEMOEXP-* resources -- they
+-- are hand-written per resource and more specific than the derivation below -- so this script
+-- does not assign PortalUrl to them. (Their Source Repository tags are still assigned here;
+-- only the portal URL is explorer-owned.)
 INSERT INTO #VocabAssign (ResourceId, TagDefinitionId, TagValue, IsMultiValued)
 SELECT
      v.ResourceId
@@ -485,9 +489,7 @@ SELECT
     ,0
 FROM #VocabRes v
 WHERE ABS(v.ResourceId) % 17 <> 0
-  AND NOT (v.LinkTagId = @TagId_PortalUrl
-           AND EXISTS (SELECT 1 FROM [HTResourceMapper].ResourceTag x
-                       WHERE x.ResourceId = v.ResourceId AND x.TagDefinitionId = @TagId_ExplorerUrl))
+  AND NOT (v.LinkTagId = @TagId_PortalUrl AND v.ResourceUid LIKE 'DEMOEXP-%')
 
 -- Source Repository as a SECOND link tag on Azure App Service, so primary-tag selection has
 -- a real choice to make (two Link tags, one starred).

@@ -80,6 +80,11 @@ namespace ResourceMapper.Common.Server.Resources
                 .AddBit("@AllowCustomValue", allowCustomValue)
                 .AddBit("@IsMultiValued", isMultiValued)
                 .AddNVarchar("@AllowedValues", allowedValuesJson)
+                // @DisplayName / @RequirementLevel / @IsDomainTag / @IsSystemTag / @DisplayOrder are
+                // deliberately NOT passed: the import document has no syntax for them, so import has
+                // no opinion to express. The sproc reads their NULL defaults as "preserve on update"
+                // (PL-49) - previously it overwrote them, clearing IsDomainTag and breaking the
+                // (Domain + Type + Key) identity model on any import that named an existing tag.
                 .AddVarchar("@OnConflict", onConflict)
                 .AddVarchar("@Result", null, 10, ParameterDirection.Output);
 

@@ -197,6 +197,10 @@ BEGIN
             pr.SortSeq,
             td.TagDefinitionUid as TagUid,
             td.TagDefinitionKey as TagKey,
+            -- PL-48: the grid must label tags with the user-facing DisplayName, not the internal
+            -- key. Same COALESCE that TagDefinition_GetAll already applies, so both read paths
+            -- agree. TagKey is still projected - filters and permalink tokens key off it.
+            COALESCE(td.DisplayName, td.TagDefinitionKey) as TagDisplayName,
             tct.TagCode as ContentType,
             rt.TagValue,
             ' + @priorityLogic + ' as Priority,
@@ -218,6 +222,7 @@ BEGIN
         LastUpdatedOn,
         TagUid,
         TagKey,
+        TagDisplayName,
         ContentType,
         TagValue,
         Priority,

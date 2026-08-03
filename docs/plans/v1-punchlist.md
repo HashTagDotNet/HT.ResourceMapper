@@ -379,6 +379,110 @@ The read model already carries what's needed — `TagDefinition_GetAll` COALESCE
 `DisplayName, TagDefinitionKey`, so the grid query should project the same. Same
 internal-vocabulary leak as PL-33 (Domain vs Subscription); fold into the PL-24 copy pass. **S**
 
+---
+
+## Session 2026-08-03 (later) — PL-49 / PL-46 / PL-48 fixed
+
+All three verified against live data on `(localdb)\MSSQLLocalDB\ResourceMapper`, not inferred.
+
+### PL-49 — **FIXED**, and it was bigger than captured
+
+The capture said "pass all five params". The better fix was at the data layer, because the import
+document genuinely cannot express those columns — so import has no opinion to pass. `TagDefinition_Upsert`
+now reads NULL for `@DisplayName`/`@RequirementLevel`/`@IsDomainTag`/`@IsSystemTag`/`@DisplayOrder`
+as **"preserve on update"** (documented insert defaults unchanged), and the identity flags are
+**monotonic** — settable, never clearable.
+
+**Two additional holes found while building the repro, both now closed:**
+
+1. **Import could reshape a system tag's vocabulary.** The five metadata columns were only half the
+   row. Import *does* control `AllowCustomValue` / `IsMultiValued` / `AllowedValues`, so an import
+   naming `Domain` turned the required, restricted `["prod","non-prod"]` vocabulary into a free-text
+   field (`AllowCustomValue` 0 → 1, `AllowedValues` → NULL). Since identity is `(Domain + Type + Key)`,
+   that lets any typo mint a new identity namespace — same severity as the flag reset, different
+   column. **A system tag's shape is deployment-owned, so an upsert against one now returns
+   `skipped`.** (Found the hard way: my first repro did this to the live Domain tag; restored from
+   `Script.PostDeployment1.sql`'s declaration.)
+2. **The domain designation could be stolen off a system tag.** The "clear any other row's
+   `IsDomainTag`" block runs *before* the update and targets *other* rows, so it bypassed the
+   monotonic guard entirely. Passing `@IsDomainTag = 1` for a new tag would have cleared the
+   deployment-owned `Domain` row. Unreachable from today's callers, but a latent hole in the same
+   defect. Now returns `error` rather than half-applying the move.
+
+Verified — four paths, each observed:
+
+| Path | Result | Domain row after |
+|---|---|---|
+| Import's exact parameter set | `skipped` | fully intact |
+| Explicit `IsDomainTag=0, IsSystemTag=0` | `skipped` | flags intact |
+| New tag claiming `IsDomainTag=1` | `error` | designation kept, no row created |
+| Non-system tag (regression) | `updated` | shape applied, omitted metadata **preserved** |
+
+`ExportContract`'s caveat is updated: the `tagDefinitions` section is still lossy (it cannot restore
+those columns) but is no longer destructive. Left off by default.
+
+### PL-46 — **FIXED**, migration ran clean twice
+
+`DemoExplorerPrimaryUrl` retired. The explorer seed now shares the vocabulary-owned `PortalUrl`,
+creating it only if absent and **never updating it**, so the two scripts cannot fight over
+`RequirementLevel`/`DisplayOrder` in any run order. Inline migration repoints `ResourceTag` and
+`PrimaryTagDefinitionId`, then drops the retired row; it is a no-op once done.
+
+One consequence worth recording: sharing the definition created a *new* overlap the duplicate had
+been hiding — both scripts would have written the same `(resource, PortalUrl)` value, and the
+vocabulary seed's derived URL would have overwritten the explorer's hand-written per-resource ones.
+Resolved with an explicit ownership rule: **the explorer seed owns the portal URLs of its `DEMOEXP-*`
+resources**, so the vocabulary seed skips them.
+
+Verified after two consecutive full runs of both seeds:
+
+| Check | Before | After |
+|---|---:|---:|
+| tag definitions | 12 | 11 |
+| duplicate DisplayNames | 1 | **0** |
+| retired definition rows | 1 | **0** |
+| `DEMOEXP-*` portal URLs kept (hand-written values) | — | **8 of 8** |
+| duplicate single-valued `ResourceTag` rows | — | 0 |
+| orphaned / unmatched primary pointers | — | 0 |
+| Domain tag intact through both runs | — | `ACV=0 IDT=1 IST=1` |
+
+### PL-48 — **FIXED**, confirmed in the browser
+
+`Resource_GetItems` projects `TagDisplayName = COALESCE(td.DisplayName, td.TagDefinitionKey)` — the
+same COALESCE `TagDefinition_GetAll` already used, so both read paths agree. `TagKey` is still
+projected: filters and URL tokens key off it, and only the *label* was wrong. Driven at 1600×1000,
+6 of 11 tags now read properly and **no internal key leaks**: `CostCenter` → "Cost Center",
+`OnCall` → "On-Call Rotation", `Owner` → "Owning Team", `Tier` → "Service Tier",
+`Repository` → "Source Repository", `PortalUrl` → "Portal URL".
+
+Incidentally closes half of **PL-33**: the grid now says "Subscription" for the Domain tag, matching
+the editor's General tab, because that is the DisplayName deployment declares.
+
+**Left out of scope, deliberately:** the *same* leak exists in the **add-filter menu and the filter
+chips** (`AddFilterMenu.razor:32` labels options with the bare key; `ResourceFilterModels.cs:175`
+does the same for chips). So the grid now reads "Portal URL" while the filter menu above it still
+says `PortalUrl`. Fixing it means threading display names through `GetAllTagKeysAsync` →
+`ActiveFilter` → chip labels, and `ActiveFilter.TagKey` must stay the URL token — real plumbing with
+its own round-trip tests. It belongs in **B7 / PL-24** with the rest of the label work, not bolted on
+here. **S/M.**
+
+### PL-52 — the Playwright suite has been red since PL-45 ⚑ (new)
+
+**The punchlist's "8/8 pass" is stale — it is currently 0/8.** Every test fails with
+`'Owning Team' is required` → "Could not save". Cause isolated by experiment, not inspection:
+relaxing `Owner` to `Suggested` makes a failing test pass, restoring `Error` makes it fail again.
+`git log -S` puts the origin at **b8a01ff (PL-45)**, which made `Owner` a `RequirementLevel='Error'`
+tag — so the suite has been broken since that commit and nothing re-ran it.
+
+**The app is right and the tests are stale.** PL-45 deliberately introduced a genuinely required tag;
+the specs predate it and never fill one. Fix belongs in the specs (fill "Owning Team" in the
+create-a-subject helper), *not* in the seed. This also means the punchlist's standing verification
+line "expect 8/8" cannot be trusted until the specs are updated — and that any work verified only by
+that suite since PL-45 was not actually verified. **S, and it blocks B14 (ship).**
+
+Also observed: **PL-A3 reproduced** — one console `404` on first load of `/`. Previously "did not
+reproduce". Still not chased down.
+
 ## Coverage gaps in this capture
 
 Findings here are only as good as what was exercised. Not covered:
@@ -483,8 +587,10 @@ shape. Adding agents does not move that floor.
 
 ## Verification
 
-- `dotnet test` — expect 416 tests, 2 known failures, no new ones
-- `cd tools/e2e && npm run test:e2e` — expect 8/8
+- `dotnet test` — expect **473** tests, 2 known failures (PL-01 `NotFound`→404), no new ones.
+  (Was 416 at capture; the count grew with the export / type-CRUD work.)
+- `cd tools/e2e && npm run test:e2e` — **currently 0/8, red since PL-45. See PL-52.** Do not read a
+  green run here as a regression signal until the specs are fixed.
 - Drive the app: `ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS="http://localhost:5200" dotnet run --project UI/ResourceMapper.UI.Web --no-launch-profile`
 - **Stop the app before building** — it locks build output
 - Screenshot driver: `tools/e2e` helpers; from Git Bash use `MSYS_NO_PATHCONV=1` or a `/` route

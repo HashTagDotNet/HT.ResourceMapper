@@ -10,10 +10,13 @@
 --  4. The ten demo-owned TagDefinitions themselves.
 --
 --NOT touched (owned elsewhere):
---  - 'Domain'                 -- the system IsDomainTag = 1 row (Script.PostDeployment1.sql).
---  - 'DemoExplorerPrimaryUrl' -- owned by Demo_Insert_ExplorerGraph.sql, purged by
---                                Demo_Purge_ExplorerGraph.sql.
+--  - 'Domain'  -- the system IsDomainTag = 1 row (Script.PostDeployment1.sql).
 --  - TagContentType, ResourceType, Resource and ResourceRelationship rows.
+--
+--NOTE (PL-46): 'PortalUrl' is shared -- Demo_Insert_ExplorerGraph.sql uses it for the DEMOEXP-*
+--portal URLs instead of the duplicate definition it used to own. Purging the vocabulary
+--therefore also removes those portal-URL tags. Re-running Demo_Insert_ExplorerGraph.sql
+--recreates the definition and its values, so the explorer dataset is not left broken.
 --
 --IDEMPOTENT: safe to run multiple times / when nothing is left to remove.
 --=============================================

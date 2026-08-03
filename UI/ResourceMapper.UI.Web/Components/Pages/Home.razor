@@ -56,7 +56,7 @@
                             {
                                 <span class="rm-tag">
                                     <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" Class="rm-tagicon" />
-                                    <MudLink Href="@tag.TagValue" Target="_blank" Typo="Typo.body2">@tag.TagKey</MudLink>
+                                    <MudLink Href="@tag.TagValue" Target="_blank" Typo="Typo.body2">@tag.TagDisplayName</MudLink>
                                     <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
                                                    Class="rm-copy" aria-label="Copy link"
                                                    OnClick="@(() => CopyAsync(tag.TagValue))" />
@@ -64,7 +64,7 @@
                             }
                             else
                             {
-                                <span class="rm-tagtext"><span class="rm-tagkey">@tag.TagKey:</span> @tag.TagValue</span>
+                                <span class="rm-tagtext"><span class="rm-tagkey">@tag.TagDisplayName:</span> @tag.TagValue</span>
                             }
                         }
                     </div>
@@ -96,7 +96,7 @@
                                         <MudIconButton Icon="@Icons.Material.Outlined.OpenInNew" Size="Size.Small"
                                                        aria-label="Open link" Class="mr-1"
                                                        OnClick="@(() => OpenExternal(link.TagValue))" />
-                                        <span class="flex-grow-1">@link.TagKey</span>
+                                        <span class="flex-grow-1">@link.TagDisplayName</span>
                                         <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
                                                        aria-label="Copy link"
                                                        OnClick="@(() => CopyAsync(link.TagValue))" />

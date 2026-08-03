@@ -172,6 +172,7 @@ namespace ResourceMapper.Common.Server.Resources
                     {
                         TagUid = row.TagUid,
                         TagKey = row.TagKey ?? string.Empty,
+                        TagDisplayName = row.TagDisplayName ?? row.TagKey ?? string.Empty,
                         ContentType = row.ContentType ?? string.Empty,
                         TagValue = row.TagValue ?? string.Empty
                     });
@@ -512,6 +513,7 @@ namespace ResourceMapper.Common.Server.Resources
                 LastUpdatedOn = reader.GetDateTime("LastUpdatedOn"),
                 TagUid = GetStringOrNull(reader, "TagUid"),
                 TagKey = GetStringOrNull(reader, "TagKey"),
+                TagDisplayName = GetStringOrNull(reader, "TagDisplayName"),
                 ContentType = GetStringOrNull(reader, "ContentType"),
                 TagValue = GetStringOrNull(reader, "TagValue")
             };
@@ -533,6 +535,7 @@ namespace ResourceMapper.Common.Server.Resources
             public DateTime LastUpdatedOn { get; set; }
             public string? TagUid { get; set; }
             public string? TagKey { get; set; }
+            public string? TagDisplayName { get; set; }
             public string? ContentType { get; set; }
             public string? TagValue { get; set; }
         }
