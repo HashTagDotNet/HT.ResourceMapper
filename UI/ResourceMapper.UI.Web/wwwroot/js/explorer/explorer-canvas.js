@@ -156,9 +156,10 @@ export function init(hostEl, dotNetRef) {
         dotNet.invokeMethodAsync('OnNodeTapped', evt.target.id());
     });
 
-    cy.on('mouseover', 'node', e => { cy.scratch('_hover', e.target.id()); applyLabeled(); });
-    cy.on('mouseout',  'node', () => { cy.scratch('_hover', null); applyLabeled(); });
-    cy.on('select unselect', 'node', () => applyLabeled());
+    // Captions no longer depend on hover/selection (see applyLabeled), so these events must NOT
+    // call it any more: applyLabeled() walks every node and regenerates its caption data-URI, so
+    // driving it from mouseover meant re-rasterising the whole graph on every pointer move.
+    // Hover still drives the tooltip — see initTooltip.
 
     initTooltip(hostEl);
     initMenu();
@@ -240,12 +241,16 @@ function legendUri() {
 
 // ---- labeled state (caption visibility) ---------------------------------
 
-// Seed + hovered + selected nodes get the caption; everyone else just the code+icon.
+// EVERY node carries its name/type caption (user decision, 2026-08-03 — supersedes pass 2's
+// seed+hover+selected-only rule, which existed to avoid the label overlap of finding #1).
+// Viable now because two things changed since: the icon/code no longer collide inside the node
+// (PL-37), and the layered layout spreads nodes instead of stacking them in one row (PL-39).
+// Consequence: 'node.labeled' bounds-expansion now applies to every node — that is correct here,
+// since every node really does have caption overhang, but it means cy.fit() frames the captions
+// too and so zooms slightly further out than a caption-less graph would.
 function applyLabeled() {
-    const hoverId = cy.scratch('_hover');
     cy.nodes().forEach(n => {
-        const on = n.hasClass('seed') || n.selected() || n.id() === hoverId;
-        if (on) n.addClass('labeled'); else n.removeClass('labeled');
+        n.addClass('labeled');
         refreshNode(n);
     });
 }
