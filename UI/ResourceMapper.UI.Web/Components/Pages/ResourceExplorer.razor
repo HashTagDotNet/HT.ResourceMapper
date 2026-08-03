@@ -19,35 +19,46 @@
 
 <div class="rm-explorer-host">
     <div class="rm-explorer-bar">
-        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
-                   StartIcon="@Icons.Material.Outlined.Save" OnClick="SaveAsync" Disabled="_isReadOnly">Save</MudButton>
-        <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
-                   StartIcon="@Icons.Material.Outlined.SaveAs" OnClick="SaveAsAsync">Save As</MudButton>
-        <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
-                   StartIcon="@Icons.Material.Outlined.FolderOpen" OnClick="OpenAsync">Open</MudButton>
-        <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
-                   StartIcon="@Icons.Material.Outlined.Share" OnClick="ShareAsync">Share</MudButton>
-        <MudMenu Label="Export" StartIcon="@Icons.Material.Outlined.Download" Size="Size.Small"
-                 Variant="Variant.Outlined" Class="ml-1">
-            <MudMenuItem Icon="@Icons.Material.Outlined.ContentCopy" OnClick="CopyImageAsync">Copy image</MudMenuItem>
-            <MudMenuItem Icon="@Icons.Material.Outlined.Image" OnClick="SavePngAsync">Save PNG</MudMenuItem>
-            <MudMenuItem Icon="@Icons.Material.Outlined.Polyline" OnClick="SaveSvgAsync">Save SVG</MudMenuItem>
-            <MudMenuItem Icon="@Icons.Material.Outlined.Print" OnClick="PrintAsync">Print / PDF</MudMenuItem>
-        </MudMenu>
-        @if (_isReadOnly)
-        {
-            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Secondary" Class="ml-1"
-                       StartIcon="@Icons.Material.Outlined.ContentCopy" OnClick="SaveCopyAsync">Save a copy to mine</MudButton>
-        }
+        @* Group 1 — diagram lifecycle: what happens to the saved artefact. *@
+        <div class="rm-explorer-bar-group" role="group" aria-label="Diagram">
+            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Outlined.Save" OnClick="SaveAsync" Disabled="_isReadOnly">Save</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
+                       StartIcon="@Icons.Material.Outlined.SaveAs" OnClick="SaveAsAsync">Save As</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
+                       StartIcon="@Icons.Material.Outlined.FolderOpen" OnClick="OpenAsync">Open</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
+                       StartIcon="@Icons.Material.Outlined.Share" OnClick="ShareAsync">Share</MudButton>
+            <MudMenu Label="Export" StartIcon="@Icons.Material.Outlined.Download" Size="Size.Small"
+                     Variant="Variant.Outlined" Class="ml-1">
+                <MudMenuItem Icon="@Icons.Material.Outlined.ContentCopy" OnClick="CopyImageAsync">Copy image</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Outlined.Image" OnClick="SavePngAsync">Save PNG</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Outlined.Polyline" OnClick="SaveSvgAsync">Save SVG</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Outlined.Print" OnClick="PrintAsync">Print / PDF</MudMenuItem>
+            </MudMenu>
+            <MudTooltip Text="@(_canDeleteCurrent ? $"Delete “{_diagramName}”" : "Only a saved diagram you own can be deleted")">
+                <MudIconButton Size="Size.Small" Color="Color.Error" Class="ml-1"
+                               Icon="@Icons.Material.Outlined.DeleteOutline" aria-label="Delete diagram"
+                               OnClick="DeleteCurrentAsync" Disabled="@(!_canDeleteCurrent)" />
+            </MudTooltip>
+            @if (_isReadOnly)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Secondary" Class="ml-1"
+                           StartIcon="@Icons.Material.Outlined.ContentCopy" OnClick="SaveCopyAsync">Save a copy to mine</MudButton>
+            }
+        </div>
         <MudDivider Vertical="true" FlexItem="true" Class="mx-2" />
-        <MudTooltip Text="Fit to screen">
-            <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.CenterFocusStrong"
-                           aria-label="Fit" OnClick="FitAsync" />
-        </MudTooltip>
-        <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
-                   StartIcon="@Icons.Material.Outlined.UnfoldLess" OnClick="CollapseAllAsync">Collapse all</MudButton>
-        <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
-                   StartIcon="@Icons.Material.Outlined.AutoFixHigh" OnClick="ReTidyAsync">Re-tidy</MudButton>
+        @* Group 2 — canvas view: what happens to the picture on screen, never to the saved artefact. *@
+        <div class="rm-explorer-bar-group" role="group" aria-label="View">
+            <MudTooltip Text="Fit to screen">
+                <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.CenterFocusStrong"
+                               aria-label="Fit" OnClick="FitAsync" />
+            </MudTooltip>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
+                       StartIcon="@Icons.Material.Outlined.UnfoldLess" OnClick="CollapseAllAsync">Collapse all</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="ml-1"
+                       StartIcon="@Icons.Material.Outlined.AutoFixHigh" OnClick="ReTidyAsync">Re-tidy</MudButton>
+        </div>
         <MudSpacer />
         <MudText Typo="Typo.body2" Class="mr-3">
             @(string.IsNullOrWhiteSpace(_diagramName) ? "(unsaved)" : _diagramName)
@@ -113,6 +124,9 @@
     private string _diagramName = string.Empty;
     private string _seedName = string.Empty;
 
+    // Delete only makes sense for a diagram that actually exists and that this client owns.
+    private bool _canDeleteCurrent => !_isReadOnly && !string.IsNullOrEmpty(_diagramUid);
+
     private async Task UpdateTitleAsync()
     {
         var title = !string.IsNullOrWhiteSpace(_diagramName) ? _diagramName
@@ -149,7 +163,13 @@
 
     private async Task LoadNodeAsync(string uid, bool seed, string? expandFromUid)
     {
-        var response = await ExplorerService.GetNodeAsync(uid);
+        // What's already drawn, so the read can also return the relationships between the nodes it
+        // is about to hand back and the ones already on the canvas. Without it a relationship
+        // between two visible resources is simply never drawn — the picture claims they are
+        // unrelated with no hint that anything was left out.
+        var known = await SafeInvokeResultAsync<string[]>("nodeIds");
+
+        var response = await ExplorerService.GetNodeAsync(uid, known);
         if (!response.IsSuccess() || response.ApiResponse.Data is null)
         {
             if (seed) { _error = $"Resource '{uid}' not found."; StateHasChanged(); }
@@ -162,13 +182,28 @@
         {
             NodePayload(node.ResourceUid, node.ResourceKey, node.ResourceName, node.ResourceType, node.Domain, node.PrimaryUrl, node.ShortCode, node.IconKey)
         };
-        var edges = new List<object>();
         foreach (var n in node.Neighbors)
         {
             nodes.Add(NodePayload(n.ResourceUid, n.ResourceKey, n.ResourceName, n.ResourceType, n.Domain, n.PrimaryUrl, n.ShortCode, n.IconKey));
-            var src = n.Direction == "DependsOn" ? node.ResourceUid : n.ResourceUid;
-            var tgt = n.Direction == "DependsOn" ? n.ResourceUid : node.ResourceUid;
-            edges.Add(new { source = src, target = tgt });
+        }
+
+        // Edges are authoritative: they cover every relationship inside the on-canvas set, not just
+        // the ones touching this node. The neighbour-derived fallback only kicks in against a
+        // database whose Resource_GetForExplorer predates the 'Edge' rows, so a stale deployment
+        // degrades to the old (incomplete) picture rather than to no edges at all.
+        var edges = new List<object>();
+        if (node.Edges.Count > 0)
+        {
+            foreach (var e in node.Edges) edges.Add(new { source = e.FromUid, target = e.ToUid });
+        }
+        else
+        {
+            foreach (var n in node.Neighbors)
+            {
+                var src = n.Direction == "DependsOn" ? node.ResourceUid : n.ResourceUid;
+                var tgt = n.Direction == "DependsOn" ? n.ResourceUid : node.ResourceUid;
+                edges.Add(new { source = src, target = tgt });
+            }
         }
 
         await SafeInvokeAsync("addGraph", nodes, edges, seed ? uid : null, expandFromUid);
@@ -372,9 +407,50 @@
             ok ? Severity.Success : Severity.Error);
     }
 
-    private async Task SavePngAsync() => await SafeInvokeAsync("savePng", DownloadName());
-    private async Task SaveSvgAsync() => await SafeInvokeAsync("saveSvg", DownloadName());
-    private async Task PrintAsync() => await SafeInvokeAsync("printDiagram");
+    // Exports used to fail silently — a click that produced no file and no message. Each JS export
+    // now reports success, and anything false becomes a snackbar.
+    private async Task SavePngAsync()
+    {
+        if (!await SafeInvokeResultAsync<bool>("savePng", DownloadName()))
+            Snackbar.Add("Could not save the PNG.", Severity.Error);
+    }
+
+    private async Task SaveSvgAsync()
+    {
+        if (!await SafeInvokeResultAsync<bool>("saveSvg", DownloadName()))
+            Snackbar.Add("Could not save the SVG.", Severity.Error);
+    }
+
+    private async Task PrintAsync()
+    {
+        if (!await SafeInvokeResultAsync<bool>("printDiagram"))
+            Snackbar.Add("Could not open the print view — check that pop-ups are allowed.", Severity.Error);
+    }
+
+    private async Task DeleteCurrentAsync()
+    {
+        if (!_canDeleteCurrent) return;
+        // Plain-string message (not MarkupString): the diagram name is user-supplied.
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Delete diagram?",
+            $"“{_diagramName}” will be permanently deleted. The picture stays on screen but is no longer saved.",
+            yesText: "Delete", cancelText: "Cancel");
+        if (confirmed != true) return;
+
+        var resp = await DiagramService.DeleteAsync(_clientId, _diagramUid!);
+        if (!resp.IsSuccess())
+        {
+            Snackbar.Add("Could not delete the diagram.", Severity.Error);
+            return;
+        }
+        var deletedName = _diagramName;
+        _diagramUid = null;
+        _shareId = null;
+        _diagramName = string.Empty;
+        await UpdateTitleAsync();
+        Snackbar.Add($"Deleted “{deletedName}”.", Severity.Success);
+        StateHasChanged();
+    }
 
     private string DownloadName()
     {

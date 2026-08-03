@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,7 +19,9 @@ namespace ResourceMapper.Common.Server.Explorer
             _repo = repo;
         }
 
-        public async Task<ApiServiceResponse<ExplorerNodeModel>> GetNodeAsync(string resourceUid, CancellationToken cancellationToken = default)
+        public async Task<ApiServiceResponse<ExplorerNodeModel>> GetNodeAsync(string resourceUid,
+            IReadOnlyCollection<string>? knownResourceUids = null,
+            CancellationToken cancellationToken = default)
         {
             var builder = new ServiceResponseBuilder<ExplorerNodeModel>();
             try
@@ -29,7 +32,7 @@ namespace ResourceMapper.Common.Server.Explorer
                     return builder.BuildResponse();
                 }
 
-                var rows = await _repo.GetForExplorerAsync(resourceUid, cancellationToken);
+                var rows = await _repo.GetForExplorerAsync(resourceUid, knownResourceUids, cancellationToken);
                 var self = rows.FirstOrDefault(r => r.Direction == "Self");
                 if (self == null)
                 {
@@ -48,8 +51,18 @@ namespace ResourceMapper.Common.Server.Explorer
                     IconKey = self.IconKey,
                     Domain = self.Domain,
                     PrimaryUrl = self.PrimaryUrl,
+                    Edges = rows
+                        .Where(r => r.Direction == "Edge"
+                                    && !string.IsNullOrWhiteSpace(r.FromResourceUid)
+                                    && !string.IsNullOrWhiteSpace(r.ToResourceUid))
+                        .Select(r => new ExplorerEdgeModel
+                        {
+                            FromUid = r.FromResourceUid!,
+                            ToUid = r.ToResourceUid!
+                        })
+                        .ToList(),
                     Neighbors = rows
-                        .Where(r => r.Direction != "Self")
+                        .Where(r => r.Direction is "DependsOn" or "DependentOn")
                         .Select(r => new ExplorerNeighborModel
                         {
                             Direction = r.Direction,
