@@ -294,8 +294,52 @@ else if (_model is not null && _response is not null)
 
     private void EnterEditMode() => _mode = "Edit";
 
-    private void Cancel()
+    /// <summary>Cancel now confirms when there are unsaved changes — this reverses the design's
+    /// OQ3 default ("Cancel is an explicit discard, so it suppresses the guard"), which in practice
+    /// discarded real edits with no warning. The guard can never do this for us: the two navigating
+    /// branches set _suppressNavGuard themselves, consuming the one-shot before OnLocationChanging
+    /// runs, and the persisted branch never navigates at all — so the IsDirty check has to live
+    /// here, with the same three-way choice semantics the guard applies (RD1/RD13/RD19).
+    /// Async, not void: the persisted branch's reload must be awaited or the discarded task leaves
+    /// _loading stuck true with nothing to repaint it (and swallows its exceptions with it).</summary>
+    private async Task Cancel()
     {
+        if (_model?.IsDirty == true)
+        {
+            if (_navPromptOpen) return; // a prompt is already up — don't stack a second one
+
+            _navPromptOpen = true;
+            string? choice;
+            try
+            {
+                choice = await ShowUnsavedDialogAsync();
+            }
+            finally
+            {
+                _navPromptOpen = false;
+            }
+
+            if (choice is null || choice == "cancel") return; // stay on the form, edits intact
+
+            if (choice == "save")
+            {
+                var uid = await SaveInternalAsync();
+                if (uid is null) return; // save failed → stay, exactly as the dirty guard does
+
+                // A nested child saved from this prompt must link into the parent just as the
+                // Save button would (RD19) — the same rule OnLocationChanging applies.
+                if (Stack.HasFrames)
+                {
+                    CommitChildAndReturn(uid);
+                    return;
+                }
+            }
+
+            // "discard", or a save with nothing left to link → fall through to Cancel's normal
+            // destination below. Note the model still reads dirty after a Create save (RD13),
+            // so the navigating branches' existing suppression is what keeps it from re-prompting.
+        }
+
         if (Stack.HasFrames)
         {
             // Discarding a nested child: pop back to the parent, linking nothing (Returned stays null).
@@ -305,7 +349,7 @@ else if (_model is not null && _response is not null)
         else if (_model?.IsPersisted == true)
         {
             _mode = "View";
-            _ = LoadAsync(forceReload: true); // discard in-memory edits, reload the persisted values
+            await LoadAsync(forceReload: true); // discard in-memory edits, reload the persisted values
         }
         else
         {
