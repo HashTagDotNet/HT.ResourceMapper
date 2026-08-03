@@ -344,6 +344,38 @@ html, body {
     gap: .25rem;
 }
 
+/* Copy-value affordance. Sits beside the control rather than inside it: an in-field end adornment
+   is unclickable on the read-only details view, where MudBlazor's disabled input intercepts pointer
+   events. `min-width: 0` lets the input keep shrinking so the button never pushes the row wider. */
+.rm-tag-valuewrap {
+    display: flex;
+    align-items: center;
+    gap: .125rem;
+    min-width: 0;
+}
+
+.rm-tag-valuewrap > :first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Keeps a chip and its copy button on one line so a wrapping chip set never orphans the button
+   onto the next row, away from the value it copies. */
+.rm-tag-chipwrap {
+    display: inline-flex;
+    align-items: center;
+}
+
+.rm-tag-copy {
+    flex: 0 0 auto;
+    padding: 2px;
+    color: var(--mud-palette-text-secondary);
+}
+
+.rm-tag-chipwrap .rm-tag-copy {
+    margin-left: -2px;
+}
+
 .rm-tag-add-row {
     gap: .25rem;
 }

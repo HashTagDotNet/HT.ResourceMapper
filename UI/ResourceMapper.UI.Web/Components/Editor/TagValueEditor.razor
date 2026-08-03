@@ -1,4 +1,6 @@
 @using ResourceMapper.Common.Shared.Editor
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
 
 @if (Row.Definition.IsMultiValued)
 {
@@ -6,7 +8,17 @@
         <MudChipSet T="string" Class="rm-tag-chipset">
             @foreach (var v in ActiveValues())
             {
-                <MudChip T="string" Value="@v.EditedValue" OnClose="@(() => RemoveValue(v))" Disabled="@ReadOnlyEffective">@v.EditedValue</MudChip>
+                @* Each value carries its own copy affordance: the multi-valued tags are Runbook and
+                   Documentation, i.e. exactly the URLs worth copying. Always visible rather than
+                   hover-revealed - hover-only actions are unreachable on touch (cf. PL-12c). *@
+                <span class="rm-tag-chipwrap">
+                    <MudChip T="string" Value="@v.EditedValue" OnClose="@(() => RemoveValue(v))" Disabled="@ReadOnlyEffective">@v.EditedValue</MudChip>
+                    <MudTooltip Text="Copy value">
+                        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
+                                       Class="rm-tag-copy" aria-label="@($"Copy {Row.Definition.DisplayName} value")"
+                                       OnClick="@(() => CopyAsync(v.EditedValue))" />
+                    </MudTooltip>
+                </span>
             }
         </MudChipSet>
         @if (!ReadOnlyEffective)
@@ -41,28 +53,45 @@
 else
 {
     var editor = EnsureSingleValue();
-    @if (Row.IsLink)
-    {
-        <MudTextField T="string" Value="@editor.EditedValue" ValueChanged="@(v => OnSingleValueChanged(editor, v))"
-                      Placeholder="https://…" Disabled="@ReadOnlyEffective" Variant="Variant.Outlined" Margin="Margin.Dense"
-                      Error="@(!string.IsNullOrWhiteSpace(editor.EditedValue) && !IsValidLink(editor.EditedValue))"
-                      ErrorText="Must be a valid http/https URL" />
-    }
-    else if (Row.IsControlledVocab)
-    {
-        <MudSelect T="string" Value="@editor.EditedValue" ValueChanged="@(v => OnSingleValueChanged(editor, v))"
-                   Placeholder="Select…" Disabled="@ReadOnlyEffective" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
-            @foreach (var opt in Row.Definition.AllowedValues ?? new List<string>())
-            {
-                <MudSelectItem Value="@opt">@opt</MudSelectItem>
-            }
-        </MudSelect>
-    }
-    else
-    {
-        <MudTextField T="string" Value="@editor.EditedValue" ValueChanged="@(v => OnSingleValueChanged(editor, v))"
-                      Disabled="@ReadOnlyEffective" Variant="Variant.Outlined" Margin="Margin.Dense" />
-    }
+    @* One copy affordance per value, rendered BESIDE the control rather than as an end adornment
+       inside it. An in-field adornment was the first attempt (the literal GitHub treatment) but it
+       is unclickable on the read-only details view: MudBlazor's `mud-disabled` input div intercepts
+       pointer events, so the icon appeared and did nothing. Rendering it outside also means one
+       mechanism covers text, link, vocab-select and chip rows alike, instead of the select being
+       silently excluded because its adornment slot is taken by the dropdown arrow. *@
+    <div class="rm-tag-valuewrap">
+        @if (Row.IsLink)
+        {
+            <MudTextField T="string" Value="@editor.EditedValue" ValueChanged="@(v => OnSingleValueChanged(editor, v))"
+                          Placeholder="https://…" Disabled="@ReadOnlyEffective" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Error="@(!string.IsNullOrWhiteSpace(editor.EditedValue) && !IsValidLink(editor.EditedValue))"
+                          ErrorText="Must be a valid http/https URL" />
+        }
+        else if (Row.IsControlledVocab)
+        {
+            <MudSelect T="string" Value="@editor.EditedValue" ValueChanged="@(v => OnSingleValueChanged(editor, v))"
+                       Placeholder="Select…" Disabled="@ReadOnlyEffective" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                @foreach (var opt in Row.Definition.AllowedValues ?? new List<string>())
+                {
+                    <MudSelectItem Value="@opt">@opt</MudSelectItem>
+                }
+            </MudSelect>
+        }
+        else
+        {
+            <MudTextField T="string" Value="@editor.EditedValue" ValueChanged="@(v => OnSingleValueChanged(editor, v))"
+                          Disabled="@ReadOnlyEffective" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        }
+
+        @if (!string.IsNullOrWhiteSpace(editor.EditedValue))
+        {
+            <MudTooltip Text="Copy value">
+                <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
+                               Class="rm-tag-copy" aria-label="@CopyLabel"
+                               OnClick="@(() => CopyAsync(editor.EditedValue))" />
+            </MudTooltip>
+        }
+    </div>
 }
 
 @code {
@@ -124,6 +153,35 @@ else
         Row.Values.Add(new SingleValueEditor { OriginalValue = string.Empty, EditedValue = _pendingValue });
         _pendingValue = null;
         await OnChanged.InvokeAsync();
+    }
+
+    private string CopyLabel => $"Copy {Row.Definition.DisplayName} value";
+
+    /// <summary>
+    /// Same clipboard call and same brief confirmation as the home grid's copy buttons
+    /// (<c>Home.razor</c>), so copying behaves identically wherever it appears.
+    /// </summary>
+    private async Task CopyAsync(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", value);
+            Snackbar.Add("Value copied", Severity.Normal, config =>
+            {
+                config.Icon = Icons.Material.Outlined.ContentCopy;   // match the copy-button icon
+                config.VisibleStateDuration = 500;
+                config.ShowTransitionDuration = 100;
+                config.HideTransitionDuration = 150;
+            });
+        }
+        catch
+        {
+            // Clipboard is unavailable outside a secure context / without permission. Say so rather
+            // than failing silently — the user is left believing the value is on their clipboard.
+            Snackbar.Add("Copy failed — clipboard unavailable.", Severity.Warning);
+        }
     }
 
     private static bool IsValidLink(string? value)
