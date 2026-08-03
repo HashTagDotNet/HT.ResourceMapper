@@ -316,6 +316,30 @@ it immediately.
 `PrimaryTagDefinitionId`) to `PortalUrl`. It exists only because the explorer seed predated a real
 vocabulary. Touches `Demo_Insert_ExplorerGraph.sql` and needs a data migration for the 8. **S**
 
+### PL-47 — grid row height explodes now that resources actually have tags ⚑
+
+Confirmed live after PL-45. Tags stack vertically in the Tags column, so a resource with
+Domain + Owner + PortalUrl + 2× Runbook renders ~5 lines. Rows went from ~39px to ~100–200px and
+**visible rows dropped from ~22 to ~7** at 1600×1000.
+
+This was invisible before PL-45 because almost nothing was tagged — the thin seed was masking a
+real density problem. It partially undoes PL-12 and contradicts UX-Plan-V2's "visually light weight
+and compact / visual focus on data".
+
+Options (design call, not decided): cap visible tags per row with a "+3 more" affordance (note
+`Resource_GetItems` already has a `@TagLimit` param); render tags as compact inline chips rather
+than stacked lines; move non-Link tags out of the grid into the detail view; or make the Tags column
+opt-in per user. **Do not solve it by removing the seed data** — the data is correct; the display is
+what does not scale. **M**
+
+### PL-48 — grid shows internal TagKey instead of DisplayName
+
+`Home.razor:51` binds `@tag.TagKey`, so the grid renders `PortalUrl`, `CostCenter`, `OnCall` where
+the definitions carry the user-facing DisplayNames "Portal URL", "Cost Center", "On-Call Rotation".
+The read model already carries what's needed — `TagDefinition_GetAll` COALESCEs
+`DisplayName, TagDefinitionKey`, so the grid query should project the same. Same
+internal-vocabulary leak as PL-33 (Domain vs Subscription); fold into the PL-24 copy pass. **S**
+
 ## Coverage gaps in this capture
 
 Findings here are only as good as what was exercised. Not covered:
