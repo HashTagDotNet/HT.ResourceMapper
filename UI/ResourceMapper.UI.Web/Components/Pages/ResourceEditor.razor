@@ -43,7 +43,7 @@ else if (_model is not null && _response is not null)
         <MudTabs Class="rm-editor-tabs">
             <MudTabPanel Text="General">
                 <GeneralTab Model="_model" ResourceTypes="_response.ResourceTypes" DomainAllowedValues="_response.DomainAllowedValues"
-                            TagDictionary="_response.TagDictionary" ReadOnly="@(_mode == "View")" DomainLocked="_domainLocked"
+                            DomainLabel="@DomainLabel" ReadOnly="@(_mode == "View")" DomainLocked="_domainLocked"
                             OnFieldChanged="OnGeneralFieldChanged" OnCheckUniqueness="CheckUniquenessAsync"
                             OnResourceTypeChanged="OnResourceTypeChanged" OnResourceDomainChanged="OnResourceDomainChanged" />
             </MudTabPanel>
@@ -54,19 +54,21 @@ else if (_model is not null && _response is not null)
             <MudTabPanel Text="Dependencies">
                 <DependencyTab Rows="_model.DependsOn" Direction="DependsOn"
                                 HelpText="What this resource depends on."
-                                Domain="@_model.Domain.EditedValue" ExcludeResourceUid="@_model.ResourceUid"
+                                Domain="@_model.Domain.EditedValue" DomainLabel="@DomainLabel"
+                                ExcludeResourceUid="@_model.ResourceUid"
                                 ReadOnly="@(_mode == "View")" OnFieldChanged="OnGeneralFieldChanged"
                                 OnCreateNewRequested="InitiateNestedCreate" />
             </MudTabPanel>
             <MudTabPanel Text="Dependent On">
                 <DependencyTab Rows="_model.DependentOn" Direction="DependentOn"
                                 HelpText="What depends on this resource."
-                                Domain="@_model.Domain.EditedValue" ExcludeResourceUid="@_model.ResourceUid"
+                                Domain="@_model.Domain.EditedValue" DomainLabel="@DomainLabel"
+                                ExcludeResourceUid="@_model.ResourceUid"
                                 ReadOnly="@(_mode == "View")" OnFieldChanged="OnGeneralFieldChanged"
                                 OnCreateNewRequested="InitiateNestedCreate" />
             </MudTabPanel>
             <MudTabPanel Text="Review">
-                <ReviewTab Model="_model" />
+                <ReviewTab Model="_model" DomainLabel="@DomainLabel" />
             </MudTabPanel>
             @* History tab: scaffolded per design §12, not built — commented out until audit/versioning lands.
             <MudTabPanel Text="History">
@@ -105,6 +107,18 @@ else if (_model is not null && _response is not null)
     private bool _saving;
     private bool _deleting;
     private bool _domainLocked;
+
+    /// <summary>
+    /// PL-33: the user-facing name of the domain/boundary field, read from the domain tag's own
+    /// DisplayName ("Subscription" in this deployment) and passed to every tab that names it. It
+    /// used to be derived inside GeneralTab and hardcoded elsewhere, so the same field read
+    /// "Subscription" on General and "Domain" on Review. Deriving it once here means a deployment
+    /// that renames the tag renames it everywhere; "Domain" is only the fallback when no domain tag
+    /// is defined at all.
+    /// </summary>
+    private string DomainLabel =>
+        _response?.TagDictionary?.FirstOrDefault(t => t.IsDomainTag)?.DisplayName ?? "Domain";
+
     private bool _hasLoadedOnce;
     private string? _lastLoadedUid;
     private int? _lastNestedLevel;

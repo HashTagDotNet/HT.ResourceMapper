@@ -3,12 +3,27 @@
 @using ResourceMapper.UI.Web.Components.ResourceTypes
 @inject IDialogService DialogService
 
+@* PL-30: fields run @DomainLabel -> Resource Type -> Key, the same order the Identity preview
+   below composes them in ("prod / Database / CATALOG-DB"). The sentence names them in that order
+   too, so the prose and the form agree. *@
 <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-    Identity is set by Resource Type, @DomainLabel, and Key together — once saved, Resource Type
-    and @DomainLabel can't be changed.
+    Identity is set by @DomainLabel, Resource Type, and Key together — once saved, @DomainLabel
+    and Resource Type can't be changed.
 </MudText>
 
 <div class="rm-editor-fields">
+    <MudSelect T="string" Value="@Model.Domain.EditedValue" ValueChanged="OnDomainChanged"
+               Label="@DomainLabel" Required="true" Disabled="@(ReadOnly || Model.IsPersisted || DomainLocked)"
+               Variant="Variant.Outlined" Margin="Margin.Dense"
+               HelperText="@(DomainLocked ? $"Locked to the parent resource's {DomainLabel}" : null)"
+               Error="@(Model.Domain.Level == EditorFieldLevel.Error)"
+               ErrorText="@Model.Domain.Messages.FirstOrDefault()?.Message">
+        @foreach (var value in DomainAllowedValues)
+        {
+            <MudSelectItem Value="@value">@value</MudSelectItem>
+        }
+    </MudSelect>
+
     @* Wrapper keeps the select + its inline-create action in a single .rm-editor-fields cell. *@
     <div>
         <MudSelect T="int?" Value="@Model.ResourceTypeId" ValueChanged="OnTypeChanged"
@@ -33,18 +48,6 @@
             </MudButton>
         }
     </div>
-
-    <MudSelect T="string" Value="@Model.Domain.EditedValue" ValueChanged="OnDomainChanged"
-               Label="@DomainLabel" Required="true" Disabled="@(ReadOnly || Model.IsPersisted || DomainLocked)"
-               Variant="Variant.Outlined" Margin="Margin.Dense"
-               HelperText="@(DomainLocked ? $"Locked to the parent resource's {DomainLabel}" : null)"
-               Error="@(Model.Domain.Level == EditorFieldLevel.Error)"
-               ErrorText="@Model.Domain.Messages.FirstOrDefault()?.Message">
-        @foreach (var value in DomainAllowedValues)
-        {
-            <MudSelectItem Value="@value">@value</MudSelectItem>
-        }
-    </MudSelect>
 
     <MudTextField T="string" Value="@Model.Name.EditedValue" ValueChanged="OnNameChanged"
                   Label="Name" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense"
@@ -82,8 +85,14 @@
     [Parameter] public ResourceEditorModel Model { get; set; } = default!;
     [Parameter] public List<ResourceTypeOption> ResourceTypes { get; set; } = new();
     [Parameter] public List<string> DomainAllowedValues { get; set; } = new();
-    [Parameter] public List<TagDefinitionModel> TagDictionary { get; set; } = new();
     [Parameter] public bool ReadOnly { get; set; }
+
+    /// <summary>
+    /// User-facing name of the domain/boundary field ("Subscription" here). Supplied by the parent
+    /// so every tab names it identically (PL-33) — this component used to derive it privately, which
+    /// is how Review drifted to "Domain".
+    /// </summary>
+    [Parameter] public string DomainLabel { get; set; } = "Domain";
 
     /// <summary>True for a nested "Create new…" dependency target — locks Domain to the parent's
     /// (same-domain rule); the parent already pre-set Model.Domain.EditedValue before render.</summary>
@@ -140,9 +149,6 @@
             await OnTypeChanged(created.ResourceTypeId);
         }
     }
-
-    private string DomainLabel =>
-        TagDictionary.FirstOrDefault(t => t.IsDomainTag)?.DisplayName ?? "Domain";
 
     private async Task OnTypeChanged(int? value)
     {

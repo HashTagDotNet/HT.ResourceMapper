@@ -9,8 +9,9 @@
    the table instead of jogging on the rows that happen to be empty. *@
 <MudSimpleTable Dense="true" Elevation="0" Class="rm-review-table" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
     <tbody>
+        @* Same order as the General tab and the Identity preview (PL-30), same label (PL-33). *@
+        @ReviewRow(DomainLabel, Model.Domain.EditedValue)
         @ReviewRow("Resource Type", Model.ResourceType.EditedValue)
-        @ReviewRow("Domain", Model.Domain.EditedValue)
         @ReviewRow("Name", Model.Name.EditedValue)
         @ReviewRow("Key", Model.Key.EditedValue)
         @ReviewRow("Description", Model.Description.EditedValue)
@@ -136,6 +137,12 @@ else
     [Parameter] public ResourceEditorModel Model { get; set; } = default!;
 
     /// <summary>
+    /// User-facing name of the domain/boundary field ("Subscription" here), supplied by the parent.
+    /// This tab hardcoded "Domain" while General showed "Subscription" for the same field (PL-33).
+    /// </summary>
+    [Parameter] public string DomainLabel { get; set; } = "Domain";
+
+    /// <summary>
     /// Shared with the Tags tab's star so the same symbol never carries two different explanations.
     /// Names the concept AND what it does — "Primary link" alone was the wording that PL-35 records
     /// as unmemorable even to its author.
@@ -156,8 +163,10 @@ else
     private List<(string Field, string Text, EditorFieldLevel Level)> CollectMessages()
     {
         var result = new List<(string, string, EditorFieldLevel)>();
+        // Validation messages name the field too, so they take the same label (PL-33) and the same
+        // order as the rows above.
+        AddFieldMessages(DomainLabel, Model.Domain, result);
         AddFieldMessages("Resource Type", Model.ResourceType, result);
-        AddFieldMessages("Domain", Model.Domain, result);
         AddFieldMessages("Name", Model.Name, result);
         AddFieldMessages("Key", Model.Key, result);
 

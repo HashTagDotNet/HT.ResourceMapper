@@ -33,7 +33,7 @@
 @if (!ReadOnly)
 {
     <div class="d-flex align-center mt-3 rm-dep-add">
-        <ResourcePicker Domain="@Domain" ExcludeResourceUid="@ExcludeResourceUid"
+        <ResourcePicker Domain="@Domain" DomainLabel="@DomainLabel" ExcludeResourceUid="@ExcludeResourceUid"
                         ExcludedUids="@ExcludedUids()" OnPicked="OnPicked"
                         OnCreateNewRequested="RaiseCreateNewRequested" />
         <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add"
@@ -49,6 +49,9 @@
     [Parameter] public string Direction { get; set; } = string.Empty; // "DependsOn" | "DependentOn"
     [Parameter] public string HelpText { get; set; } = string.Empty;
     [Parameter] public string? Domain { get; set; }
+
+    /// <summary>User-facing name of the domain field, passed through to ResourcePicker (PL-33).</summary>
+    [Parameter] public string DomainLabel { get; set; } = "Domain";
     [Parameter] public string? ExcludeResourceUid { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public EventCallback OnFieldChanged { get; set; }
