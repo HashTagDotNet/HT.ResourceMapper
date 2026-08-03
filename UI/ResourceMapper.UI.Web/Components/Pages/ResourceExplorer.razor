@@ -17,7 +17,12 @@
 
 <PageTitle>Explorer</PageTitle>
 
+@* §7: the explorer gets the "Shell" treatment — breadcrumb + fixed title — even though its canvas
+   styling is staged last. The trail is deeper here because the diagram is always of some resource,
+   so "back to that resource" is as useful as "back to the grid". *@
 <div class="rm-explorer-host">
+    <PageHeader Title="@ExplorerTitle" Parents="@ExplorerCrumbs" />
+
     <div class="rm-explorer-bar">
         @* Group 1 — diagram lifecycle: what happens to the saved artefact. *@
         <div class="rm-explorer-bar-group" role="group" aria-label="Diagram">
@@ -118,6 +123,24 @@
     private bool _isReadOnly;
     private string _preset = "nameType";
     private string _clientId = string.Empty;
+    /// <summary>
+    /// §7 page chrome. Prefers the saved diagram's name, then the seed resource's name — the same
+    /// precedence the browser tab title already used, kept in one place so they cannot diverge.
+    /// </summary>
+    private string ExplorerTitle =>
+        !string.IsNullOrWhiteSpace(_diagramName) ? _diagramName
+        : !string.IsNullOrWhiteSpace(_seedName) ? $"{_seedName} — dependencies"
+        : "Resource Explorer";
+
+    /// <summary>
+    /// Trail: Home › Resources › &lt;seed resource&gt; › this diagram. The seed crumb is a real link
+    /// back to the record the diagram is of, which is otherwise a dead end.
+    /// </summary>
+    private (string Text, string Href)[] ExplorerCrumbs =>
+        !string.IsNullOrWhiteSpace(_seedName) && !string.IsNullOrWhiteSpace(_seedUid)
+            ? [("Resources", "/"), (_seedName, $"/resources/{_seedUid}")]
+            : [("Resources", "/")];
+
     private string _seedUid = string.Empty;
     private string? _diagramUid;
     private string? _shareId;

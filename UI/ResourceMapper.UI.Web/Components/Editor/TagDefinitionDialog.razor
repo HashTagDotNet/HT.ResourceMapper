@@ -5,34 +5,88 @@
 
 <MudDialog>
     <DialogContent>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-            Create a new tag definition. If a tag with this key already exists, that existing
-            definition is reused instead of creating a duplicate.
-        </MudText>
+        @* PL-23 / design §7 (dialogs get the full treatment). This screen was the worst-affected by
+           developer vocabulary: "Requirement Level → Error", the circular "Multi-valued (multiple
+           discrete values)", an unexplained "Display Order", and the genuinely ambiguous pairing of
+           "Allow custom value" with "Allowed Values". *@
+        <div class="rm-section-desc">
+            A tag definition describes a kind of metadata — its name, what sort of value it holds,
+            and whether resources are expected to fill it in. Reuse beats duplication: if a tag with
+            this name already exists, that one is used instead of a second copy.
+        </div>
 
-        <MudTextField T="string" @bind-Value="_key" Label="Key" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense"
-                      HelperText="@KeyHelperText" Error="@_keyError" ErrorText="Key is required" />
+        <FormRow Label="Name" Required="true"
+                 Info="What people see on the resource editor and in the grid's Tags column.">
+            <MudTextField T="string" @bind-Value="_displayName" aria-label="Name"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          HelperText="e.g. Owning Team, Runbook, Cost Center" />
+        </FormRow>
 
-        <MudTextField T="string" @bind-Value="_displayName" Label="Display Name" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" />
+        <FormRow Label="Key" Required="true"
+                 Info="The stable internal identifier used by import and export. Not shown to users.">
+            <MudTextField T="string" @bind-Value="_key" aria-label="Key" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          HelperText="@(KeyHelperText ?? "No spaces — e.g. OwningTeam")"
+                          Error="@_keyError" ErrorText="Key is required" />
+        </FormRow>
 
-        <MudSelect T="string" @bind-Value="_contentType" Label="Content Type" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2">
-            <MudSelectItem Value="@("Text")">Text</MudSelectItem>
-            <MudSelectItem Value="@("Link")">Link</MudSelectItem>
-        </MudSelect>
+        <FormRow Label="Holds" Required="true"
+                 Info="Link values render as clickable links and can be opened from the grid and the explorer. Text values are shown as-is.">
+            <MudSelect T="string" @bind-Value="_contentType" aria-label="Holds"
+                       Variant="Variant.Outlined" Margin="Margin.Dense"
+                       HelperText="Pick Link for anything you would click — a portal URL, a runbook, a repo.">
+                <MudSelectItem Value="@("Text")">Text</MudSelectItem>
+                <MudSelectItem Value="@("Link")">A link (URL)</MudSelectItem>
+            </MudSelect>
+        </FormRow>
 
-        <MudSelect T="string" @bind-Value="_requirementLevel" Label="Requirement Level" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2">
-            <MudSelectItem Value="@("Error")">Error (required)</MudSelectItem>
-            <MudSelectItem Value="@("Suggested")">Suggested</MudSelectItem>
-            <MudSelectItem Value="@("Optional")">Optional</MudSelectItem>
-        </MudSelect>
+        @* Was "Requirement Level" with an "Error" option — the name of an internal severity, not
+           anything a user would recognise. The stored values are unchanged; only the wording is. *@
+        <FormRow Label="Expected?" Info="Controls whether a resource missing this tag is flagged when saving.">
+            <MudSelect T="string" @bind-Value="_requirementLevel" aria-label="Expected"
+                       Variant="Variant.Outlined" Margin="Margin.Dense"
+                       HelperText="Required tags block saving until filled in.">
+                <MudSelectItem Value="@("Error")">Required — can't save without it</MudSelectItem>
+                <MudSelectItem Value="@("Suggested")">Recommended — flagged, but can still save</MudSelectItem>
+                <MudSelectItem Value="@("Optional")">Optional — never flagged</MudSelectItem>
+            </MudSelect>
+        </FormRow>
 
-        <MudCheckBox T="bool" @bind-Value="_allowCustomValue" Label="Allow custom value (free text)" Class="mt-2" />
-        <MudCheckBox T="bool" @bind-Value="_isMultiValued" Label="Multi-valued (multiple discrete values)" />
+        @* THE conceptual fix. "Allow custom value" and "Allowed Values" were two independent
+           controls describing one decision, and their combinations included a state the app does not
+           honour: with AllowCustomValue = true the editor renders a free-text box and ignores
+           AllowedValues entirely (TagRowEditor.IsControlledVocab). Offering "suggestions, but other
+           values allowed" would therefore have produced a list that never appears. Two options only,
+           matching what the editor actually implements. *@
+        <FormRow Label="Values" Info="Whether people type the value freely or choose from a list you define.">
+            <MudRadioGroup T="bool" Value="_restrictToList" ValueChanged="OnRestrictChanged">
+                <MudRadio T="bool" Value="false" Dense="true">Anything they type</MudRadio>
+                <MudRadio T="bool" Value="true" Dense="true">Only values from a list</MudRadio>
+            </MudRadioGroup>
+        </FormRow>
 
-        <MudTextField T="string" @bind-Value="_allowedValuesCsv" Label="Allowed Values (comma-separated)" Variant="Variant.Outlined"
-                      Margin="Margin.Dense" HelperText="Optional — leave blank for unrestricted text" Class="mt-2" />
+        @if (_restrictToList)
+        {
+            <FormRow Label="The list" Required="true"
+                     Info="These become the only choices offered for this tag. Editing the list later does not change values already saved.">
+                <MudTextField T="string" @bind-Value="_allowedValuesCsv" aria-label="The list"
+                              Variant="Variant.Outlined" Margin="Margin.Dense"
+                              HelperText="Separate with commas — e.g. tier-1, tier-2, tier-3" />
+            </FormRow>
+        }
 
-        <MudNumericField T="int" @bind-Value="_displayOrder" Label="Display Order" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" />
+        <FormRow Label="How many" Info="Whether one resource can carry several values for this tag at once.">
+            <MudRadioGroup T="bool" Value="_isMultiValued" ValueChanged="@(v => _isMultiValued = v)">
+                <MudRadio T="bool" Value="false" Dense="true">One value</MudRadio>
+                <MudRadio T="bool" Value="true" Dense="true">Several values</MudRadio>
+            </MudRadioGroup>
+        </FormRow>
+
+        @* Was a bare "Display Order" number with no explanation of what it ordered. *@
+        <FormRow Label="Sort position" Info="Where this tag sits in the list of tags on the resource editor.">
+            <MudNumericField T="int" @bind-Value="_displayOrder" aria-label="Sort position"
+                             Variant="Variant.Outlined" Margin="Margin.Dense"
+                             HelperText="Lower numbers appear first. Leave at 1000 to sort after the built-ins." />
+        </FormRow>
 
         @if (!string.IsNullOrEmpty(_error))
         {
@@ -55,13 +109,28 @@
     private string? _displayName;
     private string _contentType = "Text";
     private string _requirementLevel = "Optional";
-    private bool _allowCustomValue = true;
     private bool _isMultiValued;
     private string? _allowedValuesCsv;
     private int _displayOrder = 1000;
     private bool _saving;
     private bool _keyError;
     private string? _error;
+
+    /// <summary>
+    /// PL-23: the single decision that replaced the "Allow custom value" checkbox plus the
+    /// "Allowed Values" text box. `false` = free text (no list, custom allowed); `true` = the list
+    /// is the only choice. Maps onto AllowCustomValue = !_restrictToList, which is exactly the
+    /// condition TagRowEditor.IsControlledVocab tests.
+    /// </summary>
+    private bool _restrictToList;
+
+    /// <summary>Clearing the list when switching back to free text stops a stale list being saved
+    /// against a definition that no longer uses one.</summary>
+    private void OnRestrictChanged(bool value)
+    {
+        _restrictToList = value;
+        if (!value) _allowedValuesCsv = null;
+    }
 
     private string? KeyHelperText =>
         !string.IsNullOrWhiteSpace(_key) && ExistingKeys.Any(k => string.Equals(k, _key, StringComparison.OrdinalIgnoreCase))
@@ -76,6 +145,14 @@
         _keyError = string.IsNullOrWhiteSpace(_key);
         if (_keyError) return;
 
+        // "Only values from a list" with an empty list would save a definition that offers no
+        // choices at all — an unfillable tag. Refuse rather than create it.
+        if (_restrictToList && string.IsNullOrWhiteSpace(_allowedValuesCsv))
+        {
+            _error = "Add at least one value to the list, or choose \"Anything they type\".";
+            return;
+        }
+
         _saving = true;
         try
         {
@@ -88,7 +165,9 @@
                 TagDefinitionKey = _key.Trim(),
                 DisplayName = string.IsNullOrWhiteSpace(_displayName) ? null : _displayName,
                 ContentType = _contentType,
-                AllowCustomValue = _allowCustomValue,
+                // The list is the only choice <=> custom values are not allowed. One decision,
+                // two fields (PL-23).
+                AllowCustomValue = !_restrictToList,
                 IsMultiValued = _isMultiValued,
                 AllowedValues = allowedValues,
                 RequirementLevel = _requirementLevel,

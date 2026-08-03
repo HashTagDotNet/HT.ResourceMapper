@@ -1,0 +1,60 @@
+@*
+    Shared page chrome — azure-ux-design-v1 §5 / §7 ("Shell" treatment for every route).
+
+    Breadcrumb, then large title, then an optional right-aligned action slot. Extracted so the five
+    routes cannot each invent their own header: before this, Home had no title at all while Import
+    and Resource Types each hand-rolled `Typo.h5` + inline font-weight, and only the editor had a
+    breadcrumb.
+
+    The breadcrumb is also the second, more natural route back to the grid (PL-08).
+*@
+
+<div class="rm-shell-head">
+    <MudBreadcrumbs Items="@Crumbs" Class="rm-breadcrumb" Separator="›" />
+    <div class="d-flex align-center">
+        <h1 class="rm-shell-title">@Title</h1>
+        @if (Actions is not null)
+        {
+            <MudSpacer />
+            @Actions
+        }
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Description))
+    {
+        <div class="rm-section-desc rm-shell-desc">@Description</div>
+    }
+</div>
+
+@code {
+    /// <summary>Page title, and the final (non-link) breadcrumb crumb.</summary>
+    [Parameter] public string Title { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Intermediate crumbs between Home and <see cref="Title"/>, as (text, href) pairs. Omit for a
+    /// top-level page — Home is always prepended and the title always terminates the trail.
+    /// </summary>
+    [Parameter] public IReadOnlyList<(string Text, string Href)>? Parents { get; set; }
+
+    /// <summary>One-line description under the title. Optional.</summary>
+    [Parameter] public string? Description { get; set; }
+
+    /// <summary>Right-aligned page actions (New…, Delete, Edit).</summary>
+    [Parameter] public RenderFragment? Actions { get; set; }
+
+    /// <summary>True on the Home page itself, where a "Home › Home" trail would be silly.</summary>
+    [Parameter] public bool IsHome { get; set; }
+
+    private List<BreadcrumbItem> Crumbs
+    {
+        get
+        {
+            var crumbs = new List<BreadcrumbItem>();
+            if (!IsHome) crumbs.Add(new BreadcrumbItem("Home", href: "/"));
+            if (Parents is not null)
+                foreach (var (text, href) in Parents)
+                    crumbs.Add(new BreadcrumbItem(text, href: href));
+            crumbs.Add(new BreadcrumbItem(Title, href: null, disabled: true));
+            return crumbs;
+        }
+    }
+}

@@ -43,7 +43,6 @@ html, body {
 
 .rm-tagtext {
     white-space: nowrap;
-    font-size: .85rem;
 }
 
 .rm-tagkey {
@@ -777,4 +776,36 @@ html, body {
 /* The review tables are reference content, not a form, so they get the form's width budget. */
 .rm-review-table {
     max-width: 700px;
+}
+
+/* Page description sits under the title in the fixed header, so it must not inherit the form's
+   bottom margin — the shell body immediately follows it. */
+.rm-shell-desc {
+    margin-bottom: .5rem;
+}
+
+/* --- Step 7: grid table density -----------------------------------------------------------
+   The type scale set in MudTheme applies to the grid too, but the table's own row padding is
+   MudBlazor's and does not follow it, so rows stayed loose while their text shrank. Bring the
+   padding in line so the grid reads as part of the same system.
+   Deliberately NOT touched: sorting, filtering, server paging or the Azure-DevOps-style list
+   behaviour — §"Out of scope" limits this to visual density. */
+.rm-grid .mud-table-cell {
+    padding: 6px 10px;
+    font-size: .78rem;
+}
+
+.rm-grid .mud-table-head .mud-table-cell {
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    color: var(--mud-palette-text-secondary);
+}
+
+/* Tag text in the grid was set at .85rem before the type scale existed; align it with the
+   12.5px used for values everywhere else so one page does not carry two sizes. */
+.rm-tagtext,
+.rm-tag {
+    font-size: .78rem;
 }

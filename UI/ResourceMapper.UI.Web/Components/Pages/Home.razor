@@ -17,6 +17,11 @@
 <PageTitle>Resources — Hashtag Resource Mapper</PageTitle>
 
 <div class="rm-page">
+@* §7: every route gets the shell treatment. The grid had no page title at all — the only thing
+   naming it was the browser tab. *@
+<PageHeader Title="Resources" IsHome="true"
+            Description="Every catalogued resource, across every subscription." />
+
 <ResourceFilterBar State="_state" TagKeys="_tagKeys" Total="_total" Shown="@(_items?.Count ?? 0)"
                    FacetLoader="LoadFacet" OnReload="HandleReload" />
 
@@ -79,16 +84,27 @@
                         .ToList() ?? new List<ResourceGridTagModel>();
                 }
                 <div class="rm-actions">
+                    @* PL-07: this was the one row action of four with no tooltip, in both its states.
+                       Disabled state — a MudTooltip cannot fire on a disabled button (Mud sets
+                       pointer-events: none), so the explanation goes on a wrapper span whose native
+                       `title` still receives the hover. *@
                     @if (links.Count == 0)
                     {
-                        <MudIconButton Icon="@Icons.Material.Outlined.Link" Size="Size.Small"
-                                       Disabled="true" aria-label="No external links" />
+                        <span title="No external links on this resource">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Link" Size="Size.Small"
+                                           Disabled="true" aria-label="No external links" />
+                        </span>
                     }
                     else
                     {
+                        @* Populated state — the punchlist noted a hover tooltip would fight a
+                           hover-opened menu. Resolved by making the menu open on CLICK instead: the
+                           tooltip then behaves exactly like the other three actions, and a
+                           hover-only disclosure was unreachable on touch anyway (same class as
+                           PL-12c). *@
+                        <MudTooltip Text="Open external links">
                         <MudMenu Icon="@Icons.Material.Outlined.Link" Size="Size.Small"
-                                 AriaLabel="External links" Dense="true"
-                                 ActivationEvent="MouseEvent.MouseOver">
+                                 AriaLabel="External links" Dense="true">
                             @foreach (var link in links)
                             {
                                 <MudMenuItem>
@@ -104,6 +120,7 @@
                                 </MudMenuItem>
                             }
                         </MudMenu>
+                        </MudTooltip>
                     }
                     <MudTooltip Text="Open details">
                         <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"

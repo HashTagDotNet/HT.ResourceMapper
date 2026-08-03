@@ -30,11 +30,8 @@ else if (_model is not null && _response is not null)
        carrying the tab strip and Save away with it) and PL-08 (the breadcrumb is a more natural
        route back to the grid than a menu item). *@
     <div class="rm-page-shell">
-        <div class="rm-shell-head">
-            <MudBreadcrumbs Items="Breadcrumbs" Class="rm-breadcrumb" Separator="›" />
-            <div class="d-flex align-center">
-                <h1 class="rm-shell-title">@PageTitleText</h1>
-                <MudSpacer />
+        <PageHeader Title="@PageTitleText" Parents="@ParentCrumbs">
+            <Actions>
                 @if (_model.IsPersisted)
                 {
                     <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Outlined.Delete"
@@ -44,8 +41,8 @@ else if (_model is not null && _response is not null)
                 {
                     <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Edit" OnClick="EnterEditMode">Edit</MudButton>
                 }
-            </div>
-        </div>
+            </Actions>
+        </PageHeader>
 
         @* @bind-ActivePanelIndex is the prerequisite §5 calls out: nothing drove the tabs
            programmatically before, so the footer's Previous/Next had nothing to move. *@
@@ -154,15 +151,10 @@ else if (_model is not null && _response is not null)
     }
 
     /// <summary>
-    /// PL-08 via §5: a breadcrumb is a more natural route back to the grid than a menu item. The
-    /// last crumb is the current record and is deliberately not a link.
+    /// PL-08 via §5: a breadcrumb is a more natural route back to the grid than a menu item. Home
+    /// and the current record are supplied by PageHeader; this is the middle of the trail.
     /// </summary>
-    private List<BreadcrumbItem> Breadcrumbs =>
-    [
-        new BreadcrumbItem("Home", href: "/"),
-        new BreadcrumbItem("Resources", href: "/"),
-        new BreadcrumbItem(PageTitleText, href: null, disabled: true)
-    ];
+    private static readonly (string Text, string Href)[] ParentCrumbs = [("Resources", "/")];
 
     /// <summary>
     /// PL-33: the user-facing name of the domain/boundary field, read from the domain tag's own

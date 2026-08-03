@@ -9,19 +9,15 @@
 
 <PageTitle>Resource Types — Hashtag Resource Mapper</PageTitle>
 
-<div class="d-flex align-center mb-1">
-    <MudText Typo="Typo.h5" Style="font-weight:600;">Resource Types</MudText>
-    <MudSpacer />
-    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.Add"
-               OnClick="@(() => OpenEditor(null))">
-        New Resource Type
-    </MudButton>
-</div>
-
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
-    The catalog's vocabulary. Short code and icon drive how each resource is drawn in the
-    dependency explorer. A type can only be deleted once nothing uses it.
-</MudText>
+<PageHeader Title="Resource Types"
+            Description="The catalog's vocabulary. Short code and icon drive how each resource is drawn in the dependency explorer. A type can only be deleted once nothing uses it.">
+    <Actions>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.Add"
+                   OnClick="@(() => OpenEditor(null))">
+            New Resource Type
+        </MudButton>
+    </Actions>
+</PageHeader>
 
 @if (_loading)
 {
