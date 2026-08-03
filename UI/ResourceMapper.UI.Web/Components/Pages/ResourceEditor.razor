@@ -303,6 +303,19 @@ else if (_model is not null && _response is not null)
             return;
 
         _hasLoadedOnce = true;
+
+        // Every route into this component is /resources or /resources/{uid}, so Blazor reuses the
+        // same instance across records and nested descents — which means _activeTab persists unless
+        // it is reset here. Without this, opening a second record (or a nested "Create new…") lands
+        // you on whichever tab you happened to leave, e.g. a brand-new resource opening on
+        // Dependencies with its identity fields unseen. Deliberately reset on record/level CHANGE
+        // only: re-rendering the same record — View -> Edit, or a save — should keep you where you
+        // were. Regression introduced with @bind-ActivePanelIndex; MudTabs used to default to the
+        // first panel because nothing held the state.
+        var isDifferentRecord = !string.Equals(ResourceUid, _lastLoadedUid, StringComparison.Ordinal)
+                                || _lastNestedLevel != NestedLevel;
+        if (isDifferentRecord) _activeTab = 0;
+
         _lastLoadedUid = ResourceUid;
         _lastNestedLevel = NestedLevel;
         _loading = true;
@@ -469,6 +482,27 @@ else if (_model is not null && _response is not null)
             });
         }
 
+        // PL-53: a globally REQUIRED tag gets a row whether or not this type's entry-point template
+        // lists it. Requiredness lives on the definition, so the server demands every
+        // RequirementLevel='Error' tag on every resource (ResourceService: "'{name}' is required").
+        // Seeding only from the template meant a type with no template for such a tag produced a
+        // form that could never be saved — Save was refused for a field the UI never offered, with
+        // no way for the user to comply. Found because it makes every create-and-save e2e spec fail
+        // against a type created after the vocabulary seed ran.
+        foreach (var definition in _response.TagDictionary.Where(IsGloballyRequired))
+        {
+            if (_model.Tags.Any(t => t.TagDefinitionId == definition.TagDefinitionId)) continue;
+
+            _model.Tags.Add(new TagRowEditor
+            {
+                Definition = definition,
+                TagDefinitionId = definition.TagDefinitionId,
+                Values = new List<SingleValueEditor>(),
+                IsPrimary = false,
+                IsPreSeeded = true
+            });
+        }
+
         if (newDefaultPrimaryId is not null)
         {
             foreach (var t in _model.Tags)
@@ -478,6 +512,15 @@ else if (_model is not null && _response is not null)
 
         StateHasChanged();
     }
+
+    /// <summary>
+    /// Mirrors the server's required-tag rule exactly (ResourceService.ValidateTags): every
+    /// RequirementLevel='Error' definition except the domain tag, whose requiredness is enforced
+    /// through request.Domain instead. System tags are excluded here for the same reason they are
+    /// excluded from the add-tag picker — they are plumbing, not user metadata.
+    /// </summary>
+    private static bool IsGloballyRequired(TagDefinitionModel d) =>
+        !d.IsDomainTag && !d.IsSystemTag && string.Equals(d.RequirementLevel, "Error", StringComparison.Ordinal);
 
     private void OnResourceDomainChanged()
     {

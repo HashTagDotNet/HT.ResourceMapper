@@ -7,7 +7,7 @@
 // (confirmed by driving this exact flow manually). Specs must re-click "Dependencies" after a
 // pop-back before asserting on its rows, rather than assume the tab stayed active.
 const { test, expect } = require('@playwright/test');
-const { clickSelect, pickOption, selectTypeAndDomain, fillNameAndWaitForSlug } = require('../mud-helpers');
+const { clickSelect, pickOption, selectTypeAndDomain, fillNameAndWaitForSlug, fillRequiredTags } = require('../mud-helpers');
 
 const IGNORED_CONSOLE_PATTERNS = [/404 \(Not Found\)/];
 
@@ -15,6 +15,8 @@ async function createAndSaveSubject(page, name) {
   await page.goto('/resources');
   await selectTypeAndDomain(page, 'E2eDepType', 'non-prod');
   await fillNameAndWaitForSlug(page, name);
+  // PL-52: 'Owning Team' is a required tag since PL-45, so Save refuses without it.
+  await fillRequiredTags(page);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await page.waitForTimeout(1500);
   const url = page.url();
@@ -41,11 +43,14 @@ async function fillNestedChild(page, name) {
   // before touching Name, using the identity preview against the ALREADY-locked domain.
   await clickSelect(page, 'Resource Type');
   await pickOption(page, 'E2eDepType');
-  await expect(page.locator('.rm-identity-preview')).toContainText('non-prod / E2eDepType', { timeout: 8000 });
+  await expect(page.locator('.rm-identity-inline')).toContainText('non-prod / E2eDepType', { timeout: 8000 });
   // fillNameAndWaitForSlug's Key-auto-slug wait matters especially here, right before an
   // immediate goBack() in some tests: a premature navigation would otherwise race the model
   // update and submit/act on an empty Name.
   await fillNameAndWaitForSlug(page, name);
+  // PL-52/PL-53: the nested child is a resource in its own right, so it carries the same required
+  // tags as the parent and its own Save is refused without them.
+  await fillRequiredTags(page);
 }
 
 test.describe('Nested "Create new…" dependency target (slice #9)', () => {

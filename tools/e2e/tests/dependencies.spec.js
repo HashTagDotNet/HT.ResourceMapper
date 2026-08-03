@@ -3,7 +3,7 @@
 //   - ResourceType 'E2eDepType'
 //   - Picker candidates: e2e-candidate-1, e2e-candidate-2 (non-prod), e2e-candidate-prod (prod)
 const { test, expect } = require('@playwright/test');
-const { clickSelect, pickOption } = require('../mud-helpers');
+const { clickSelect, pickOption, fillRequiredTags } = require('../mud-helpers');
 
 // Pre-existing, non-blocking artifact already noted in slice #6/#7 execution notes.
 const IGNORED_CONSOLE_PATTERNS = [/404 \(Not Found\)/];
@@ -54,7 +54,8 @@ test.describe('Dependencies / Dependent On tabs (slice #8)', () => {
     await fillPickerAndPick(page, 'E2E Candidate Two', /E2E Candidate Two/);
     await expect(page.locator('.rm-dep-row', { hasText: 'E2E Candidate Two' })).toBeVisible();
 
-    // 4. Save.
+    // 4. Save. PL-52: 'Owning Team' is a required tag since PL-45, so Save refuses without it.
+    await fillRequiredTags(page);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await page.waitForTimeout(1500);
     const subjectUrl = page.url();

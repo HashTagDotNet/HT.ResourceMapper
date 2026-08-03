@@ -3,7 +3,7 @@
 //   - ResourceType 'E2eDepType'
 //   - Picker candidates: e2e-candidate-1, e2e-candidate-2 (non-prod), e2e-candidate-prod (prod)
 const { test, expect } = require('@playwright/test');
-const { selectTypeAndDomain, fillNameAndWaitForSlug } = require('../mud-helpers');
+const { selectTypeAndDomain, fillNameAndWaitForSlug, fillRequiredTags } = require('../mud-helpers');
 
 // Pre-existing, non-blocking artifact already noted in slice #6/#7/#8 execution notes.
 const IGNORED_CONSOLE_PATTERNS = [/404 \(Not Found\)/];
@@ -12,6 +12,8 @@ async function createSubject(page, name) {
   await page.goto('/resources');
   await selectTypeAndDomain(page, 'E2eDepType', 'non-prod');
   await fillNameAndWaitForSlug(page, name);
+  // PL-52: 'Owning Team' is a required tag since PL-45, so Save refuses without it.
+  await fillRequiredTags(page);
 }
 
 async function fillPickerAndPick(page, text, optionText) {

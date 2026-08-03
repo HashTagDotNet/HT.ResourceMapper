@@ -9,7 +9,7 @@
 // real back/forward) must therefore use in-app clicks, not `page.goto`, between them. `page.goto`
 // is only safe at a scenario's start, or to independently verify PERSISTED server state afterward.
 const { test, expect } = require('@playwright/test');
-const { selectTypeAndDomain, fillNameAndWaitForSlug } = require('../mud-helpers');
+const { selectTypeAndDomain, fillNameAndWaitForSlug, fillRequiredTags } = require('../mud-helpers');
 
 const IGNORED_CONSOLE_PATTERNS = [/404 \(Not Found\)/];
 
@@ -17,6 +17,8 @@ async function createAndSaveSubject(page, name) {
   await page.goto('/resources');
   await selectTypeAndDomain(page, 'E2eDepType', 'non-prod');
   await fillNameAndWaitForSlug(page, name);
+  // PL-52: 'Owning Team' is a required tag since PL-45, so Save refuses without it.
+  await fillRequiredTags(page);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await page.waitForTimeout(1500);
   const url = page.url();
@@ -73,7 +75,7 @@ test.describe('Dirty guard — unsaved-changes prompt (slice #9)', () => {
     expect(page.url()).not.toBe(subjectUrl, 'Discard must let the navigation through');
 
     await page.goto(subjectUrl, { waitUntil: 'networkidle' });
-    await expect(page.locator('h5.mud-typography-h5')).toHaveText(baseName,
+    await expect(page.locator('.rm-shell-title')).toHaveText(baseName,
       'the discarded edit must not have persisted — the name should still be the original');
 
     // (c) Save (fresh edit) -> navigation proceeds AND the edit is persisted.
@@ -85,7 +87,7 @@ test.describe('Dirty guard — unsaved-changes prompt (slice #9)', () => {
     expect(page.url()).not.toBe(subjectUrl, 'a confirmed Save must let the navigation through');
 
     await page.goto(subjectUrl, { waitUntil: 'networkidle' });
-    await expect(page.locator('h5.mud-typography-h5')).toHaveText(baseName + ' ModC',
+    await expect(page.locator('.rm-shell-title')).toHaveText(baseName + ' ModC',
       'choosing Save in the dirty-guard dialog must persist the edit before leaving');
 
     const meaningfulErrors = consoleErrors.filter(e => !IGNORED_CONSOLE_PATTERNS.some(rx => rx.test(e)));

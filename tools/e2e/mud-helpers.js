@@ -30,7 +30,7 @@ async function launch(options = {}) {
 }
 
 /**
- * Clicks a MudSelect identified by its floating Label text (e.g. "Resource Type", "Subscription").
+ * Clicks a MudSelect identified by its label text (e.g. "Resource Type", "Subscription").
  *
  * Why not a plain `getByLabel(...).click()`: MudSelect renders its trigger in one of two shapes
  * depending on whether a value is currently set —
@@ -39,12 +39,42 @@ async function launch(options = {}) {
  *             `<div class="...mud-select-input..." tabindex="0">{displayText}</div>` with NO
  *             aria-label at all.
  * Targeting the aria-label directly is therefore unreliable once a value is set. Scoping to the
- * `.mud-input-control` that contains the label text, then picking the `:visible` trigger inside
- * it, works for both shapes.
+ * container that holds the label text, then picking the `:visible` trigger inside it, works for
+ * both shapes.
+ *
+ * Two container shapes, because azure-ux-design-v1 moved editor labels out of the input:
+ *   - `.rm-form-row`        — the label lives in a sibling `.rm-form-label`, NOT inside
+ *                             `.mud-input-control`, so the old scope no longer matches.
+ *   - `.mud-input-control`  — MudBlazor's floating label, still used by surfaces not yet converted.
+ * Tried in that order so a converted row is never matched by the legacy path.
  */
 async function clickSelect(page, labelText) {
-  const control = page.locator('.mud-input-control', { hasText: labelText }).first();
-  await control.locator('.mud-select-input:visible').first().click();
+  const formRow = page.locator('.rm-form-row').filter({
+    has: page.locator('.rm-form-label', { hasText: labelText }),
+  }).first();
+
+  const control = (await formRow.count()) > 0
+    ? formRow
+    : page.locator('.mud-input-control', { hasText: labelText }).first();
+
+  const trigger = control.locator('.mud-select-input:visible').first();
+
+  // Click, then CONFIRM the popover actually opened, and click once more if it did not.
+  //
+  // Why: the very first select interaction of a suite run can swallow its click. The server has
+  // just started, so that click is also paying JIT plus the first SignalR circuit setup, and
+  // MudSelect's open is a server round-trip. Observed concretely — delete.spec's first test timed
+  // out at 60s waiting for an option that never appeared, while the identical call passed in 16s on
+  // a warm run. A missed first click is indistinguishable from a slow one, so waiting longer does
+  // not help; re-clicking does. Bounded at one retry so a genuinely broken locator still fails fast
+  // rather than looping.
+  await trigger.click();
+  try {
+    await page.locator('.mud-popover-open .mud-list-item, .mud-popover-open [role=option]')
+      .first().waitFor({ state: 'visible', timeout: 5000 });
+  } catch {
+    await trigger.click();
+  }
 }
 
 /**
@@ -79,7 +109,46 @@ async function selectTypeAndDomain(page, typeName, domainName) {
   await pickOption(page, typeName);
   await clickSelect(page, 'Subscription');
   await pickOption(page, domainName);
-  await expect(page.locator('.rm-identity-preview')).toContainText(`${domainName} / ${typeName}`, { timeout: 8000 });
+  // The identity preview moved from its own card (.rm-identity-preview) into a form row
+  // (.rm-identity-inline) when the General tab became a single column — azure-ux-design-v1 §6.
+  await expect(page.locator('.rm-identity-inline')).toContainText(`${domainName} / ${typeName}`, { timeout: 8000 });
+}
+
+/**
+ * Fills every REQUIRED tag on the Tags tab, then returns to the General tab.
+ *
+ * Why the specs need this now (punchlist PL-52): commit b8a01ff (PL-45) seeded a realistic tag
+ * vocabulary in which 'Owner' / "Owning Team" carries RequirementLevel = 'Error'. That is a genuine
+ * required field, so Save legitimately refuses with "'Owning Team' is required" — and because these
+ * specs predate it and never fill one, ALL EIGHT began failing at Save. The app was right and the
+ * specs were stale; this is the fix on the spec side.
+ *
+ * Deliberately driven off the rendered `.rm-tag-required` marker rather than a hardcoded
+ * "Owning Team": if the seed later makes another tag required, these specs keep working instead of
+ * failing the same way a second time.
+ */
+async function fillRequiredTags(page) {
+  await page.getByRole('tab', { name: 'Tags' }).click();
+  await page.waitForSelector('.rm-tag-row', { timeout: 10000 });
+
+  const requiredRows = page.locator('.rm-tag-row').filter({ has: page.locator('.rm-tag-required') });
+
+  for (let i = 0; i < await requiredRows.count(); i++) {
+    const row = requiredRows.nth(i);
+
+    // A controlled-vocabulary tag renders a MudSelect; anything else renders a text input.
+    if (await row.locator('.mud-select-input:visible').count() > 0) {
+      await clickSelectInScope(row);
+      await page.getByRole('option').first().click();
+    } else {
+      await row.locator('input:visible').first().fill('e2e');
+      await page.keyboard.press('Tab');
+    }
+    await page.waitForTimeout(250);   // let the model round-trip land before the next row
+  }
+
+  await page.getByRole('tab', { name: 'General' }).click();
+  await page.waitForTimeout(250);
 }
 
 /**
@@ -115,4 +184,4 @@ async function waitForServer(url, timeoutMs = 60000) {
   throw new Error(`Server at ${url} did not respond within ${timeoutMs}ms`);
 }
 
-module.exports = { launch, clickSelect, clickSelectInScope, pickOption, selectTypeAndDomain, fillNameAndWaitForSlug, waitForServer };
+module.exports = { launch, clickSelect, clickSelectInScope, pickOption, selectTypeAndDomain, fillNameAndWaitForSlug, fillRequiredTags, waitForServer };
