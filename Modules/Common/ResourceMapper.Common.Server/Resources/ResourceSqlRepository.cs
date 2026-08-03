@@ -36,10 +36,62 @@ namespace ResourceMapper.Common.Server.Resources
                     UpdatedOn = dr.ReadDateTime("UpdatedOn"),
                     ResourceTypeId = dr.ReadInt("ResourceTypeId"),
                     ResourceTypeUid = dr.ReadString("ResourceTypeUid"),
-                    TypeName = dr.ReadString("TypeName")
+                    TypeName = dr.ReadString("TypeName"),
+                    ShortCode = dr.ReadString("ShortCode"),
+                    IconKey = dr.ReadString("IconKey")
                 };
             }, cancellationToken:cancellationToken);
 
+        }
+
+        public async Task<List<ResourceTypeUsage>> GetResourceTypesWithUsageAsync(CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].ResourceType_GetAllWithUsage");
+
+            return await _db.Execute.ExecuteQueryAsync(cmd, dr => new ResourceTypeUsage
+            {
+                ResourceTypeId = dr.ReadInt("ResourceTypeId"),
+                ResourceTypeUid = dr.ReadString("ResourceTypeUid"),
+                TypeName = dr.ReadString("TypeName"),
+                ShortCode = dr.ReadString("ShortCode"),
+                IconKey = dr.ReadString("IconKey"),
+                AllowCustomTags = dr.ReadBoolean("AllowCustomTags"),
+                CreatedOn = dr.ReadDateTime("CreatedOn"),
+                UpdatedOn = dr.ReadNullableDateTime("UpdatedOn"),
+                ResourceCount = dr.ReadInt("ResourceCount"),
+                EntryPointTagCount = dr.ReadInt("EntryPointTagCount")
+            }, cancellationToken: cancellationToken);
+        }
+
+        public async Task<(string Result, int ResourceTypeId)> SaveResourceTypeAsync(int? resourceTypeId,
+            string resourceTypeUid, string typeName, string? shortCode, string? iconKey,
+            bool allowCustomTags, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].ResourceType_Save")
+                .AddVarchar("@ResourceTypeUid", resourceTypeUid)
+                .AddNVarchar("@TypeName", typeName)
+                .AddVarchar("@ShortCode", shortCode)
+                .AddVarchar("@IconKey", iconKey)
+                .AddBit("@AllowCustomTags", allowCustomTags)
+                // The sproc treats 0 the same as NULL ("create"), so a null id maps cleanly onto
+                // the non-nullable AddInteger overload that accepts a direction.
+                .AddInteger("@ResourceTypeId", resourceTypeId ?? 0, ParameterDirection.InputOutput)
+                .AddVarchar("@Result", null, 10, ParameterDirection.Output);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+            return (cmd.ReadString("@Result") ?? "error", cmd.ReadInt("@ResourceTypeId"));
+        }
+
+        public async Task<(string Result, int DependentCount)> DeleteResourceTypeAsync(int resourceTypeId,
+            CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].ResourceType_Delete")
+                .AddInteger("@ResourceTypeId", resourceTypeId)
+                .AddInteger("@DependentCount", 0, ParameterDirection.Output)
+                .AddVarchar("@Result", null, 10, ParameterDirection.Output);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+            return (cmd.ReadString("@Result") ?? "error", cmd.ReadInt("@DependentCount"));
         }
 
         // Original method signature for backward compatibility

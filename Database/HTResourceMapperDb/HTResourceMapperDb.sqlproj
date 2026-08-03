@@ -79,7 +79,10 @@
     <Build Include="Stored Procedures\ResourceRelationship_GetForResource.sql" />
     <Build Include="Stored Procedures\ResourceRelationship_Remove.sql" />
     <Build Include="Stored Procedures\ResourceTag_SetForResource.sql" />
+    <Build Include="Stored Procedures\ResourceType_Delete.sql" />
     <Build Include="Stored Procedures\ResourceType_GetAll.sql" />
+    <Build Include="Stored Procedures\ResourceType_GetAllWithUsage.sql" />
+    <Build Include="Stored Procedures\ResourceType_Save.sql" />
     <Build Include="Stored Procedures\ResourceType_Upsert.sql" />
     <Build Include="Stored Procedures\Resource_CheckUnique.sql" />
     <Build Include="Stored Procedures\Resource_Delete.sql" />

@@ -1,0 +1,39 @@
+/* Scoped to ResourceTypeDialog.razor (Blazor CSS isolation). */
+
+/* Short code and icon are a pair — the two inputs that decide how the node is drawn — so they
+   sit on one row. Collapses to a single column on narrow dialogs. */
+.rt-dialog-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+@media (max-width: 480px) {
+    .rt-dialog-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.rt-preview-body {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Same geometry as the grid's .rt-node and the explorer's own node badge. */
+.rt-preview-node {
+    width: 40px;
+    height: 40px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    flex: 0 0 auto;
+}

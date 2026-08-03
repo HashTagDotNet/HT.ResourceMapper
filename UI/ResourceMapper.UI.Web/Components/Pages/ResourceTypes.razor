@@ -1,0 +1,205 @@
+@page "/resource-types"
+@using HT.Api.Client.Contracts.Models
+@using ResourceMapper.Common.Server.Resources.Interfaces
+@using ResourceMapper.Common.Shared.ResourceTypes
+@using ResourceMapper.UI.Web.Components.ResourceTypes
+@inject IResourceService ResourceService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Resource Types — Hashtag Resource Mapper</PageTitle>
+
+<div class="d-flex align-center mb-1">
+    <MudText Typo="Typo.h5" Style="font-weight:600;">Resource Types</MudText>
+    <MudSpacer />
+    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.Add"
+               OnClick="@(() => OpenEditor(null))">
+        New Resource Type
+    </MudButton>
+</div>
+
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    The catalog's vocabulary. Short code and icon drive how each resource is drawn in the
+    dependency explorer. A type can only be deleted once nothing uses it.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+else if (_loadError is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-3">@_loadError</MudAlert>
+}
+else
+{
+    <MudTable T="ResourceTypeModel" Items="_types" Dense="true" Hover="true" Striped="false"
+              Elevation="0" Breakpoint="Breakpoint.Sm" AllowUnsorted="false">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel SortBy="@(new Func<ResourceTypeModel, object?>(t => t.TypeName))" InitialDirection="SortDirection.Ascending">Type Name</MudTableSortLabel></MudTh>
+            <MudTh>Node</MudTh>
+            <MudTh><MudTableSortLabel SortBy="@(new Func<ResourceTypeModel, object?>(t => t.IconKey ?? string.Empty))">Icon Key</MudTableSortLabel></MudTh>
+            <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="@(new Func<ResourceTypeModel, object?>(t => t.ResourceCount))">Resources</MudTableSortLabel></MudTh>
+            <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="@(new Func<ResourceTypeModel, object?>(t => t.EntryPointTagCount))">Tag Template</MudTableSortLabel></MudTh>
+            <MudTh>Custom Tags</MudTh>
+            <MudTh Style="text-align:right;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Type Name">@context.TypeName</MudTd>
+            <MudTd DataLabel="Node">
+                <div class="rt-node" style="@($"background:{ResourceTypeIcons.ColorFor(context.IconKey)};")">
+                    @NodeCode(context)
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Icon Key">
+                @if (string.IsNullOrWhiteSpace(context.IconKey))
+                {
+                    <MudTooltip Text="No icon key — the explorer draws a generic dot on the default blue.">
+                        <MudText Typo="Typo.body2" Color="Color.Warning">not set</MudText>
+                    </MudTooltip>
+                }
+                else if (!ResourceTypeIcons.KnownKeys.Contains(context.IconKey))
+                {
+                    <MudTooltip Text="The explorer has no glyph for this key — it renders a generic dot.">
+                        <MudText Typo="Typo.body2" Color="Color.Warning">@context.IconKey (unknown)</MudText>
+                    </MudTooltip>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2">@context.IconKey</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Resources" Style="text-align:right;">@context.ResourceCount</MudTd>
+            <MudTd DataLabel="Tag Template" Style="text-align:right;">@context.EntryPointTagCount</MudTd>
+            <MudTd DataLabel="Custom Tags">
+                @if (context.AllowCustomTags)
+                {
+                    <MudIcon Icon="@Icons.Material.Outlined.Check" Size="Size.Small" />
+                }
+            </MudTd>
+            <MudTd DataLabel="Actions" Style="text-align:right;">
+                <MudTooltip Text="Edit this resource type">
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" aria-label="Edit"
+                                   OnClick="@(() => OpenEditor(context))" />
+                </MudTooltip>
+                <MudTooltip Text="@DeleteTooltip(context)">
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error"
+                                   aria-label="Delete" Disabled="@(context.ResourceCount > 0 || _busy)"
+                                   OnClick="@(() => ConfirmDelete(context))" />
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-4">
+                No resource types yet. Create one to start cataloguing resources.
+            </MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private List<ResourceTypeModel> _types = new();
+    private bool _loading = true;
+    private bool _busy;
+    private string? _loadError;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadError = null;
+        try
+        {
+            var response = await ResourceService.GetResourceTypesAsync(CancellationToken.None);
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+                _types = response.ApiResponse.Data;
+            else
+                _loadError = FirstMessage(response.ApiResponse.Errors) ?? "Could not load resource types.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>Mirrors explorer-canvas.js's fallback so the grid shows what the graph will show.</summary>
+    private static string NodeCode(ResourceTypeModel type)
+    {
+        if (!string.IsNullOrWhiteSpace(type.ShortCode)) return type.ShortCode!;
+        if (string.IsNullOrWhiteSpace(type.TypeName)) return "?";
+        return type.TypeName[..Math.Min(3, type.TypeName.Length)].ToUpperInvariant();
+    }
+
+    private static string DeleteTooltip(ResourceTypeModel type) =>
+        type.ResourceCount > 0
+            ? $"{type.ResourceCount} {(type.ResourceCount == 1 ? "resource uses" : "resources use")} this type — reassign or delete them first"
+            : "Delete this resource type";
+
+    private async Task OpenEditor(ResourceTypeModel? existing)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(ResourceTypeDialog.Existing), existing },
+            {
+                nameof(ResourceTypeDialog.ExistingNames),
+                _types.Where(t => existing is null || t.ResourceTypeId != existing.ResourceTypeId)
+                      .Select(t => t.TypeName).ToList()
+            }
+        };
+
+        var title = existing is null ? "New resource type" : $"Edit {existing.TypeName}";
+        var dialog = await DialogService.ShowAsync<ResourceTypeDialog>(title, parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        if (result.Data is ResourceTypeModel saved)
+        {
+            // Re-read rather than patching the row in place: the counts and UpdatedOn come from
+            // the server, and a create needs the whole list re-sorted by name anyway.
+            await LoadAsync();
+            Snackbar.Add($"Saved '{saved.TypeName}'.", Severity.Success);
+        }
+    }
+
+    private async Task ConfirmDelete(ResourceTypeModel type)
+    {
+        // Plain-string message (not MarkupString): the type name is user-supplied.
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Delete resource type",
+            $"Delete '{type.TypeName}'? Its tag template ({type.EntryPointTagCount} " +
+            $"{(type.EntryPointTagCount == 1 ? "entry" : "entries")}) is removed with it. This cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirmed != true) return;
+
+        _busy = true;
+        try
+        {
+            var response = await ResourceService.DeleteResourceTypeAsync(type.ResourceTypeId, CancellationToken.None);
+            if (response.IsSuccess())
+            {
+                Snackbar.Add($"Deleted '{type.TypeName}'.", Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                // Covers the in-use case: the service names the dependent count rather than
+                // letting FK_Resource_ResourceTypeId surface as a raw SQL error.
+                Snackbar.Add(FirstMessage(response.ApiResponse.Errors) ?? "Could not delete the resource type.",
+                    Severity.Error);
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string? FirstMessage(List<Message>? errors)
+    {
+        var first = errors?.FirstOrDefault();
+        return first is null ? null : first.Details ?? first.Title;
+    }
+}

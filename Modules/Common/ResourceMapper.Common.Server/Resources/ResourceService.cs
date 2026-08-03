@@ -8,6 +8,8 @@ using ResourceMapper.Common.Shared.HomePage.Contracts;
 using ResourceMapper.Common.Shared.HomePage;
 using ResourceMapper.Common.Shared.Editor;
 using ResourceMapper.Common.Shared.Editor.Contracts;
+using ResourceMapper.Common.Shared.ResourceTypes;
+using ResourceMapper.Common.Shared.ResourceTypes.Contracts;
 
 namespace ResourceMapper.Common.Server.Resources
 {
@@ -592,6 +594,159 @@ namespace ResourceMapper.Common.Server.Resources
             }
         }
 
+        // ---------------- resource type CRUD (PL-28) ----------------
+
+        public async Task<ApiServiceResponse<List<ResourceTypeModel>>> GetResourceTypesAsync(CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<List<ResourceTypeModel>>();
+            try
+            {
+                var rows = await _repo.GetResourceTypesWithUsageAsync(cancellationToken);
+                builder.Data.Set(rows.Select(MapToResourceTypeModel).ToList());
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<ResourceTypeModel>> SaveResourceTypeAsync(SaveResourceTypeRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<ResourceTypeModel>();
+            try
+            {
+                if (request == null)
+                {
+                    builder.Validation.AddValidation("request", "Is required");
+                    return builder.BuildResponse();
+                }
+
+                var typeName = request.TypeName?.Trim() ?? string.Empty;
+                var shortCode = NullIfBlank(request.ShortCode);
+                var iconKey = NullIfBlank(request.IconKey);
+
+                if (string.IsNullOrWhiteSpace(typeName))
+                    builder.Validation.AddValidation("request.TypeName", "Type name is required");
+                else if (typeName.Length > MaxResourceTypeNameLength)
+                    builder.Validation.AddValidation("request.TypeName", $"Must be {MaxResourceTypeNameLength} characters or fewer");
+
+                if (shortCode is { Length: > MaxShortCodeLength })
+                    builder.Validation.AddValidation("request.ShortCode", $"Must be {MaxShortCodeLength} characters or fewer");
+
+                if (iconKey is { Length: > MaxIconKeyLength })
+                    builder.Validation.AddValidation("request.IconKey", $"Must be {MaxIconKeyLength} characters or fewer");
+
+                if (!builder.IsOk)
+                    return builder.BuildResponse();
+
+                var isCreate = request.ResourceTypeId == 0;
+                var uid = isCreate ? Guid.NewGuid().ToString() : string.Empty;
+
+                var (result, resourceTypeId) = await _repo.SaveResourceTypeAsync(
+                    isCreate ? null : request.ResourceTypeId, uid, typeName, shortCode, iconKey,
+                    request.AllowCustomTags, cancellationToken);
+
+                switch (result)
+                {
+                    case "duplicate":
+                        builder.Errors.AddError(CallStatusCode.AlreadyExists, "Duplicate Resource Type",
+                            $"A resource type named '{typeName}' already exists.", "TypeName");
+                        return builder.BuildResponse();
+                    case "notfound":
+                        builder.Errors.AddError(CallStatusCode.NotFound, "Resource Type Not Found",
+                            $"Resource type {request.ResourceTypeId} was not found.", "ResourceTypeId");
+                        return builder.BuildResponse();
+                    case "created":
+                    case "updated":
+                        break;
+                    default:
+                        builder.Errors.AddError(CallStatusCode.InternalError, "Resource type could not be saved.");
+                        return builder.BuildResponse();
+                }
+
+                // Re-read so the caller gets the persisted row plus its dependency counts (the
+                // create path needs the new id and uid; the update path needs the new UpdatedOn).
+                var saved = (await _repo.GetResourceTypesWithUsageAsync(cancellationToken))
+                    .FirstOrDefault(t => t.ResourceTypeId == resourceTypeId);
+
+                if (saved == null)
+                {
+                    builder.Errors.AddError(CallStatusCode.InternalError, "Resource type could not be loaded after save.");
+                    return builder.BuildResponse();
+                }
+
+                builder.Data.Set(MapToResourceTypeModel(saved));
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<DeleteResourceTypeResponse>> DeleteResourceTypeAsync(int resourceTypeId,
+            CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<DeleteResourceTypeResponse>();
+            try
+            {
+                if (resourceTypeId == 0)
+                {
+                    builder.Validation.AddValidation("resourceTypeId", "Resource type id is required");
+                    return builder.BuildResponse();
+                }
+
+                var (result, dependentCount) = await _repo.DeleteResourceTypeAsync(resourceTypeId, cancellationToken);
+
+                switch (result)
+                {
+                    case "inuse":
+                        // Resource.ResourceTypeId is a NOT NULL FK — name the blocker rather than
+                        // letting a raw constraint violation reach the user.
+                        builder.Errors.AddError(CallStatusCode.FailedPrecondition, "Resource Type In Use",
+                            $"{dependentCount} {(dependentCount == 1 ? "resource uses" : "resources use")} this type. " +
+                            "Reassign or delete them before deleting the type.", "ResourceTypeId");
+                        return builder.BuildResponse();
+                    case "notfound":
+                        builder.Errors.AddError(CallStatusCode.NotFound, "Resource Type Not Found",
+                            $"Resource type {resourceTypeId} was not found.", "ResourceTypeId");
+                        return builder.BuildResponse();
+                    case "deleted":
+                        builder.Data.Set(new DeleteResourceTypeResponse { Deleted = true, DependentCount = 0 });
+                        return builder.BuildResponse();
+                    default:
+                        builder.Errors.AddError(CallStatusCode.InternalError, "Resource type could not be deleted.");
+                        return builder.BuildResponse();
+                }
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        private static ResourceTypeModel MapToResourceTypeModel(ResourceTypeUsage row) => new()
+        {
+            ResourceTypeId = row.ResourceTypeId,
+            ResourceTypeUid = row.ResourceTypeUid,
+            TypeName = row.TypeName,
+            ShortCode = row.ShortCode,
+            IconKey = row.IconKey,
+            AllowCustomTags = row.AllowCustomTags,
+            CreatedOn = row.CreatedOn,
+            UpdatedOn = row.UpdatedOn,
+            ResourceCount = row.ResourceCount,
+            EntryPointTagCount = row.EntryPointTagCount
+        };
+
+        private static string? NullIfBlank(string? value) =>
+            string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
         // ---------------- editor / detail helpers ----------------
 
         private async Task<ResourceDetailModel> ProjectResourceDetailAsync(ResourceDetail detail, CancellationToken cancellationToken)
@@ -990,6 +1145,11 @@ namespace ResourceMapper.Common.Server.Resources
         private const int MaxResourceKeyLength = 250;
         private const int MaxTagDefinitionKeyLength = 50;
         private const int MaxAllowedValuesLength = 2000;
+        // Mirror ResourceType's column widths so an over-long value is a validation message
+        // rather than a truncation or a SQL error.
+        private const int MaxResourceTypeNameLength = 250;
+        private const int MaxShortCodeLength = 10;
+        private const int MaxIconKeyLength = 40;
         private const int DefaultPickerTake = 20;
         private const int MaxPickerTake = 100;
 

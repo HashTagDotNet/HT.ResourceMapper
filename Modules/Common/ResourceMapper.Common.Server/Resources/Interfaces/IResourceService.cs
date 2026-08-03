@@ -2,6 +2,8 @@ using HT.Api.Service.Contracts;
 using ResourceMapper.Common.Shared.Editor;
 using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
+using ResourceMapper.Common.Shared.ResourceTypes;
+using ResourceMapper.Common.Shared.ResourceTypes.Contracts;
 
 namespace ResourceMapper.Common.Server.Resources.Interfaces
 {
@@ -44,5 +46,16 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
 
         /// <summary>Same-domain resource search backing the Dependencies / Dependent On tabs' picker.</summary>
         Task<ApiServiceResponse<ResourcePickerResponse>> SearchResourcesForPickerAsync(ResourcePickerRequest request, CancellationToken cancellationToken = default);
+
+        /// <summary>All resource types with their dependency counts, for the /resource-types management screen.</summary>
+        Task<ApiServiceResponse<List<ResourceTypeModel>>> GetResourceTypesAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Creates (ResourceTypeId 0) or updates a resource type, including the
+        /// ShortCode/IconKey pair the explorer renders from.</summary>
+        Task<ApiServiceResponse<ResourceTypeModel>> SaveResourceTypeAsync(SaveResourceTypeRequest request, CancellationToken cancellationToken = default);
+
+        /// <summary>Deletes a resource type. Refused (FailedPrecondition) while any resource still
+        /// uses it — the response names the dependent count instead of surfacing an FK error.</summary>
+        Task<ApiServiceResponse<DeleteResourceTypeResponse>> DeleteResourceTypeAsync(int resourceTypeId, CancellationToken cancellationToken = default);
     }
 }

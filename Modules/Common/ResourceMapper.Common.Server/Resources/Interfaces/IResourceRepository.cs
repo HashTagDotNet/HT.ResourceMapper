@@ -50,6 +50,25 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
 
         Task<List<ResourceType>> GetAllResourceTypesAsync(CancellationToken cancellationToken);
 
+        // Management-screen read: every resource type plus its dependency counts (resources using
+        // it, entry-point template rows). Separate from GetAllResourceTypesAsync so the editor's
+        // hot path doesn't pay for the aggregates.
+        Task<List<ResourceTypeUsage>> GetResourceTypesWithUsageAsync(CancellationToken cancellationToken);
+
+        // Editor-facing resource-type create/update, keyed on the surrogate id (resourceTypeId
+        // null = create), so a rename is a normal update. Distinct from the import path's
+        // ResourceType_Upsert, which keys on TypeName and ignores ShortCode/IconKey.
+        // Result is 'created' | 'updated' | 'duplicate' (TypeName taken) | 'notfound'.
+        Task<(string Result, int ResourceTypeId)> SaveResourceTypeAsync(int? resourceTypeId,
+            string resourceTypeUid, string typeName, string? shortCode, string? iconKey,
+            bool allowCustomTags, CancellationToken cancellationToken);
+
+        // Deletes a resource type and its entry-point template rows, but refuses when resources
+        // still reference it (Resource.ResourceTypeId is a NOT NULL FK).
+        // Result is 'deleted' | 'inuse' (DependentCount > 0) | 'notfound'.
+        Task<(string Result, int DependentCount)> DeleteResourceTypeAsync(int resourceTypeId,
+            CancellationToken cancellationToken);
+
         // Distinct tag keys (for the "Add filter" column picker).
         Task<List<string>> GetAllTagKeysAsync(CancellationToken cancellationToken);
 

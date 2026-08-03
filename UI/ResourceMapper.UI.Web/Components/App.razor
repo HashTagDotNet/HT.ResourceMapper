@@ -9,6 +9,9 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="_content/MudBlazor/MudBlazor.min.css" />
     <link rel="stylesheet" href="app.css" />
+    @* Blazor CSS-isolation bundle (every *.razor.css in this project). Additive: without it,
+       scoped component styles are compiled but never served. *@
+    <link rel="stylesheet" href="ResourceMapper.UI.Web.styles.css" />
     <HeadOutlet />
 </head>
 

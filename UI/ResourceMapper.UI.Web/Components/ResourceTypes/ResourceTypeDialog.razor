@@ -1,0 +1,197 @@
+@using HT.Api.Client.Contracts.Models
+@using ResourceMapper.Common.Server.Resources.Interfaces
+@using ResourceMapper.Common.Shared.ResourceTypes
+@using ResourceMapper.Common.Shared.ResourceTypes.Contracts
+@inject IResourceService ResourceService
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            Short code and icon are what the dependency explorer draws: the code is printed inside
+            each node and the icon picks the glyph and colour. Leaving them blank gives every
+            resource of this type a generic blue dot.
+        </MudText>
+
+        <MudTextField T="string" @bind-Value="_typeName" Label="Type Name" Required="true"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="250"
+                      Immediate="true" Error="@_typeNameError" ErrorText="@_typeNameErrorText"
+                      HelperText="@DuplicateHint" />
+
+        <div class="rt-dialog-row mt-2">
+            <MudTextField T="string" @bind-Value="_shortCode" Label="Short Code" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" MaxLength="10" Immediate="true"
+                          HelperText="Up to 10 characters, e.g. APP, SBQ" />
+
+            <MudSelect T="string" @bind-Value="_iconKey" Label="Icon" Variant="Variant.Outlined"
+                       Margin="Margin.Dense" Clearable="true"
+                       HelperText="Determines the node glyph and colour">
+                @foreach (var key in ResourceTypeIcons.KnownKeys)
+                {
+                    <MudSelectItem Value="@key">@key</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+
+        <MudCheckBox T="bool" @bind-Value="_allowCustomTags" Class="mt-2"
+                     Label="Allow custom tags on resources of this type" />
+
+        @* Scoped CSS only reaches elements this component renders itself, so the framing here is
+           an inline style on the MudPaper and the classes below sit on plain divs. *@
+        <MudPaper Elevation="0" Class="pa-3 mt-3" Style="border:1px solid var(--mud-palette-divider);">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Explorer node preview</MudText>
+            <div class="rt-preview-body mt-2">
+                <div class="rt-preview-node" style="@($"background:{ResourceTypeIcons.ColorFor(_iconKey)};")">
+                    @PreviewCode
+                </div>
+                <MudText Typo="Typo.body2">
+                    @(string.IsNullOrWhiteSpace(_typeName) ? "Untitled type" : _typeName)
+                </MudText>
+            </div>
+            @if (string.IsNullOrWhiteSpace(_shortCode))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    No short code — the explorer falls back to the first three letters of the name.
+                </MudText>
+            }
+        </MudPaper>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mt-3">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_saving">
+            @(_saving ? "Saving…" : IsEdit ? "Save" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>The row being edited, or null to create a new type.</summary>
+    [Parameter] public ResourceTypeModel? Existing { get; set; }
+
+    /// <summary>Every other type's name, so a collision is flagged before the round trip.
+    /// The server still enforces it (UK_ResourceType_TypeName) — this is only a hint.</summary>
+    [Parameter] public List<string> ExistingNames { get; set; } = new();
+
+    private string _typeName = string.Empty;
+    private string? _shortCode;
+    private string? _iconKey;
+    private bool _allowCustomTags = true;
+    private bool _saving;
+    private bool _typeNameError;
+    private string? _typeNameErrorText;
+    private string? _error;
+
+    private bool IsEdit => Existing is not null && Existing.ResourceTypeId != 0;
+
+    protected override void OnInitialized()
+    {
+        if (Existing is null) return;
+
+        _typeName = Existing.TypeName;
+        _shortCode = Existing.ShortCode;
+        _iconKey = Existing.IconKey;
+        _allowCustomTags = Existing.AllowCustomTags;
+    }
+
+    /// <summary>Mirrors explorer-canvas.js: the node prints ShortCode, or the first three letters
+    /// of the type name upper-cased when there isn't one.</summary>
+    private string PreviewCode
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(_shortCode)) return _shortCode!.Trim();
+            if (!string.IsNullOrWhiteSpace(_typeName))
+            {
+                var trimmed = _typeName.Trim();
+                return trimmed[..Math.Min(3, trimmed.Length)].ToUpperInvariant();
+            }
+            return "?";
+        }
+    }
+
+    private string? DuplicateHint =>
+        !string.IsNullOrWhiteSpace(_typeName)
+        && ExistingNames.Any(n => string.Equals(n, _typeName.Trim(), StringComparison.OrdinalIgnoreCase))
+            ? "A resource type with this name already exists."
+            : null;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        _error = null;
+        _typeNameErrorText = null;
+        _typeNameError = string.IsNullOrWhiteSpace(_typeName);
+        if (_typeNameError)
+        {
+            _typeNameErrorText = "Type name is required";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var request = new SaveResourceTypeRequest
+            {
+                ResourceTypeId = Existing?.ResourceTypeId ?? 0,
+                TypeName = _typeName.Trim(),
+                ShortCode = string.IsNullOrWhiteSpace(_shortCode) ? null : _shortCode!.Trim(),
+                IconKey = string.IsNullOrWhiteSpace(_iconKey) ? null : _iconKey!.Trim(),
+                AllowCustomTags = _allowCustomTags
+            };
+
+            var response = await ResourceService.SaveResourceTypeAsync(request, CancellationToken.None);
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+            {
+                MudDialog.Close(DialogResult.Ok(response.ApiResponse.Data));
+                return;
+            }
+
+            ApplyServerErrors(response.ApiResponse.Errors);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    /// <summary>
+    /// Validation messages carry the field in PropertyName; ErrorBuilder messages (the
+    /// AlreadyExists duplicate) carry it in MessageCode. Check both so a duplicate name lands on
+    /// the name field rather than in a generic alert.
+    /// </summary>
+    private void ApplyServerErrors(List<Message>? errors)
+    {
+        var messages = errors ?? new List<Message>();
+        if (messages.Count == 0)
+        {
+            _error = "Could not save the resource type.";
+            return;
+        }
+
+        foreach (var message in messages)
+        {
+            var text = message.Details ?? message.Title ?? "Could not save the resource type.";
+
+            if (IsNameField(message.PropertyName) || IsNameField(message.MessageCode))
+            {
+                _typeNameError = true;
+                _typeNameErrorText = text;
+            }
+            else
+            {
+                _error = text;
+            }
+        }
+    }
+
+    private static bool IsNameField(string? field) =>
+        string.Equals(field, "TypeName", StringComparison.Ordinal)
+        || string.Equals(field, "request.TypeName", StringComparison.Ordinal);
+}

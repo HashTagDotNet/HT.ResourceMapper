@@ -1,4 +1,7 @@
 @using ResourceMapper.Common.Shared.Editor
+@using ResourceMapper.Common.Shared.ResourceTypes
+@using ResourceMapper.UI.Web.Components.ResourceTypes
+@inject IDialogService DialogService
 
 <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
     Identity is set by Resource Type, @DomainLabel, and Key together — once saved, Resource Type
@@ -6,16 +9,30 @@
 </MudText>
 
 <div class="rm-editor-fields">
-    <MudSelect T="int?" Value="@Model.ResourceTypeId" ValueChanged="OnTypeChanged"
-               Label="Resource Type" Required="true" Disabled="@(ReadOnly || Model.IsPersisted)"
-               Placeholder="Select…" Variant="Variant.Outlined" Margin="Margin.Dense"
-               Error="@(Model.ResourceType.Level == EditorFieldLevel.Error)"
-               ErrorText="@Model.ResourceType.Messages.FirstOrDefault()?.Message">
-        @foreach (var option in ResourceTypes)
+    @* Wrapper keeps the select + its inline-create action in a single .rm-editor-fields cell. *@
+    <div>
+        <MudSelect T="int?" Value="@Model.ResourceTypeId" ValueChanged="OnTypeChanged"
+                   Label="Resource Type" Required="true" Disabled="@(ReadOnly || Model.IsPersisted)"
+                   Placeholder="Select…" Variant="Variant.Outlined" Margin="Margin.Dense"
+                   Error="@(Model.ResourceType.Level == EditorFieldLevel.Error)"
+                   ErrorText="@Model.ResourceType.Messages.FirstOrDefault()?.Message">
+            @foreach (var option in ResourceTypes)
+            {
+                <MudSelectItem Value="@((int?)option.ResourceTypeId)">@option.TypeName</MudSelectItem>
+            }
+        </MudSelect>
+
+        @* PL-29: mirrors TagsTab's "Create new tag…" — only offered while the Type select is
+           still live, i.e. Create mode. Type is immutable once the resource is persisted, so a
+           create-and-select action there would have nothing to select into. *@
+        @if (CanCreateType)
         {
-            <MudSelectItem Value="@((int?)option.ResourceTypeId)">@option.TypeName</MudSelectItem>
+            <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
+                       OnClick="OpenCreateTypeDialog">
+                Create new type…
+            </MudButton>
         }
-    </MudSelect>
+    </div>
 
     <MudSelect T="string" Value="@Model.Domain.EditedValue" ValueChanged="OnDomainChanged"
                Label="@DomainLabel" Required="true" Disabled="@(ReadOnly || Model.IsPersisted || DomainLocked)"
@@ -84,6 +101,45 @@
     [Parameter] public EventCallback OnResourceDomainChanged { get; set; }
 
     private bool _keyManuallyEdited;
+
+    /// <summary>PL-29: inline type create is only offered where the Type select is enabled.</summary>
+    private bool CanCreateType => !ReadOnly && !Model.IsPersisted;
+
+    /// <summary>
+    /// Inline "create new type", shaped exactly like TagsTab.OpenCreateDialog: show the same
+    /// dialog the /resource-types screen uses, and on OK fold the new row into the in-memory
+    /// picklist and select it — no page reload, no second service call to refetch the list.
+    /// </summary>
+    private async Task OpenCreateTypeDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(ResourceTypeDialog.ExistingNames), ResourceTypes.Select(t => t.TypeName).ToList() }
+        };
+
+        var dialog = await DialogService.ShowAsync<ResourceTypeDialog>("New resource type", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        if (result.Data is ResourceTypeModel created)
+        {
+            if (!ResourceTypes.Any(t => t.ResourceTypeId == created.ResourceTypeId))
+            {
+                ResourceTypes.Add(new ResourceTypeOption
+                {
+                    ResourceTypeId = created.ResourceTypeId,
+                    TypeName = created.TypeName,
+                    ResourceTypeUid = created.ResourceTypeUid
+                });
+                // Keep the picklist in the same name order the server returns it in.
+                ResourceTypes.Sort((a, b) => string.Compare(a.TypeName, b.TypeName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Route through the normal selection path so the Tags tab re-seeds from the new
+            // type's (empty) entry-point template and the identity preview re-checks uniqueness.
+            await OnTypeChanged(created.ResourceTypeId);
+        }
+    }
 
     private string DomainLabel =>
         TagDictionary.FirstOrDefault(t => t.IsDomainTag)?.DisplayName ?? "Domain";
