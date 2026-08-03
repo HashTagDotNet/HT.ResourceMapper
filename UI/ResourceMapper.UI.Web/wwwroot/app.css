@@ -809,3 +809,59 @@ html, body {
 .rm-tag {
     font-size: .78rem;
 }
+
+/* --- Resource type tag-template editor (PL-28's missing half) ------------------------------- */
+.rt-template-table {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    margin-bottom: .25rem;
+}
+
+.rt-template-head,
+.rt-template-row {
+    display: grid;
+    /* 150px truncated the longest option ("Inherit (recommended)") to "Inherit (rec…", which defeats
+       the point of naming the inherited level. */
+    grid-template-columns: minmax(0, 1fr) 194px 84px 32px;
+    align-items: center;
+    gap: .5rem;
+}
+
+.rt-template-head {
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--mud-palette-text-secondary);
+    padding-bottom: .15rem;
+    border-bottom: 1px solid var(--mud-palette-divider);
+}
+
+.rt-template-row {
+    padding: .1rem 0;
+    border-bottom: 1px solid var(--mud-palette-divider);
+}
+
+.rt-template-name {
+    font-size: .78rem;
+    overflow-wrap: anywhere;
+}
+
+/* Marks a text tag, which cannot be a click-through link — explains why its radio is absent. */
+.rt-template-kind {
+    font-size: .65rem;
+    color: var(--mud-palette-text-disabled);
+    margin-left: .3rem;
+}
+
+.rt-template-primary,
+.rt-template-dash {
+    display: flex;
+    justify-content: center;
+    color: var(--mud-palette-text-disabled);
+}
+
+.rt-template-add {
+    max-width: 320px;
+}

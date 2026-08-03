@@ -98,7 +98,7 @@ else if (_model is not null && _response is not null)
                 </MudButton>
             }
             <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.ChevronLeft"
-                       Disabled="@(_activeTab <= 0)" OnClick="GoPreviousTab">Previous</MudButton>
+                       Disabled="@(_activeTab <= 0)" OnClick="GoPreviousTab">@PreviousTabLabel</MudButton>
             <MudButton Variant="Variant.Outlined" EndIcon="@Icons.Material.Outlined.ChevronRight"
                        Disabled="@(_activeTab >= TabNames.Length - 1)" OnClick="GoNextTab">@NextTabLabel</MudButton>
             <MudSpacer />
@@ -136,9 +136,17 @@ else if (_model is not null && _response is not null)
 
     private int _activeTab;
 
-    /// <summary>PL-15: name the destination rather than leaving "Next" to be guessed at.</summary>
+    /// <summary>
+    /// PL-15: name the destination rather than leaving the direction to be guessed at. Both
+    /// directions, not just Next — §5 specified naming only on Next, but an unlabelled Previous
+    /// beside a labelled Next reads as an oversight, and you need the name just as much going back.
+    /// Falls back to the bare word at each end, where the button is disabled anyway.
+    /// </summary>
     private string NextTabLabel =>
         _activeTab >= TabNames.Length - 1 ? "Next" : $"Next : {TabNames[_activeTab + 1]}";
+
+    private string PreviousTabLabel =>
+        _activeTab <= 0 ? "Previous" : $"Previous : {TabNames[_activeTab - 1]}";
 
     private void GoPreviousTab()
     {

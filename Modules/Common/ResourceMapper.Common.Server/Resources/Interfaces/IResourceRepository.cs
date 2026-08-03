@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using ResourceMapper.Common.Server.Resources.Models;
 using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
+using ResourceMapper.Common.Shared.ResourceTypes.Contracts;
 
 namespace ResourceMapper.Common.Server.Resources.Interfaces
 {
@@ -113,6 +114,10 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
         // Every ResourceTypeTag row (all types) — drives the Tags tab's pre-seed + client-side
         // re-seed on type change with no round trip.
         Task<List<ResourceTypeTag>> GetAllEntryPointTemplatesAsync(CancellationToken cancellationToken);
+
+        /// <summary>Replaces one resource type's entry-point template. Returns 'ok' or 'error'.</summary>
+        Task<string> SetEntryPointTemplatesAsync(int resourceTypeId,
+            IReadOnlyList<EntryPointTagTemplateModel> tags, CancellationToken cancellationToken);
 
         // Replaces all non-domain applied tags for the resource (delete-all-then-reinsert via
         // ResourceTag_SetForResource — domain-safe; a domain-keyed pair is ignored by the sproc).

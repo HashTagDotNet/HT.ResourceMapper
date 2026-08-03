@@ -1,5 +1,6 @@
 @using HT.Api.Client.Contracts.Models
 @using ResourceMapper.Common.Server.Resources.Interfaces
+@using ResourceMapper.Common.Shared.Editor
 @using ResourceMapper.Common.Shared.ResourceTypes
 @using ResourceMapper.Common.Shared.ResourceTypes.Contracts
 @inject IResourceService ResourceService
@@ -34,6 +35,103 @@
 
         <MudCheckBox T="bool" @bind-Value="_allowCustomTags" Class="mt-2"
                      Label="Allow custom tags on resources of this type" />
+
+        @* The tag template. The list screen has always REPORTED a "Tag Template" count per type
+           while offering no way to change it — the only editor was a seed script, since no write
+           path existed below this point either (only ResourceTypeTag_GetAll). This is that gap.
+
+           Why it matters beyond completeness: these rows decide which tags a new resource of this
+           type is prompted for, and IsDefaultPrimary decides which Link tag becomes its
+           click-through link. Both were configurable only by re-running SQL. *@
+        <div class="rm-section-heading mt-4">Tag template</div>
+        <div class="rm-section-desc">
+            Tags a new resource of this type starts with. One Link tag can be marked the default
+            primary — that becomes the resource's click-through link.
+        </div>
+
+        @if (_template.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                No tags — a new resource of this type starts with none.
+            </MudText>
+        }
+        else
+        {
+            <MudRadioGroup T="int?" Value="_defaultPrimaryTagId" ValueChanged="OnDefaultPrimaryChanged">
+                <div class="rt-template-table">
+                    <div class="rt-template-head">
+                        <span>Tag</span>
+                        <span>Expected?</span>
+                        <span title="The Link tag opened from the grid and the explorer">Default primary</span>
+                        <span></span>
+                    </div>
+                    @foreach (var row in _template)
+                    {
+                        var def = DefinitionFor(row.TagDefinitionId);
+                        <div class="rt-template-row">
+                            <span class="rt-template-name">
+                                @(def?.DisplayName ?? def?.TagDefinitionKey ?? $"#{row.TagDefinitionId}")
+                                @if (def is not null && !IsLink(def))
+                                {
+                                    <span class="rt-template-kind">text</span>
+                                }
+                            </span>
+
+                            @* Null = inherit the definition's own level, which is the common case;
+                               an override is offered because the column exists and a type genuinely
+                               may need a tag that is required here but optional elsewhere. *@
+                            <MudSelect T="string" Value="@(row.RequirementLevel ?? string.Empty)"
+                                       ValueChanged="@(v => OnRequirementChanged(row, v))"
+                                       aria-label="@($"Expected level for {def?.DisplayName ?? def?.TagDefinitionKey}")"
+                                       Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                                <MudSelectItem Value="@("")">Inherit (@InheritedLevelText(def))</MudSelectItem>
+                                <MudSelectItem Value="@("Error")">Required</MudSelectItem>
+                                <MudSelectItem Value="@("Suggested")">Recommended</MudSelectItem>
+                                <MudSelectItem Value="@("Optional")">Optional</MudSelectItem>
+                            </MudSelect>
+
+                            <span class="rt-template-primary">
+                                @* Only a Link tag can be a click-through link, so only Link rows get
+                                   the radio — offering it on a text tag would be a choice the
+                                   explorer cannot honour. *@
+                                @if (def is not null && IsLink(def))
+                                {
+                                    <MudRadio T="int?" Value="@((int?)row.TagDefinitionId)" Color="Color.Primary" Dense="true" />
+                                }
+                                else
+                                {
+                                    <span class="rt-template-dash" title="Only a link tag can be the primary">—</span>
+                                }
+                            </span>
+
+                            <MudTooltip Text="Remove from this type's template">
+                                <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small"
+                                               aria-label="@($"Remove {def?.DisplayName ?? def?.TagDefinitionKey}")"
+                                               OnClick="@(() => RemoveRow(row))" />
+                            </MudTooltip>
+                        </div>
+                    }
+                </div>
+            </MudRadioGroup>
+        }
+
+        @if (AddableDefinitions().Any())
+        {
+            <MudAutocomplete T="TagDefinitionModel" @key="_addKey" Value="null" ValueChanged="OnAddTag"
+                             SearchFunc="SearchAddable"
+                             ToStringFunc="@(t => t?.DisplayName ?? t?.TagDefinitionKey ?? string.Empty)"
+                             Placeholder="Add a tag to this template…" Variant="Variant.Outlined"
+                             Margin="Margin.Dense" Clearable="true" ResetValueOnEmptyText="true"
+                             CoerceValue="false" Class="mt-2 rt-template-add" />
+        }
+        else if (_tagDictionary.Count > 0)
+        {
+            @* Same rule as the editor's add-tag control (PL-20): hide/explain rather than show an
+               empty picker. *@
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                Every available tag is already in this template.
+            </MudText>
+        }
 
         @* Scoped CSS only reaches elements this component renders itself, so the framing here is
            an inline style on the MudPaper and the classes below sit on plain divs. *@
@@ -78,6 +176,22 @@
     /// The server still enforces it (UK_ResourceType_TypeName) — this is only a hint.</summary>
     [Parameter] public List<string> ExistingNames { get; set; } = new();
 
+    /// <summary>
+    /// Every tag definition, for the template picker. Supplied by the caller so the dialog does not
+    /// re-fetch it per open; empty means the caller does not offer template editing (the editor's
+    /// inline create-type), in which case EntryPointTags is left null on save and the template is
+    /// untouched.
+    /// </summary>
+    [Parameter] public List<TagDefinitionModel> TagDictionary { get; set; } = new();
+
+    /// <summary>This type's existing template rows. Empty for a new type.</summary>
+    [Parameter] public List<EntryPointTagTemplateModel> EntryPointTags { get; set; } = new();
+
+    private readonly List<EntryPointTagTemplateModel> _template = new();
+    private List<TagDefinitionModel> _tagDictionary = new();
+    private int? _defaultPrimaryTagId;
+    private int _addKey;
+
     private string _typeName = string.Empty;
     private string? _shortCode;
     private string? _iconKey;
@@ -91,6 +205,25 @@
 
     protected override void OnInitialized()
     {
+        // Domain and system tags are excluded for the same reason the editor's add-tag picker
+        // excludes them (PL-04/PL-21): Domain is set on the General tab, and a system tag is
+        // plumbing. A template row for either would be unfillable or meaningless.
+        _tagDictionary = TagDictionary
+            .Where(d => !d.IsDomainTag && !d.IsSystemTag)
+            .OrderBy(d => d.DisplayOrder)
+            .ThenBy(d => d.DisplayName ?? d.TagDefinitionKey, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        // Copy rather than bind: Cancel must leave the caller's list untouched.
+        _template.AddRange(EntryPointTags.Select(t => new EntryPointTagTemplateModel
+        {
+            TagDefinitionId = t.TagDefinitionId,
+            IsDefaultPrimary = t.IsDefaultPrimary,
+            RequirementLevel = t.RequirementLevel
+        }));
+        SortTemplate();
+        _defaultPrimaryTagId = _template.FirstOrDefault(t => t.IsDefaultPrimary)?.TagDefinitionId;
+
         if (Existing is null) return;
 
         _typeName = Existing.TypeName;
@@ -98,6 +231,83 @@
         _iconKey = Existing.IconKey;
         _allowCustomTags = Existing.AllowCustomTags;
     }
+
+    // --- Tag template editing -------------------------------------------------------------------
+
+    private TagDefinitionModel? DefinitionFor(int tagDefinitionId) =>
+        _tagDictionary.FirstOrDefault(d => d.TagDefinitionId == tagDefinitionId);
+
+    private static bool IsLink(TagDefinitionModel d) =>
+        string.Equals(d.ContentType, "Link", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Names the level a row inherits, so "Inherit" is not a blank cheque.</summary>
+    private static string InheritedLevelText(TagDefinitionModel? d) => d?.RequirementLevel switch
+    {
+        "Error" => "required",
+        "Suggested" => "recommended",
+        _ => "optional"
+    };
+
+    /// <summary>Template order follows the definitions' DisplayOrder, matching the Tags tab.</summary>
+    private void SortTemplate()
+    {
+        var order = _tagDictionary
+            .Select((d, i) => (d.TagDefinitionId, i))
+            .ToDictionary(x => x.TagDefinitionId, x => x.i);
+
+        _template.Sort((a, b) =>
+            order.GetValueOrDefault(a.TagDefinitionId, int.MaxValue)
+                 .CompareTo(order.GetValueOrDefault(b.TagDefinitionId, int.MaxValue)));
+    }
+
+    private IEnumerable<TagDefinitionModel> AddableDefinitions()
+    {
+        var present = _template.Select(t => t.TagDefinitionId).ToHashSet();
+        return _tagDictionary.Where(d => !present.Contains(d.TagDefinitionId));
+    }
+
+    private Task<IEnumerable<TagDefinitionModel>> SearchAddable(string search, CancellationToken cancellationToken)
+    {
+        var candidates = AddableDefinitions();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            candidates = candidates.Where(d =>
+                (d.DisplayName ?? d.TagDefinitionKey).Contains(search, StringComparison.OrdinalIgnoreCase)
+                || d.TagDefinitionKey.Contains(search, StringComparison.OrdinalIgnoreCase));
+        }
+        return Task.FromResult(candidates);
+    }
+
+    private void OnAddTag(TagDefinitionModel? definition)
+    {
+        if (definition is null) return;
+        if (_template.Any(t => t.TagDefinitionId == definition.TagDefinitionId)) return;
+
+        _template.Add(new EntryPointTagTemplateModel { TagDefinitionId = definition.TagDefinitionId });
+        SortTemplate();
+        _addKey++;   // PL-16: remount so the autocomplete resets to its placeholder
+    }
+
+    private void RemoveRow(EntryPointTagTemplateModel row)
+    {
+        _template.Remove(row);
+        if (_defaultPrimaryTagId == row.TagDefinitionId)
+        {
+            // Removing the primary must clear the pointer, not leave it aimed at a row that is gone.
+            _defaultPrimaryTagId = null;
+            foreach (var t in _template) t.IsDefaultPrimary = false;
+        }
+    }
+
+    private void OnDefaultPrimaryChanged(int? tagDefinitionId)
+    {
+        _defaultPrimaryTagId = tagDefinitionId;
+        foreach (var t in _template)
+            t.IsDefaultPrimary = t.TagDefinitionId == tagDefinitionId;
+    }
+
+    private void OnRequirementChanged(EntryPointTagTemplateModel row, string? value) =>
+        row.RequirementLevel = string.IsNullOrEmpty(value) ? null : value;
 
     /// <summary>Mirrors explorer-canvas.js: the node prints ShortCode, or the first three letters
     /// of the type name upper-cased when there isn't one.</summary>
@@ -143,7 +353,10 @@
                 TypeName = _typeName.Trim(),
                 ShortCode = string.IsNullOrWhiteSpace(_shortCode) ? null : _shortCode!.Trim(),
                 IconKey = string.IsNullOrWhiteSpace(_iconKey) ? null : _iconKey!.Trim(),
-                AllowCustomTags = _allowCustomTags
+                AllowCustomTags = _allowCustomTags,
+                // Null when this caller does not offer template editing, so the existing template is
+                // left alone rather than cleared. An empty LIST is different — it means "no tags".
+                EntryPointTags = TagDictionary.Count == 0 ? null : _template.ToList()
             };
 
             var response = await ResourceService.SaveResourceTypeAsync(request, CancellationToken.None);

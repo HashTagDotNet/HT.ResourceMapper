@@ -6,6 +6,7 @@ using ResourceMapper.Common.Server.Resources.Interfaces;
 using ResourceMapper.Common.Server.Resources.Models;
 using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
+using ResourceMapper.Common.Shared.ResourceTypes.Contracts;
 using System.Data;
 
 namespace ResourceMapper.Common.Server.Resources
@@ -14,6 +15,7 @@ namespace ResourceMapper.Common.Server.Resources
     {
         private const string ResourceFilterListType = "[HTResourceMapper].[ResourceFilterList]";
         private const string TagKeyValueListType = "[HTResourceMapper].[TagKeyValueList]";
+        private const string ResourceTypeTagListType = "[HTResourceMapper].[ResourceTypeTagList]";
 
         private readonly IDbConnector _db;
 
@@ -410,6 +412,36 @@ namespace ResourceMapper.Common.Server.Resources
                 IsDefaultPrimary = dr.ReadBoolean("IsDefaultPrimary"),
                 RequirementLevel = dr.ReadString("RequirementLevel")
             }, cancellationToken: cancellationToken);
+        }
+
+        /// <summary>
+        /// Replaces one type's entry-point template with exactly <paramref name="tags"/>. An empty
+        /// list clears it — that is a real edit (a type that prompts for nothing), so it is not
+        /// short-circuited here.
+        /// </summary>
+        public async Task<string> SetEntryPointTemplatesAsync(int resourceTypeId,
+            IReadOnlyList<EntryPointTagTemplateModel> tags, CancellationToken cancellationToken)
+        {
+            using var table = new DataTable();
+            table.Columns.Add("TagDefinitionId", typeof(int));
+            table.Columns.Add("IsDefaultPrimary", typeof(bool));
+            table.Columns.Add("RequirementLevel", typeof(string));
+
+            foreach (var t in tags)
+            {
+                object level = string.IsNullOrWhiteSpace(t.RequirementLevel)
+                    ? DBNull.Value
+                    : t.RequirementLevel!;
+                table.Rows.Add(t.TagDefinitionId, t.IsDefaultPrimary, level);
+            }
+
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].ResourceTypeTag_SetForType")
+                .AddInteger("@ResourceTypeId", resourceTypeId)
+                .AddTvp("@Tags", ResourceTypeTagListType, table)
+                .AddVarchar("@Result", null, 10, ParameterDirection.Output);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+            return cmd.ReadString("@Result") ?? "error";
         }
 
         public async Task SetResourceTagsAsync(int resourceId, IReadOnlyList<(string TagKey, string TagValue)> tags,

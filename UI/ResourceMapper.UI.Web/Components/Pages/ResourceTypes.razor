@@ -1,7 +1,9 @@
 @page "/resource-types"
 @using HT.Api.Client.Contracts.Models
 @using ResourceMapper.Common.Server.Resources.Interfaces
+@using ResourceMapper.Common.Shared.Editor
 @using ResourceMapper.Common.Shared.ResourceTypes
+@using ResourceMapper.Common.Shared.ResourceTypes.Contracts
 @using ResourceMapper.UI.Web.Components.ResourceTypes
 @inject IResourceService ResourceService
 @inject IDialogService DialogService
@@ -95,6 +97,12 @@ else
 
 @code {
     private List<ResourceTypeModel> _types = new();
+
+    // Loaded once for the whole screen rather than per dialog open: both are small, catalog-wide
+    // reference lists, and the dialog needs them synchronously in OnInitialized.
+    private List<TagDefinitionModel> _tagDictionary = new();
+    private Dictionary<int, List<EntryPointTagTemplateModel>> _templates = new();
+
     private bool _loading = true;
     private bool _busy;
     private string? _loadError;
@@ -112,6 +120,17 @@ else
                 _types = response.ApiResponse.Data;
             else
                 _loadError = FirstMessage(response.ApiResponse.Errors) ?? "Could not load resource types.";
+
+            // Tag template editing needs the vocabulary and the current rows. A failure here is not
+            // fatal to the screen — the list still reads correctly — so it degrades to an empty
+            // dictionary, which the dialog treats as "template editing unavailable".
+            var tags = await ResourceService.GetTagDictionaryAsync(CancellationToken.None);
+            if (tags.IsSuccess() && tags.ApiResponse.Data is not null)
+                _tagDictionary = tags.ApiResponse.Data;
+
+            var templates = await ResourceService.GetEntryPointTemplatesAsync(CancellationToken.None);
+            if (templates.IsSuccess() && templates.ApiResponse.Data is not null)
+                _templates = templates.ApiResponse.Data;
         }
         finally
         {
@@ -141,6 +160,13 @@ else
                 nameof(ResourceTypeDialog.ExistingNames),
                 _types.Where(t => existing is null || t.ResourceTypeId != existing.ResourceTypeId)
                       .Select(t => t.TypeName).ToList()
+            },
+            { nameof(ResourceTypeDialog.TagDictionary), _tagDictionary },
+            {
+                nameof(ResourceTypeDialog.EntryPointTags),
+                existing is not null && _templates.TryGetValue(existing.ResourceTypeId, out var rows)
+                    ? rows
+                    : new List<EntryPointTagTemplateModel>()
             }
         };
 

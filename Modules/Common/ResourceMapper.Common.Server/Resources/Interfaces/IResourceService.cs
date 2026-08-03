@@ -50,6 +50,14 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
         /// <summary>All resource types with their dependency counts, for the /resource-types management screen.</summary>
         Task<ApiServiceResponse<List<ResourceTypeModel>>> GetResourceTypesAsync(CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// Every type's entry-point template, keyed by ResourceTypeId. Returns all types in one call
+        /// (as ResourceTypeTag_GetAll does) so the management screen can edit any row without a
+        /// per-type round trip.
+        /// </summary>
+        Task<ApiServiceResponse<Dictionary<int, List<EntryPointTagTemplateModel>>>> GetEntryPointTemplatesAsync(
+            CancellationToken cancellationToken = default);
+
         /// <summary>Creates (ResourceTypeId 0) or updates a resource type, including the
         /// ShortCode/IconKey pair the explorer renders from.</summary>
         Task<ApiServiceResponse<ResourceTypeModel>> SaveResourceTypeAsync(SaveResourceTypeRequest request, CancellationToken cancellationToken = default);

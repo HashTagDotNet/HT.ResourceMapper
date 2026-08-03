@@ -612,6 +612,35 @@ namespace ResourceMapper.Common.Server.Resources
             }
         }
 
+        public async Task<ApiServiceResponse<Dictionary<int, List<EntryPointTagTemplateModel>>>> GetEntryPointTemplatesAsync(
+            CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<Dictionary<int, List<EntryPointTagTemplateModel>>>();
+            try
+            {
+                var rows = await _repo.GetAllEntryPointTemplatesAsync(cancellationToken);
+
+                var byType = rows
+                    .GroupBy(r => r.ResourceTypeId)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(r => new EntryPointTagTemplateModel
+                        {
+                            TagDefinitionId = r.TagDefinitionId,
+                            IsDefaultPrimary = r.IsDefaultPrimary,
+                            RequirementLevel = r.RequirementLevel
+                        }).ToList());
+
+                builder.Data.Set(byType);
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
         public async Task<ApiServiceResponse<ResourceTypeModel>> SaveResourceTypeAsync(SaveResourceTypeRequest request,
             CancellationToken cancellationToken = default)
         {
@@ -665,6 +694,26 @@ namespace ResourceMapper.Common.Server.Resources
                     default:
                         builder.Errors.AddError(CallStatusCode.InternalError, "Resource type could not be saved.");
                         return builder.BuildResponse();
+                }
+
+                // Entry-point template, when the caller edits it. Null means "leave it alone", which
+                // is how the editor's inline create-type opts out — it has no template UI, and
+                // treating null as "clear" would silently wipe a template on every such save.
+                // Runs after the row is saved so a create has an id to attach rows to.
+                if (request.EntryPointTags is not null)
+                {
+                    var templateResult = await _repo.SetEntryPointTemplatesAsync(
+                        resourceTypeId, request.EntryPointTags, cancellationToken);
+
+                    if (templateResult != "ok")
+                    {
+                        // The type itself saved; only the template failed. Say exactly that rather
+                        // than implying nothing was written.
+                        builder.Errors.AddError(CallStatusCode.InternalError,
+                            "Tag template could not be saved",
+                            "The resource type was saved, but its tag template was not.", "EntryPointTags");
+                        return builder.BuildResponse();
+                    }
                 }
 
                 // Re-read so the caller gets the persisted row plus its dependency counts (the
