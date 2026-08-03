@@ -1,6 +1,4 @@
 @using ResourceMapper.Common.Shared.Editor
-@inject IJSRuntime JS
-@inject ISnackbar Snackbar
 
 @if (Row.Definition.IsMultiValued)
 {
@@ -10,15 +8,11 @@
             {
                 @* Each value carries its own copy affordance: the multi-valued tags are Runbook and
                    Documentation, i.e. exactly the URLs worth copying. Revealed on row hover (see
-                   .rm-tag-copy) with :focus-within for keyboard and a coarse-pointer fallback, so
+                   .rm-copybtn) with :focus-within for keyboard and a coarse-pointer fallback, so
                    hiding it does not make it unreachable on touch (PL-12c). *@
                 <span class="rm-tag-chipwrap">
                     <MudChip T="string" Value="@v.EditedValue" OnClose="@(() => RemoveValue(v))" Disabled="@ReadOnlyEffective">@v.EditedValue</MudChip>
-                    <MudTooltip Text="Copy value">
-                        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
-                                       Class="rm-tag-copy" aria-label="@($"Copy {Row.Definition.DisplayName} value")"
-                                       OnClick="@(() => CopyAsync(v.EditedValue))" />
-                    </MudTooltip>
+                    <CopyValueButton Value="@v.EditedValue" Label="@Row.Definition.DisplayName" />
                 </span>
             }
         </MudChipSet>
@@ -84,14 +78,7 @@ else
                           Disabled="@ReadOnlyEffective" Variant="Variant.Outlined" Margin="Margin.Dense" />
         }
 
-        @if (!string.IsNullOrWhiteSpace(editor.EditedValue))
-        {
-            <MudTooltip Text="Copy value">
-                <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
-                               Class="rm-tag-copy" aria-label="@CopyLabel"
-                               OnClick="@(() => CopyAsync(editor.EditedValue))" />
-            </MudTooltip>
-        }
+        <CopyValueButton Value="@editor.EditedValue" Label="@Row.Definition.DisplayName" />
     </div>
 }
 
@@ -154,35 +141,6 @@ else
         Row.Values.Add(new SingleValueEditor { OriginalValue = string.Empty, EditedValue = _pendingValue });
         _pendingValue = null;
         await OnChanged.InvokeAsync();
-    }
-
-    private string CopyLabel => $"Copy {Row.Definition.DisplayName} value";
-
-    /// <summary>
-    /// Same clipboard call and same brief confirmation as the home grid's copy buttons
-    /// (<c>Home.razor</c>), so copying behaves identically wherever it appears.
-    /// </summary>
-    private async Task CopyAsync(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return;
-
-        try
-        {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", value);
-            Snackbar.Add("Value copied", Severity.Normal, config =>
-            {
-                config.Icon = Icons.Material.Outlined.ContentCopy;   // match the copy-button icon
-                config.VisibleStateDuration = 500;
-                config.ShowTransitionDuration = 100;
-                config.HideTransitionDuration = 150;
-            });
-        }
-        catch
-        {
-            // Clipboard is unavailable outside a secure context / without permission. Say so rather
-            // than failing silently — the user is left believing the value is on their clipboard.
-            Snackbar.Add("Copy failed — clipboard unavailable.", Severity.Warning);
-        }
     }
 
     private static bool IsValidLink(string? value)

@@ -102,8 +102,8 @@ html, body {
         visibility: visible;
     }
 
-    /* Same reasoning for the tag editor's copy-value buttons. */
-    .rm-tag-copy {
+    /* Same reasoning for the editor's copy-value buttons (Tags and Review tabs). */
+    .rm-copybtn {
         opacity: 1;
     }
 }
@@ -371,47 +371,62 @@ html, body {
     align-items: center;
 }
 
-/* Copy stays out of the way until the row is under the pointer — the same hover-reveal the home
-   grid's row actions use, so the two surfaces behave alike. Hover is scoped to the whole
-   .rm-tag-row (not the button's own wrapper), so pointing anywhere in the row reveals it.
+/* Copy stays out of the way until its row is under the pointer — the same hover-reveal the home
+   grid's row actions use, so every surface behaves alike. Hover is scoped to the whole row (not the
+   button's own wrapper), so pointing anywhere in the row reveals it. One class serves both the Tags
+   tab's .rm-tag-row and the Review tab's table rows.
 
    `opacity`, not `visibility: hidden`: a visibility-hidden element is removed from the tab order,
    so on the read-only details view — where every field is disabled and the button is the row's only
    focusable thing — a keyboard user could never reach it, and :focus-within could never fire to
    un-hide it. At opacity 0 the button stays tabbable and :focus-visible brings it into view. The
-   box is reserved either way, so revealing it never reflows the input or shifts the row.
+   box is reserved either way, so revealing it never reflows the row.
    Trade-off accepted: the target is clickable while invisible, but it sits in its own slot outside
-   the input and the snackbar confirms what happened. */
-.rm-tag-copy {
+   the value and the snackbar confirms what happened. */
+.rm-copybtn {
     flex: 0 0 auto;
     padding: 1px;
-    /* text-disabled, not text-secondary: the same lighter tone the grid's row actions use. This is
-       an operation, and operations stay visually subordinate to the data (UX-Plan rule). */
-    color: var(--mud-palette-text-disabled);
     opacity: 0;
     transition: opacity .1s linear;
 }
 
-.rm-tag-row:hover .rm-tag-copy,
-.rm-tag-row:focus-within .rm-tag-copy,
-.rm-tag-copy:focus-visible {
+.rm-tag-row:hover .rm-copybtn,
+.rm-tag-row:focus-within .rm-copybtn,
+.rm-review-table tbody tr:hover .rm-copybtn,
+.rm-review-table tbody tr:focus-within .rm-copybtn,
+.rm-copybtn:focus-visible {
     opacity: 1;
 }
 
-/* Smaller than MudBlazor's Size.Small default (~1.25rem): this is a secondary, per-row action and
-   at full size it competed with the value itself. */
-.rm-tag-copy,
-.rm-tag-copy .mud-icon-root {
+/* text-disabled, not text-secondary: the same lighter tone the grid's row actions use — these are
+   operations, and operations stay visually subordinate to the data (UX-Plan rule). Smaller than
+   MudBlazor's Size.Small default (~1.25rem), which competed with the value itself. */
+.rm-copybtn,
+.rm-copybtn .mud-icon-root {
     color: var(--mud-palette-text-disabled);
 }
 
-.rm-tag-copy .mud-icon-root {
+.rm-copybtn .mud-icon-root {
     padding: 0;
     font-size: .95rem;
 }
 
-.rm-tag-chipwrap .rm-tag-copy {
+.rm-tag-chipwrap .rm-copybtn {
     margin-left: -1px;
+}
+
+/* Review tab: the copy column shrinks to its button so it never steals width from the value. */
+.rm-review-copy {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+}
+
+/* The primary-link star is a passive annotation, not an action or a status to chase. At
+   Color.Primary it was the loudest mark in the tag list; text-disabled keeps it subordinate to the
+   value it annotates and consistent with the copy buttons beside it. */
+.rm-primary-star {
+    color: var(--mud-palette-text-disabled);
 }
 
 .rm-tag-add-row {

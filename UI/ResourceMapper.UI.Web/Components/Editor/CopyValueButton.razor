@@ -1,0 +1,57 @@
+@*
+    Copy-a-value affordance, shared by the Tags tab and the Review tab so the two cannot drift.
+    Renders nothing when there is no value — an icon over an empty cell reads as an action that
+    does nothing.
+
+    Hidden at rest and revealed when its row is hovered; the reveal rules live in app.css keyed on
+    .rm-copybtn, because the hover target is the whole row and only the row's own stylesheet knows
+    what "row" means on each surface.
+*@
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+@if (!string.IsNullOrWhiteSpace(Value))
+{
+    <MudTooltip Text="Copy value">
+        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
+                       Class="rm-copybtn" aria-label="@AriaLabel"
+                       OnClick="Copy" />
+    </MudTooltip>
+}
+
+@code {
+    /// <summary>The text placed on the clipboard. No button renders when this is blank.</summary>
+    [Parameter] public string? Value { get; set; }
+
+    /// <summary>What the value is, e.g. "Portal URL" — names the button for screen readers.</summary>
+    [Parameter] public string? Label { get; set; }
+
+    private string AriaLabel => string.IsNullOrWhiteSpace(Label) ? "Copy value" : $"Copy {Label} value";
+
+    /// <summary>
+    /// Same clipboard call and same brief confirmation as the home grid's copy buttons, so copying
+    /// behaves identically wherever it appears.
+    /// </summary>
+    private async Task Copy()
+    {
+        if (string.IsNullOrWhiteSpace(Value)) return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Value);
+            Snackbar.Add("Value copied", Severity.Normal, config =>
+            {
+                config.Icon = Icons.Material.Outlined.ContentCopy;   // match the copy-button icon
+                config.VisibleStateDuration = 500;
+                config.ShowTransitionDuration = 100;
+                config.HideTransitionDuration = 150;
+            });
+        }
+        catch
+        {
+            // Clipboard is unavailable outside a secure context / without permission. Say so rather
+            // than failing silently — the user is left believing the value is on their clipboard.
+            Snackbar.Add("Copy failed — clipboard unavailable.", Severity.Warning);
+        }
+    }
+}

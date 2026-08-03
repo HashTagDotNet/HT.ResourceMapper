@@ -37,8 +37,12 @@
                     }
                     else if (row.IsPrimary)
                     {
-                        <MudTooltip Text="Primary link">
-                            <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Primary" />
+                        @* Same star treatment and same wording as the Review tab (PL-35): one symbol,
+                           one colour, one explanation. Was Color.Primary here and on Review, which
+                           made a passive indicator louder than the data it annotates. *@
+                        <MudTooltip Text="@ReviewTab.PrimaryLinkTooltip">
+                            <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small"
+                                     Color="Color.Inherit" Class="rm-primary-star" />
                         </MudTooltip>
                     }
                 </div>

@@ -4,20 +4,23 @@
     Review before saving. The record isn't saved until Save succeeds.
 </MudText>
 
-<MudSimpleTable Dense="true" Elevation="0" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
+@* Every row ends in a copy cell, revealed on row hover (see .rm-copybtn in app.css). The cell is
+   always present even where there is no value, so the value column keeps one consistent width down
+   the table instead of jogging on the rows that happen to be empty. *@
+<MudSimpleTable Dense="true" Elevation="0" Class="rm-review-table" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
     <tbody>
-        <tr><td class="rm-review-label">Resource Type</td><td>@(string.IsNullOrEmpty(Model.ResourceType.EditedValue) ? "—" : Model.ResourceType.EditedValue)</td></tr>
-        <tr><td class="rm-review-label">Domain</td><td>@(string.IsNullOrEmpty(Model.Domain.EditedValue) ? "—" : Model.Domain.EditedValue)</td></tr>
-        <tr><td class="rm-review-label">Name</td><td>@(string.IsNullOrEmpty(Model.Name.EditedValue) ? "—" : Model.Name.EditedValue)</td></tr>
-        <tr><td class="rm-review-label">Key</td><td>@(string.IsNullOrEmpty(Model.Key.EditedValue) ? "—" : Model.Key.EditedValue)</td></tr>
-        <tr><td class="rm-review-label">Description</td><td>@(string.IsNullOrEmpty(Model.Description.EditedValue) ? "—" : Model.Description.EditedValue)</td></tr>
-        <tr><td class="rm-review-label">Identity</td><td>@(string.IsNullOrEmpty(Model.IdentityPreview.Display) ? "—" : Model.IdentityPreview.Display)</td></tr>
+        @ReviewRow("Resource Type", Model.ResourceType.EditedValue)
+        @ReviewRow("Domain", Model.Domain.EditedValue)
+        @ReviewRow("Name", Model.Name.EditedValue)
+        @ReviewRow("Key", Model.Key.EditedValue)
+        @ReviewRow("Description", Model.Description.EditedValue)
+        @ReviewRow("Identity", Model.IdentityPreview.Display)
     </tbody>
 </MudSimpleTable>
 
-<MudSimpleTable Dense="true" Elevation="0" Class="mt-3" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
+<MudSimpleTable Dense="true" Elevation="0" Class="mt-3 rm-review-table" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
     <thead>
-        <tr><th colspan="2">Tags</th></tr>
+        <tr><th colspan="3">Tags</th></tr>
     </thead>
     <tbody>
         @{
@@ -25,30 +28,37 @@
         }
         @if (visibleTags.Count == 0)
         {
-            <tr><td colspan="2" class="rm-review-label">No tags set.</td></tr>
+            <tr><td colspan="3" class="rm-review-label">No tags set.</td></tr>
         }
         else
         {
             @foreach (var row in visibleTags)
             {
+                var value = RowValueDisplay(row);
                 <tr>
                     <td class="rm-review-label">
                         @row.Definition.DisplayName
                         @if (row.IsPrimary)
                         {
-                            <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Primary" Class="ml-1" />
+                            @* PL-35: the star carried no explanation at all — Steve designed it and
+                               could not recall what it meant. Same wording as the Tags tab's star. *@
+                            <MudTooltip Text="@PrimaryLinkTooltip">
+                                <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small"
+                                         Color="Color.Inherit" Class="ml-1 rm-primary-star" />
+                            </MudTooltip>
                         }
                     </td>
-                    <td>@RowValueDisplay(row)</td>
+                    <td>@value</td>
+                    <td class="rm-review-copy"><CopyValueButton Value="@value" Label="@row.Definition.DisplayName" /></td>
                 </tr>
             }
         }
     </tbody>
 </MudSimpleTable>
 
-<MudSimpleTable Dense="true" Elevation="0" Class="mt-3" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
+<MudSimpleTable Dense="true" Elevation="0" Class="mt-3 rm-review-table" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
     <thead>
-        <tr><th colspan="2">Dependencies</th></tr>
+        <tr><th colspan="3">Dependencies</th></tr>
     </thead>
     <tbody>
         @{
@@ -56,21 +66,27 @@
         }
         @if (dependsOn.Count == 0)
         {
-            <tr><td colspan="2" class="rm-review-label">No dependencies set.</td></tr>
+            <tr><td colspan="3" class="rm-review-label">No dependencies set.</td></tr>
         }
         else
         {
             @foreach (var row in dependsOn)
             {
-                <tr><td class="rm-review-label">@row.OtherResourceName</td><td>@row.OtherResourceType</td></tr>
+                <tr>
+                    <td class="rm-review-label">@row.OtherResourceName</td>
+                    <td>@row.OtherResourceType</td>
+                    @* These rows are (name, type) pairs rather than label/value, so copy takes the
+                       resource NAME — the identifying half, and the thing worth pasting into search. *@
+                    <td class="rm-review-copy"><CopyValueButton Value="@row.OtherResourceName" Label="dependency" /></td>
+                </tr>
             }
         }
     </tbody>
 </MudSimpleTable>
 
-<MudSimpleTable Dense="true" Elevation="0" Class="mt-3" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
+<MudSimpleTable Dense="true" Elevation="0" Class="mt-3 rm-review-table" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
     <thead>
-        <tr><th colspan="2">Dependent On</th></tr>
+        <tr><th colspan="3">Dependent On</th></tr>
     </thead>
     <tbody>
         @{
@@ -78,13 +94,17 @@
         }
         @if (dependentOn.Count == 0)
         {
-            <tr><td colspan="2" class="rm-review-label">No dependents set.</td></tr>
+            <tr><td colspan="3" class="rm-review-label">No dependents set.</td></tr>
         }
         else
         {
             @foreach (var row in dependentOn)
             {
-                <tr><td class="rm-review-label">@row.OtherResourceName</td><td>@row.OtherResourceType</td></tr>
+                <tr>
+                    <td class="rm-review-label">@row.OtherResourceName</td>
+                    <td>@row.OtherResourceType</td>
+                    <td class="rm-review-copy"><CopyValueButton Value="@row.OtherResourceName" Label="dependent" /></td>
+                </tr>
             }
         }
     </tbody>
@@ -114,6 +134,24 @@ else
 
 @code {
     [Parameter] public ResourceEditorModel Model { get; set; } = default!;
+
+    /// <summary>
+    /// Shared with the Tags tab's star so the same symbol never carries two different explanations.
+    /// Names the concept AND what it does — "Primary link" alone was the wording that PL-35 records
+    /// as unmemorable even to its author.
+    /// </summary>
+    internal const string PrimaryLinkTooltip = "Primary link — the resource's click-through link";
+
+    /// <summary>
+    /// One label/value/copy row. Renders an em dash for a blank value and, via CopyValueButton,
+    /// no copy affordance at all in that case.
+    /// </summary>
+    private RenderFragment ReviewRow(string label, string? value) =>
+        @<tr>
+            <td class="rm-review-label">@label</td>
+            <td>@(string.IsNullOrEmpty(value) ? "—" : value)</td>
+            <td class="rm-review-copy"><CopyValueButton Value="@value" Label="@label" /></td>
+        </tr>;
 
     private List<(string Field, string Text, EditorFieldLevel Level)> CollectMessages()
     {
