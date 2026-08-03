@@ -171,7 +171,12 @@ else
         };
 
         var title = existing is null ? "New resource type" : $"Edit {existing.TypeName}";
-        var dialog = await DialogService.ShowAsync<ResourceTypeDialog>(title, parameters);
+
+        // Medium, not the default Small: the tag-template table added a four-column grid, and at
+        // Small the "Expected?" selects truncated their longest option to "Inherit (recomme…", which
+        // defeats the point of naming the level a row inherits.
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ResourceTypeDialog>(title, parameters, options);
         var result = await dialog.Result;
         if (result is null || result.Canceled) return;
 

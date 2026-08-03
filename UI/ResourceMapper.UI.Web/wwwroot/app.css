@@ -816,14 +816,21 @@ html, body {
     flex-direction: column;
     gap: .15rem;
     margin-bottom: .25rem;
+    /* Belt and braces against a flex-row ancestor sizing this to content instead of to the dialog:
+       a grid whose first column is 1fr collapses to min-content when it is a content-sized flex
+       item, which is exactly how the Expected? selects ended up clipped. */
+    width: 100%;
+    flex: 1 1 auto;
 }
 
 .rt-template-head,
 .rt-template-row {
     display: grid;
-    /* 150px truncated the longest option ("Inherit (recommended)") to "Inherit (rec…", which defeats
-       the point of naming the inherited level. */
-    grid-template-columns: minmax(0, 1fr) 194px 84px 32px;
+    /* Sized by MEASUREMENT, not guesswork: MudSelect's own padding and dropdown arrow leave the text
+       area ~38px narrower than the column, and "Inherit (recommended)" needs 180px of text. 150px
+       then 194px both still clipped it to "Inherit (recomme…", which defeats the whole point of
+       naming the level a row inherits. */
+    grid-template-columns: minmax(0, 1fr) 240px 84px 32px;
     align-items: center;
     gap: .5rem;
 }
@@ -864,4 +871,10 @@ html, body {
 
 .rt-template-add {
     max-width: 320px;
+}
+
+/* Add-existing picker and create-new action share one row, like the editor's Tags tab. */
+.rt-template-actions {
+    flex-wrap: wrap;
+    gap: .25rem 0;
 }

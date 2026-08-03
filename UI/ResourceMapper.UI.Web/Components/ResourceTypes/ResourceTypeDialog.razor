@@ -3,7 +3,9 @@
 @using ResourceMapper.Common.Shared.Editor
 @using ResourceMapper.Common.Shared.ResourceTypes
 @using ResourceMapper.Common.Shared.ResourceTypes.Contracts
+@using ResourceMapper.UI.Web.Components.Editor
 @inject IResourceService ResourceService
+@inject IDialogService DialogService
 
 <MudDialog>
     <DialogContent>
@@ -33,8 +35,14 @@
             </MudSelect>
         </div>
 
+        @* Wrapped in its own div: MudCheckBox renders a MudInputControl whose input container is a
+           flex ROW, and everything after it was being laid out inside that container. The tag
+           template below is a grid, so as a flex item it collapsed to content width — its TAG column
+           resolved to 110px inside a 912px dialog, which is what clipped the "Expected?" selects. *@
+    <div>
         <MudCheckBox T="bool" @bind-Value="_allowCustomTags" Class="mt-2"
                      Label="Allow custom tags on resources of this type" />
+    </div>
 
         @* The tag template. The list screen has always REPORTED a "Tag Template" count per type
            while offering no way to change it — the only editor was a seed script, since no write
@@ -115,23 +123,27 @@
             </MudRadioGroup>
         }
 
-        @if (AddableDefinitions().Any())
-        {
-            <MudAutocomplete T="TagDefinitionModel" @key="_addKey" Value="null" ValueChanged="OnAddTag"
-                             SearchFunc="SearchAddable"
-                             ToStringFunc="@(t => t?.DisplayName ?? t?.TagDefinitionKey ?? string.Empty)"
-                             Placeholder="Add a tag to this template…" Variant="Variant.Outlined"
-                             Margin="Margin.Dense" Clearable="true" ResetValueOnEmptyText="true"
-                             CoerceValue="false" Class="mt-2 rt-template-add" />
-        }
-        else if (_tagDictionary.Count > 0)
-        {
-            @* Same rule as the editor's add-tag control (PL-20): hide/explain rather than show an
-               empty picker. *@
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
-                Every available tag is already in this template.
-            </MudText>
-        }
+        @* Two affordances, exactly as the editor's Tags tab has: attach an EXISTING definition, or
+           create a brand-new one. Only the first shipped initially, so a type could not be given a
+           tag that did not already exist — and when every existing tag was already in the template
+           the section became a dead end with nothing to do. "Create new tag…" always shows, because
+           a brand-new definition is always addable (same reasoning as TagsTab). *@
+        <div class="d-flex align-center mt-2 rt-template-actions">
+            @if (AddableDefinitions().Any())
+            {
+                <MudAutocomplete T="TagDefinitionModel" @key="_addKey" Value="null" ValueChanged="OnAddTag"
+                                 SearchFunc="SearchAddable"
+                                 ToStringFunc="@(t => t?.DisplayName ?? t?.TagDefinitionKey ?? string.Empty)"
+                                 Placeholder="Add a tag to this template…" Variant="Variant.Outlined"
+                                 Margin="Margin.Dense" Clearable="true" ResetValueOnEmptyText="true"
+                                 CoerceValue="false" Class="rt-template-add" />
+            }
+            <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
+                       OnClick="OpenCreateTagDialog"
+                       Class="@(AddableDefinitions().Any() ? "ml-2" : string.Empty)">
+                Create new tag…
+            </MudButton>
+        </div>
 
         @* Scoped CSS only reaches elements this component renders itself, so the framing here is
            an inline style on the MudPaper and the classes below sit on plain divs. *@
@@ -308,6 +320,48 @@
 
     private void OnRequirementChanged(EntryPointTagTemplateModel row, string? value) =>
         row.RequirementLevel = string.IsNullOrEmpty(value) ? null : value;
+
+    /// <summary>
+    /// Creates a tag definition and drops it straight into this template — the same shape as
+    /// TagsTab.OpenCreateDialog, reusing the same dialog so the two paths cannot ask for different
+    /// things. The definition is persisted by the dialog itself; only the template row is pending
+    /// until Save, so cancelling this dialog afterwards leaves an orphan definition and no template
+    /// row. Accepted: that matches how the editor's inline tag create already behaves, and an unused
+    /// definition is harmless (and reusable) where a half-written one would not be.
+    /// </summary>
+    private async Task OpenCreateTagDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(TagDefinitionDialog.ExistingKeys), TagDictionary.Select(t => t.TagDefinitionKey).ToList() }
+        };
+
+        var dialog = await DialogService.ShowAsync<TagDefinitionDialog>("Create tag definition", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        if (result.Data is not TagDefinitionModel created) return;
+
+        // Keep both lists current: TagDictionary is what the create dialog checks for duplicate keys
+        // on a second create, _tagDictionary is what the picker and the row renderer read.
+        if (!TagDictionary.Any(t => t.TagDefinitionId == created.TagDefinitionId))
+            TagDictionary.Add(created);
+
+        if (!_tagDictionary.Any(t => t.TagDefinitionId == created.TagDefinitionId))
+        {
+            _tagDictionary.Add(created);
+            _tagDictionary = _tagDictionary
+                .OrderBy(d => d.DisplayOrder)
+                .ThenBy(d => d.DisplayName ?? d.TagDefinitionKey, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        if (!_template.Any(t => t.TagDefinitionId == created.TagDefinitionId))
+        {
+            _template.Add(new EntryPointTagTemplateModel { TagDefinitionId = created.TagDefinitionId });
+            SortTemplate();
+        }
+    }
 
     /// <summary>Mirrors explorer-canvas.js: the node prints ShortCode, or the first three letters
     /// of the type name upper-cased when there isn't one.</summary>
