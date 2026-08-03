@@ -75,6 +75,11 @@ Carried from the design spec's non-goals — parked for future stories:
 
 ---
 
+> ⚠️ **The RESUME/TODO list below is superseded — see [`docs/plans/v1-punchlist.md`](../v1-punchlist.md).**
+> Item 1 ("push the pass-2 commits") is **done** — `origin/home-page` and local are identical.
+> Item 2 (deferred 9c/9d/fix-batch reviews) is **done** — findings are PL-A8, PL-A9, PL-37, PL-39, PL-42.
+> Item 3 (user verification) happened 2026-08-02 and produced the punchlist.
+
 ## Build status — 2026-07-20 (resume marker)
 
 **Explorer feature COMPLETE + UI-polish pass 1 & 2 COMPLETE.** Branch `home-page`.

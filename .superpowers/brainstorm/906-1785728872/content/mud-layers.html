@@ -1,0 +1,159 @@
+<h2>The same design &mdash; annotated by how it gets built</h2>
+<p class="subtitle">
+  You approved <b>Compact + Azure footer</b> against hand-drawn HTML. This is that same design with
+  every piece colour-coded by which MudBlazor layer it needs. The point: <b>almost all of it is
+  native.</b> Only one property is genuinely at risk.
+</p>
+
+<div class="section">
+  <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;margin-bottom:4px">
+    <span><span style="display:inline-block;width:11px;height:11px;background:#16a34a;border-radius:2px;vertical-align:-1px"></span>
+      <b>L1</b> &mdash; <code>MudTheme</code> in C# (no CSS at all)</span>
+    <span><span style="display:inline-block;width:11px;height:11px;background:#2563EB;border-radius:2px;vertical-align:-1px"></span>
+      <b>L2</b> &mdash; layout CSS <i>around</i> Mud</span>
+    <span><span style="display:inline-block;width:11px;height:11px;background:#d97706;border-radius:2px;vertical-align:-1px"></span>
+      <b>L3</b> &mdash; <code>--mud-*</code> variable</span>
+    <span><span style="display:inline-block;width:11px;height:11px;background:#dc2626;border-radius:2px;vertical-align:-1px"></span>
+      <b>L4</b> &mdash; override Mud internals <i>(avoid)</i></span>
+  </div>
+</div>
+
+<style>
+  .lay { display:grid; grid-template-columns:1.15fr .85fr; gap:18px; align-items:start; }
+  @media (max-width:1050px){ .lay{ grid-template-columns:1fr; } }
+
+  .frame { border:1px solid var(--border,#d6dae1); border-radius:10px; overflow:hidden; background:#fff; }
+  .frame-h { padding:8px 13px; border-bottom:1px solid var(--border,#d6dae1);
+             background:rgba(127,127,127,.07); font-weight:700; font-size:13px; }
+
+  .app { background:#F8FAFC; color:#1E293B; font-size:12px; position:relative; }
+  .band { background:#eef2f7; }
+  .crumb{ padding:7px 14px 0; font-size:11px; color:#64748b; }
+  .crumb b{ color:#2563EB; font-weight:500; }
+  .ttl  { padding:2px 14px 8px; font-size:19px; font-weight:700; color:#0f172a; }
+  .tabs { display:flex; gap:20px; padding:0 14px; border-bottom:1px solid #dbe1e8; }
+  .tab  { font-size:11.5px; padding:7px 0; color:#64748b; border-bottom:2px solid transparent; }
+  .tab.on{ color:#2563EB; border-bottom-color:#2563EB; font-weight:600; }
+  .body { background:#fff; padding:11px 14px 14px; }
+  .foot { background:#eef2f7; border-top:1px solid #dbe1e8; padding:9px 14px; display:flex; gap:8px; align-items:center; }
+
+  .sec-h{ font-size:12.5px; font-weight:700; color:#0f172a; margin:0 0 2px; }
+  .sec-d{ font-size:11.5px; color:#64748b; margin:0 0 9px; }
+  .r    { display:grid; grid-template-columns:128px 1fr; gap:10px; margin-bottom:7px; align-items:start; }
+  .lab  { font-size:11.5px; color:#334155; padding-top:7px; }
+  .req  { color:#dc2626; }
+  .inf  { color:#94a3b8; font-weight:600; }
+  .fld  { height:30px; border:1px solid #cbd5e1; border-radius:4px; background:#fff;
+          display:flex; align-items:center; padding:0 8px; font-size:12.5px; color:#334155; }
+  .car  { margin-left:auto; opacity:.5; }
+  .hlp  { font-size:10.5px; color:#64748b; margin-top:2px; }
+  .btn  { font-size:11.5px; padding:5px 11px; border-radius:4px; border:1px solid #cbd5e1;
+          background:#fff; color:#334155; }
+  .btn.pri{ background:#2563EB; border-color:#2563EB; color:#fff; font-weight:600; }
+  .btn.dis{ opacity:.42; }
+  .btn.gh { border-color:transparent; background:transparent; color:#64748b; margin-left:auto; }
+
+  /* annotation tags */
+  .t { font-size:9px; font-weight:800; letter-spacing:.4px; color:#fff; border-radius:3px;
+       padding:1px 4px; vertical-align:1px; margin-left:5px; }
+  .t1{ background:#16a34a; } .t2{ background:#2563EB; }
+  .t3{ background:#d97706; } .t4{ background:#dc2626; }
+
+  .tbl { width:100%; border-collapse:collapse; font-size:12px; }
+  .tbl th,.tbl td{ text-align:left; padding:5px 7px; border-bottom:1px solid #e6eaf0; vertical-align:top; }
+  .tbl th{ font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; color:#64748b; }
+  .tbl code{ font-size:11px; }
+</style>
+
+<div class="lay">
+
+  <div class="frame">
+    <div class="frame-h">Compact + Azure footer, annotated</div>
+    <div class="app">
+      <div class="band">
+        <div class="crumb"><b>Home</b> &rsaquo; <b>Resources</b> &rsaquo; Orders API <span class="t t2">L2</span></div>
+        <div class="ttl">Orders API <span class="t t1">L1</span></div>
+        <div class="tabs">
+          <div class="tab on">General</div><div class="tab">Tags</div>
+          <div class="tab">Dependencies</div><div class="tab">Review</div>
+          <span class="t t1" style="align-self:center">L1</span>
+        </div>
+      </div>
+
+      <div class="body">
+        <div class="sec-h">Identity <span class="t t1">L1</span></div>
+        <div class="sec-d">How this resource is uniquely identified.</div>
+
+        <div class="r">
+          <div class="lab">Subscription <span class="req">*</span> <span class="inf">&#9432;</span><span class="t t2">L2</span></div>
+          <div>
+            <div class="fld">prod<span class="car">&#9662;</span></div>
+            <div class="hlp">Locked after save. Change via Rename. <span class="t t1">L1</span></div>
+          </div>
+        </div>
+
+        <div class="r">
+          <div class="lab">Resource Type <span class="req">*</span> <span class="inf">&#9432;</span></div>
+          <div>
+            <div class="fld" style="outline:2px dashed #dc2626;outline-offset:1px">Azure App Service<span class="car">&#9662;</span></div>
+            <div class="hlp" style="color:#dc2626"><b>height 30px &mdash; the only at-risk property</b> <span class="t t4">L4?</span></div>
+          </div>
+        </div>
+
+        <div class="r">
+          <div class="lab">Key <span class="req">*</span> <span class="inf">&#9432;</span></div>
+          <div>
+            <div class="fld">orders-api</div>
+            <div class="hlp">Lowercase, hyphens. e.g. <b>orders-api</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="foot">
+        <div class="btn pri">Review + Save</div>
+        <div class="btn dis">&lsaquo; Previous</div>
+        <div class="btn">Next : Tags &rsaquo;</div>
+        <span class="t t2" style="align-self:center">L2</span>
+        <div class="btn gh">Cancel</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="frame">
+    <div class="frame-h">What each piece actually needs</div>
+    <div style="padding:4px 10px 10px">
+      <table class="tbl">
+        <tr><th>Piece</th><th>Layer</th><th>How</th></tr>
+        <tr><td>Type scale (all sizes)</td><td><span class="t t1">L1</span></td><td><code>MudTheme.Typography</code></td></tr>
+        <tr><td>Colours, border radius</td><td><span class="t t1">L1</span></td><td><code>PaletteLight</code> + <code>LayoutProperties</code> &mdash; already used</td></tr>
+        <tr><td>Section heading + description</td><td><span class="t t1">L1</span></td><td><code>MudText</code> with Typo</td></tr>
+        <tr><td>&#9432; tooltip</td><td><span class="t t1">L1</span></td><td><code>MudTooltip</code> + <code>MudIcon</code></td></tr>
+        <tr><td>Helper text</td><td><span class="t t1">L1</span></td><td><code>HelperText</code> param (exists, used 4&times;)</td></tr>
+        <tr><td>Underline tab strip</td><td><span class="t t1">L1</span></td><td>MudTabs default look</td></tr>
+        <tr><td>Field text size</td><td><span class="t t1">L1</span></td><td><code>Typography.Input</code> + <code>Margin.Dense</code></td></tr>
+        <tr><td><b>128px label column</b></td><td><span class="t t2">L2</span></td><td>CSS grid <i>wrapping</i> the Mud field</td></tr>
+        <tr><td>Breadcrumb</td><td><span class="t t2">L2</span></td><td><code>MudBreadcrumbs</code> + placement CSS</td></tr>
+        <tr><td>Fixed chrome / scroll region</td><td><span class="t t2">L2</span></td><td><code>.rm-page</code> flex pattern &mdash; <b>already in the repo</b></td></tr>
+        <tr><td>Sticky footer bar</td><td><span class="t t2">L2</span></td><td>flex container, Mud buttons inside</td></tr>
+        <tr><td>Row gap / spacing rhythm</td><td><span class="t t2">L2</span></td><td>margins on <code>.rm-form-row</code></td></tr>
+        <tr><td>Input tint / divider colour</td><td><span class="t t3">L3</span></td><td><code>--mud-palette-*</code> if L1 falls short</td></tr>
+        <tr style="background:#fef2f2"><td><b>30px field height</b></td><td><span class="t t4">L4?</span></td><td><b>Unknown until measured.</b> If Mud's dense floor is ~36px, accept it.</td></tr>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:18px">
+  <p class="subtitle" style="margin:0">
+    <b>Read this as the answer to "did the MudBlazor decision change anything?"</b> &mdash; it did not
+    change the <i>design</i>. 13 of 14 pieces are layer&nbsp;1 or&nbsp;2, i.e. supported MudBlazor APIs
+    plus CSS that never touches Mud's internals. The single red row is the one thing I refuse to
+    guess at: I'll measure the real dense floor before deciding whether to accept ~36px or override.
+  </p>
+  <p class="subtitle" style="margin-top:9px">
+    <b>Still a caveat:</b> this is hand-drawn HTML, not MudBlazor. It cannot tell you what Mud
+    actually renders. The only honest fix is a throwaway page built with real components &mdash;
+    say the word and I'll build and screenshot one before any production code is touched.
+  </p>
+</div>

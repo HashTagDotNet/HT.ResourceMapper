@@ -1,0 +1,164 @@
+<h2>What stays fixed while the form scrolls?</h2>
+<p class="subtitle">
+  Both keep your tab architecture and the compact density you just picked. The difference is the
+  <b>footer</b>: where the primary action sits relative to the step navigation. Grey band = fixed
+  chrome; white = the only region that scrolls.
+</p>
+
+<style>
+  .ch-wrap { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+  @media (max-width:1050px){ .ch-wrap{ grid-template-columns:1fr; } }
+
+  .ch { border:1px solid var(--border,#d6dae1); border-radius:10px; overflow:hidden;
+        cursor:pointer; transition:box-shadow .15s,border-color .15s; background:#fff; }
+  .ch:hover { border-color:#2563EB; box-shadow:0 2px 12px rgba(37,99,235,.13); }
+  .ch.selected { border-color:#2563EB; box-shadow:0 0 0 2px rgba(37,99,235,.35); }
+
+  .ch-head { padding:9px 13px; border-bottom:1px solid var(--border,#d6dae1);
+             background:rgba(127,127,127,.07); }
+  .ch-name { font-weight:700; font-size:13.5px; }
+  .ch-meta { font-size:11.5px; opacity:.68; margin-top:2px; }
+
+  .app { background:#F8FAFC; color:#1E293B; font-size:12px; }
+
+  .fixed-band { background:#eef2f7; border-bottom:1px dashed #b9c2cf; }
+  .crumb { padding:7px 14px 0; font-size:11px; color:#64748b; }
+  .crumb b { color:#2563EB; font-weight:500; }
+  .ttl   { padding:2px 14px 8px; font-size:19px; font-weight:700; color:#0f172a; }
+  .tabs  { display:flex; gap:20px; padding:0 14px; }
+  .tab   { font-size:11.5px; padding:7px 0; color:#64748b; border-bottom:2px solid transparent; }
+  .tab.on{ color:#2563EB; border-bottom-color:#2563EB; font-weight:600; }
+
+  .scroll-lbl { font-size:9.5px; text-transform:uppercase; letter-spacing:.7px; color:#94a3b8;
+                padding:4px 14px 0; }
+  .body { background:#fff; padding:9px 14px 14px; height:150px; overflow:hidden; position:relative; }
+  .fade { position:absolute; left:0; right:0; bottom:0; height:26px;
+          background:linear-gradient(rgba(255,255,255,0),#fff); }
+
+  .sec-h { font-size:12.5px; font-weight:700; color:#0f172a; margin:0 0 2px; }
+  .sec-d { font-size:11.5px; color:#64748b; margin:0 0 9px; }
+  .r     { display:grid; grid-template-columns:128px 1fr; gap:10px; margin-bottom:7px; align-items:start; }
+  .lab   { font-size:11.5px; color:#334155; padding-top:7px; }
+  .req   { color:#dc2626; }
+  .inf   { color:#94a3b8; font-weight:600; }
+  .fld   { height:30px; border:1px solid #cbd5e1; border-radius:4px; background:#fff;
+           display:flex; align-items:center; padding:0 8px; font-size:12.5px; color:#334155; }
+  .car   { margin-left:auto; opacity:.5; }
+  .hlp   { font-size:10.5px; color:#64748b; margin-top:2px; }
+
+  .foot { background:#eef2f7; border-top:1px dashed #b9c2cf; padding:9px 14px;
+          display:flex; align-items:center; gap:8px; }
+  .btn  { font-size:11.5px; padding:5px 11px; border-radius:4px; border:1px solid #cbd5e1;
+          background:#fff; color:#334155; white-space:nowrap; }
+  .btn.pri  { background:#2563EB; border-color:#2563EB; color:#fff; font-weight:600; }
+  .btn.dis  { opacity:.42; }
+  .btn.ghost{ border-color:transparent; background:transparent; color:#64748b; }
+  .spacer { margin-left:auto; }
+</style>
+
+<div class="ch-wrap">
+
+  <!-- ================= A ================= -->
+  <div class="ch" data-choice="azure-footer" onclick="toggleSelect(this)">
+    <div class="ch-head">
+      <div class="ch-name">A &middot; Azure footer &mdash; nav and primary together, left</div>
+      <div class="ch-meta">Primary always reachable &middot; Next names its destination</div>
+    </div>
+    <div class="app">
+      <div class="fixed-band">
+        <div class="crumb"><b>Home</b> &rsaquo; <b>Resources</b> &rsaquo; Orders API</div>
+        <div class="ttl">Orders API</div>
+        <div class="tabs">
+          <div class="tab on">General</div><div class="tab">Tags</div>
+          <div class="tab">Dependencies</div><div class="tab">Dependent On</div>
+          <div class="tab">Review</div>
+        </div>
+      </div>
+      <div class="scroll-lbl">&#8597; scrolls</div>
+      <div class="body">
+        <div class="sec-h">Identity</div>
+        <div class="sec-d">How this resource is uniquely identified.</div>
+        <div class="r"><div class="lab">Subscription <span class="req">*</span> <span class="inf">&#9432;</span></div>
+          <div><div class="fld">prod<span class="car">&#9662;</span></div>
+          <div class="hlp">Locked after save. Change via Rename.</div></div></div>
+        <div class="r"><div class="lab">Resource Type <span class="req">*</span> <span class="inf">&#9432;</span></div>
+          <div><div class="fld">Azure App Service<span class="car">&#9662;</span></div>
+          <div class="hlp">Cannot be changed after save.</div></div></div>
+        <div class="r"><div class="lab">Key <span class="req">*</span> <span class="inf">&#9432;</span></div>
+          <div><div class="fld">orders-api</div></div></div>
+        <div class="fade"></div>
+      </div>
+      <div class="foot">
+        <div class="btn pri">Review + Save</div>
+        <div class="btn dis">&lsaquo; Previous</div>
+        <div class="btn">Next : Tags &rsaquo;</div>
+        <div class="btn ghost spacer">Cancel</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= B ================= -->
+  <div class="ch" data-choice="split-footer" onclick="toggleSelect(this)">
+    <div class="ch-head">
+      <div class="ch-name">B &middot; Split footer &mdash; step nav left, commit actions right</div>
+      <div class="ch-meta">Keeps today's Cancel/Save position &middot; commit separated from navigation</div>
+    </div>
+    <div class="app">
+      <div class="fixed-band">
+        <div class="crumb"><b>Home</b> &rsaquo; <b>Resources</b> &rsaquo; Orders API</div>
+        <div class="ttl">Orders API</div>
+        <div class="tabs">
+          <div class="tab on">General</div><div class="tab">Tags</div>
+          <div class="tab">Dependencies</div><div class="tab">Dependent On</div>
+          <div class="tab">Review</div>
+        </div>
+      </div>
+      <div class="scroll-lbl">&#8597; scrolls</div>
+      <div class="body">
+        <div class="sec-h">Identity</div>
+        <div class="sec-d">How this resource is uniquely identified.</div>
+        <div class="r"><div class="lab">Subscription <span class="req">*</span> <span class="inf">&#9432;</span></div>
+          <div><div class="fld">prod<span class="car">&#9662;</span></div>
+          <div class="hlp">Locked after save. Change via Rename.</div></div></div>
+        <div class="r"><div class="lab">Resource Type <span class="req">*</span> <span class="inf">&#9432;</span></div>
+          <div><div class="fld">Azure App Service<span class="car">&#9662;</span></div>
+          <div class="hlp">Cannot be changed after save.</div></div></div>
+        <div class="r"><div class="lab">Key <span class="req">*</span> <span class="inf">&#9432;</span></div>
+          <div><div class="fld">orders-api</div></div></div>
+        <div class="fade"></div>
+      </div>
+      <div class="foot">
+        <div class="btn dis">&lsaquo; Previous</div>
+        <div class="btn">Next : Tags &rsaquo;</div>
+        <div class="btn ghost spacer">Cancel</div>
+        <div class="btn pri">Save</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:20px">
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>A gives you</h4>
+      <ul>
+        <li><b>Review + Save is always one click</b>, from any tab &mdash; you never have to walk the wizard to commit</li>
+        <li>Matches your Azure reference exactly</li>
+        <li>Reads as one action group</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>B gives you</h4>
+      <ul>
+        <li><b>Save stays bottom-right</b> where it is today &mdash; no relearning, and existing Playwright specs keep passing</li>
+        <li>Destructive/committing actions visually separated from harmless navigation</li>
+        <li>Conventional for an <i>edit</i> form, where Azure's bar is a <i>create</i> wizard</li>
+      </ul>
+    </div>
+  </div>
+  <p class="subtitle" style="margin-top:12px">
+    Both fix PL-34 (only the white band scrolls &mdash; title and tabs stay put) and both add the
+    breadcrumb, which is also the fix for PL-08 (no way back to the grid).
+  </p>
+</div>

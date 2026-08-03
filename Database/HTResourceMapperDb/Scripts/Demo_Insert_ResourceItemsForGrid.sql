@@ -9,11 +9,16 @@
 --4. Pagination functionality
 --5. Resource type categorization
 --6. Link and Text content types
+--7. Domain ('Subscription') filtering -- every resource gets a Domain tag, mixed prod/non-prod
 
 --IDEMPOTENT: Safe to run multiple times - will not create duplicates
 --=============================================
 --*/
 USE [ResourceMapper]
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
 GO
 
 CREATE OR ALTER PROCEDURE #Seed_ResourceType(
@@ -129,7 +134,13 @@ END
 GO
 
 BEGIN TRANSACTION
-delete [HTResourceMapper].[Resource]
+-- NOTE: this script used to start with an unqualified "DELETE [HTResourceMapper].[Resource]".
+-- That was removed because (a) #Seed_Resource is already an upsert keyed on ResourceId, so the
+-- delete bought no idempotency, and (b) it wiped resources owned by *other* demo scripts
+-- (e.g. Demo_Insert_ExplorerGraph.sql) and now fails outright against FK_ResourceTag_ResourceId
+-- / FK_ResourceRelationship_* once any resource has tags or relationships. This script owns
+-- ResourceId -1 .. -75 only; use Demo_Purge_ResourceItemsForGrid.sql to clear demo data.
+
 -- Create demo resource types
 DECLARE @ResourceType_Application VARCHAR(40) =  'DEMO-AppUid'
 , @ResourceType_AppServices VARCHAR(40) =  'DEMO-AppServiceUid'
@@ -395,9 +406,77 @@ EXEC #Seed_Resource @ResourceId=-74, @ResourceUid=@ResourceUid, @ResourceKey='RG
 SET @ResourceUid = 'DEMO'+LOWER(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''))
 EXEC #Seed_Resource @ResourceId=-75, @ResourceUid=@ResourceUid, @ResourceKey='RG006', @ResourceTypeUid=@ResourceType_ResourceGroup, @ResourceName='Shared Infrastructure', @Description='Resource group for shared infrastructure components like networking and DNS.'
 
+-- ==========================================================================
+-- Domain tag on EVERY resource this script owns (ResourceId -1 .. -75).
+--
+-- The Domain tag is the one system-wide IsDomainTag = 1 TagDefinition
+-- (TagDefinitionKey = 'Domain', DisplayName 'Subscription'), seeded by
+-- Script.PostDeployment1.sql. It is REQUIRED (RequirementLevel = 'Error'),
+-- single-valued (IsMultiValued = 0) and restricted to AllowedValues
+-- ["prod","non-prod"] (AllowCustomValue = 0). It is NOT created here.
+--
+-- Without it these demo rows are unusable: the editor refuses to add
+-- dependencies to a resource that has no Domain, and the Domain filter has
+-- nothing to filter on.
+--
+-- DETERMINISTIC VALUE RULE (no randomness -- same result on every run/machine):
+--     ABS(ResourceId) % 5 IN (0, 1)  ->  'non-prod'
+--     otherwise                      ->  'prod'
+-- Over the 75 ids -1 .. -75 that is exactly 30 'non-prod' / 45 'prod' (a 40/60
+-- split), so both Domain values are represented and the filter is exercisable.
+-- Resources seeded by other scripts (e.g. Demo_Insert_ExplorerGraph.sql, all
+-- 'prod') are untouched -- the MERGE source is scoped to this script's id range.
+--
+-- IDEMPOTENT: MERGE keyed on (ResourceId, TagDefinitionId). Re-running updates
+-- in place; it never inserts a second Domain row for a resource.
+-- ==========================================================================
+DECLARE @DomainTagDefinitionId INT =
+    (SELECT TagDefinitionId FROM [HTResourceMapper].TagDefinition WHERE IsDomainTag = 1)
+
+IF @DomainTagDefinitionId IS NULL
+BEGIN
+    RAISERROR('No IsDomainTag = 1 TagDefinition found. Publish the database (Script.PostDeployment1.sql seeds the Domain tag) before running this demo script.', 16, 1)
+    ROLLBACK TRANSACTION
+    RETURN
+END
+
+;WITH DemoResourceDomain AS (
+    SELECT
+        r.ResourceId,
+        [TagDefinitionId] = @DomainTagDefinitionId,
+        [TagValue] = CASE WHEN ABS(r.ResourceId) % 5 IN (0, 1) THEN N'non-prod' ELSE N'prod' END
+    FROM
+        [HTResourceMapper].[Resource] r
+    WHERE
+        r.ResourceId BETWEEN -75 AND -1
+)
+MERGE [HTResourceMapper].ResourceTag AS target
+USING DemoResourceDomain AS source
+    ON  target.ResourceId       = source.ResourceId
+    AND target.TagDefinitionId  = source.TagDefinitionId
+WHEN MATCHED AND ISNULL(target.TagValue, N'') <> source.TagValue THEN
+    UPDATE SET
+         target.TagValue  = source.TagValue
+        ,target.UpdatedOn = SYSUTCDATETIME()
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (ResourceId, TagDefinitionId, TagValue)
+    VALUES (source.ResourceId, source.TagDefinitionId, source.TagValue);
+
 SELECT * FROM [HTResourceMapper].ResourceType
 SELECT * FROM [HTResourceMapper].TagContentType
 SELECT * FROM [HTResourceMapper].[Resource]
+
+-- Domain coverage / split for the rows this script owns.
+SELECT
+     [DomainValue] = rt.TagValue
+    ,[Resources]   = COUNT(*)
+FROM
+    [HTResourceMapper].ResourceTag rt
+WHERE
+    rt.TagDefinitionId = @DomainTagDefinitionId
+    AND rt.ResourceId BETWEEN -75 AND -1
+GROUP BY
+    rt.TagValue
 
 --ROLLBACK
 COMMIT

@@ -1,0 +1,310 @@
+@page "/uxlab"
+@* ---------------------------------------------------------------------------
+   THROWAWAY DESIGN LAB — not production.
+   Renders the agreed "Compact" form language with REAL MudBlazor components so
+   the density decision in docs/plans/azure-ux-design-v1.md can be measured
+   instead of guessed. Delete (or keep deliberately as a living style reference)
+   once the design is locked. See punchlist B11 / PL-11.
+   --------------------------------------------------------------------------- *@
+
+<style>
+    /* L2 — layout CSS that WRAPS Mud, never reaches inside it. */
+    .ux-form { max-width: 720px; }
+
+    .ux-sec-h { font-size: .8125rem; font-weight: 700; color: var(--mud-palette-text-primary); margin: 0 0 2px; }
+    .ux-sec-d { font-size: .75rem; color: var(--mud-palette-text-secondary); margin: 0 0 10px; line-height: 1.4; }
+
+    .ux-row { display: grid; grid-template-columns: 128px 1fr; gap: 10px; align-items: start; margin-bottom: 6px; }
+    .ux-lab { font-size: .75rem; color: var(--mud-palette-text-primary); padding-top: 7px; display: flex; align-items: center; gap: 3px; }
+    .ux-req { color: var(--mud-palette-error); }
+    .ux-val { min-width: 0; }
+
+    @@media (max-width: 900px) {
+        .ux-row { grid-template-columns: 1fr; gap: 2px; }
+        .ux-lab { padding-top: 0; }
+    }
+
+    /* L3 — scoped --mud-* variable test. Applies ONLY inside this wrapper. */
+    .ux-l3 { --mud-typography-input-size: .78rem; }
+
+    .ux-measure { border: 1px dashed var(--mud-palette-divider); border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; }
+    .ux-tag { font-size: .65rem; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
+              color: var(--mud-palette-text-secondary); }
+</style>
+
+<MudText Typo="Typo.h5" Class="mb-1">UX Lab — real MudBlazor</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    Measuring what MudBlazor actually renders, so the density decision is evidence-based.
+</MudText>
+
+<MudDivider Class="mb-4" />
+
+@* ===================== PART 1 — density probes ===================== *@
+<MudText Typo="Typo.subtitle2" Class="mb-2">1 · Field height probes</MudText>
+
+<div class="ux-measure">
+    <div class="ux-tag mb-1">A — Outlined + Margin.Normal (today's baseline)</div>
+    <div id="probe-a" style="max-width:380px">
+        <MudTextField T="string" Value="@("orders-api")" Label="Key"
+                      Variant="Variant.Outlined" Margin="Margin.Normal" />
+    </div>
+</div>
+
+<div class="ux-measure">
+    <div class="ux-tag mb-1">B — Outlined + Margin.Dense</div>
+    <div id="probe-b" style="max-width:380px">
+        <MudTextField T="string" Value="@("orders-api")" Label="Key"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" />
+    </div>
+</div>
+
+<div class="ux-measure">
+    <div class="ux-tag mb-1">C — Outlined + Dense, no floating label (label lives outside)</div>
+    <div id="probe-c" style="max-width:380px">
+        <MudTextField T="string" Value="@("orders-api")"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" />
+    </div>
+</div>
+
+<div class="ux-measure ux-l3">
+    <div class="ux-tag mb-1">D — Same as C, inside an L3 wrapper (--mud-typography-input-size: .78rem)</div>
+    <div id="probe-d" style="max-width:380px">
+        <MudTextField T="string" Value="@("orders-api")"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" />
+    </div>
+</div>
+
+<div class="ux-measure">
+    <div class="ux-tag mb-1">E — MudSelect, Dense (selects often differ from text fields)</div>
+    <div id="probe-e" style="max-width:380px">
+        <MudSelect T="string" Value="@("prod")" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem Value="@("prod")">prod</MudSelectItem>
+            <MudSelectItem Value="@("non-prod")">non-prod</MudSelectItem>
+        </MudSelect>
+    </div>
+</div>
+
+<MudDivider Class="my-5" />
+
+@* ===================== PART 2 — the agreed design, for real ===================== *@
+<MudText Typo="Typo.subtitle2" Class="mb-3">2 · The agreed "Compact" language, real components</MudText>
+
+<div class="ux-form ux-l3" id="real-form">
+
+    <div class="ux-sec-h">Identity</div>
+    <div class="ux-sec-d">How this resource is uniquely identified. These values cannot all be changed later.</div>
+
+    <div class="ux-row">
+        <div class="ux-lab">
+            Subscription <span class="ux-req">*</span>
+            <MudTooltip Text="Which cloud subscription this lives in. Part of the resource's unique identity.">
+                <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small"
+                         Style="font-size:.95rem;opacity:.55" />
+            </MudTooltip>
+        </div>
+        <div class="ux-val">
+            <MudSelect T="string" Value="@("prod")" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       HelperText="Locked after save. Change it via Rename.">
+                <MudSelectItem Value="@("prod")">prod</MudSelectItem>
+                <MudSelectItem Value="@("non-prod")">non-prod</MudSelectItem>
+            </MudSelect>
+        </div>
+    </div>
+
+    <div class="ux-row">
+        <div class="ux-lab">
+            Resource Type <span class="ux-req">*</span>
+            <MudTooltip Text="The kind of cloud resource. Drives which tags are suggested.">
+                <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small"
+                         Style="font-size:.95rem;opacity:.55" />
+            </MudTooltip>
+        </div>
+        <div class="ux-val">
+            <MudSelect T="string" Value="@("Azure App Service")" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       HelperText="Cannot be changed after save.">
+                <MudSelectItem Value="@("Azure App Service")">Azure App Service</MudSelectItem>
+            </MudSelect>
+        </div>
+    </div>
+
+    <div class="ux-row">
+        <div class="ux-lab">
+            Key <span class="ux-req">*</span>
+            <MudTooltip Text="Stable identifier used to match this resource on import.">
+                <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small"
+                         Style="font-size:.95rem;opacity:.55" />
+            </MudTooltip>
+        </div>
+        <div class="ux-val">
+            <MudTextField T="string" Value="@("orders-api")" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          HelperText="Lowercase, hyphens. e.g. orders-api" />
+        </div>
+    </div>
+
+    <div class="ux-sec-h mt-4">Details</div>
+    <div class="ux-sec-d">Human-readable information shown in the catalog.</div>
+
+    <div class="ux-row">
+        <div class="ux-lab">
+            Name
+            <MudTooltip Text="What people search for and see in the grid.">
+                <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small"
+                         Style="font-size:.95rem;opacity:.55" />
+            </MudTooltip>
+        </div>
+        <div class="ux-val">
+            <MudTextField T="string" Value="@("Orders API")" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </div>
+    </div>
+
+    <div class="ux-row">
+        <div class="ux-lab">
+            Description
+            <MudTooltip Text="One line on what this resource does.">
+                <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small"
+                         Style="font-size:.95rem;opacity:.55" />
+            </MudTooltip>
+        </div>
+        <div class="ux-val">
+            <MudTextField T="string" Value="@("")" Placeholder="What this resource is for…"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+        </div>
+    </div>
+</div>
+
+<MudDivider Class="my-5" />
+
+@* ===================== PART 3 — side-by-side against today ===================== *@
+<MudText Typo="Typo.subtitle2" Class="mb-3">3 · Today's treatment, same fields (for comparison)</MudText>
+
+<div style="max-width:720px" id="today-form">
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+        Identity is set by Resource Type, Subscription, and Key together — once saved, Resource Type
+        and Subscription can't be changed.
+    </MudText>
+    <MudGrid Spacing="2">
+        <MudItem xs="6">
+            <MudSelect T="string" Value="@("Azure App Service")" Label="Resource Type" Required="true"
+                       Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem Value="@("Azure App Service")">Azure App Service</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6">
+            <MudSelect T="string" Value="@("prod")" Label="Subscription" Required="true"
+                       Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem Value="@("prod")">prod</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6">
+            <MudTextField T="string" Value="@("Orders API")" Label="Name"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudItem>
+        <MudItem xs="6">
+            <MudTextField T="string" Value="@("orders-api")" Label="Key" Required="true"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          HelperText="Auto-filled from Name — edit to override" />
+        </MudItem>
+        <MudItem xs="12">
+            <MudTextField T="string" Value="@("")" Label="Description"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+        </MudItem>
+    </MudGrid>
+</div>
+
+<MudDivider Class="my-5" />
+
+@* ===================== PART 4 — compression variants ===================== *@
+<MudText Typo="Typo.subtitle2" Class="mb-1">4 · Compressing label &rarr; field &rarr; helper</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+    Same field, four tightening levels. Each block is measured end-to-end.
+</MudText>
+
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;max-width:1400px">
+
+    <div>
+        <div class="ux-tag mb-1">V1 — as-is</div>
+        <div class="ux-v1" id="v1">
+            <div class="ux-row2">
+                <div class="ux-lab2">Resource Type <span class="ux-req">*</span>
+                    <MudTooltip Text="The kind of cloud resource."><MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" Style="font-size:.95rem;opacity:.55" /></MudTooltip>
+                </div>
+                <MudSelect T="string" Value="@("Azure App Service")" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           HelperText="Cannot be changed after save.">
+                    <MudSelectItem Value="@("Azure App Service")">Azure App Service</MudSelectItem>
+                </MudSelect>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div class="ux-tag mb-1">V2 — L2 only (my CSS tightened)</div>
+        <div class="ux-v2" id="v2">
+            <div class="ux-row2">
+                <div class="ux-lab2">Resource Type <span class="ux-req">*</span>
+                    <MudTooltip Text="The kind of cloud resource."><MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" Style="font-size:.95rem;opacity:.55" /></MudTooltip>
+                </div>
+                <MudSelect T="string" Value="@("Azure App Service")" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           HelperText="Cannot be changed after save.">
+                    <MudSelectItem Value="@("Azure App Service")">Azure App Service</MudSelectItem>
+                </MudSelect>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div class="ux-tag mb-1">V3 — + Mud margin trim (L4, margins only)</div>
+        <div class="ux-v3" id="v3">
+            <div class="ux-row2">
+                <div class="ux-lab2">Resource Type <span class="ux-req">*</span>
+                    <MudTooltip Text="The kind of cloud resource."><MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" Style="font-size:.95rem;opacity:.55" /></MudTooltip>
+                </div>
+                <MudSelect T="string" Value="@("Azure App Service")" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           HelperText="Cannot be changed after save.">
+                    <MudSelectItem Value="@("Azure App Service")">Azure App Service</MudSelectItem>
+                </MudSelect>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div class="ux-tag mb-1">V4 — V3 + helper as suffix line</div>
+        <div class="ux-v4" id="v4">
+            <div class="ux-row2">
+                <div class="ux-lab2">Resource Type <span class="ux-req">*</span>
+                    <MudTooltip Text="The kind of cloud resource."><MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" Style="font-size:.95rem;opacity:.55" /></MudTooltip>
+                </div>
+                <MudSelect T="string" Value="@("Azure App Service")" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("Azure App Service")">Azure App Service</MudSelectItem>
+                </MudSelect>
+                <div class="ux-help-tight">Cannot be changed after save.</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<style>
+    /* shared: stacked label above field (matches the annotated screenshot) */
+    .ux-row2 { display: block; }
+    .ux-lab2 { font-size: .75rem; color: var(--mud-palette-text-primary);
+               display: flex; align-items: center; gap: 3px; }
+
+    /* V1 — untouched baseline */
+    .ux-v1 .ux-lab2 { margin-bottom: 4px; }
+
+    /* V2 — layer 2 only: my own spacing tightened, Mud untouched */
+    .ux-v2 .ux-lab2 { margin-bottom: 1px; line-height: 1.2; }
+
+    /* V3 — layer 4, but MARGINS ONLY on two well-known classes (low risk) */
+    .ux-v3 .ux-lab2 { margin-bottom: 1px; line-height: 1.2; }
+    .ux-v3 ::deep .mud-input-control { margin-bottom: 0 !important; }
+    .ux-v3 ::deep .mud-input-helper-text { margin-top: 1px !important; line-height: 1.25; font-size: .7rem; }
+
+    /* V4 — as V3, plus helper rendered by us instead of by Mud */
+    .ux-v4 .ux-lab2 { margin-bottom: 1px; line-height: 1.2; }
+    .ux-v4 ::deep .mud-input-control { margin-bottom: 0 !important; }
+    .ux-help-tight { font-size: .7rem; line-height: 1.25; color: var(--mud-palette-text-secondary);
+                     margin-top: 1px; }
+</style>
+
+<div style="height:60px"></div>

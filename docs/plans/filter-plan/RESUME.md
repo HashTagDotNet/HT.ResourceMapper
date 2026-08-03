@@ -1,3 +1,9 @@
+> ⚠️ **SUPERSEDED for outstanding work — see [`docs/plans/v1-punchlist.md`](../v1-punchlist.md).**
+> The "Outstanding / next steps" list below is stale: item 5 ("nothing committed yet") is wrong —
+> everything is committed and pushed. Item 4 (system tag keys in the Add-filter picker) is carried
+> forward as PL-04. Items 1–3 remain genuinely unverified and are recorded as a coverage gap.
+> The "CRITICAL environment facts" section below is still accurate and worth reading.
+
 # Filter UI — Resume State (as of 2026-07-09)
 
 Branch: **home-page**. Plan: `docs/plans/filter-plan/filter-plan.md` (revised after adversarial review — read its changelog).
