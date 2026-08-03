@@ -265,7 +265,7 @@ Driven live at 1600×1000 against the merged build. All 5 routes returned 200.
 | **PL-40** | **RESOLVED — was never a styling bug.** Arrowheads are clearly visible on every edge. It was a PL-39 layout artifact. The agent was right to refuse to call it from code alone. |
 | PL-43 | Delete control present in the explorer toolbar |
 | PL-25a | Domain renders on every grid row with a real prod/non-prod mix |
-| PL-28 | `/resource-types` lists 12 types with live node previews, usage counts, delete disabled while in use |
+| PL-28 | `/resource-types` lists 12 types with live node previews, usage counts, delete disabled while in use — **but see PL-54: this confirmation was premature.** PL-28's scope also required the `ResourceTypeTag` entry-point template, which was not built. Verifying "the screen exists and reads correctly" missed a whole half of the item |
 
 **PL-20 — earlier diagnosis was WRONG.** I attributed the empty add-tag dropdown to slice #7
 pre-seeding every applicable entry-point row. Measured reality:
@@ -490,8 +490,9 @@ reproduce". Still not chased down.
 `azure-ux-design-v1.md` steps **1–7 of 8** are implemented; that doc now carries the authoritative
 status table, four measured corrections to its own §4a, and the reason step 8 was skipped.
 
-**Closed by this work:** PL-34, PL-15, PL-31, PL-32, PL-30 (fully), PL-23, PL-07, PL-08 (second
-route, via breadcrumb), PL-11 (the design it called for is now built, minus the canvas).
+**Closed by this work:** PL-34, PL-15 (both directions named), PL-31, PL-32, PL-30 (fully), PL-23,
+PL-07, PL-08 (second route, via breadcrumb), PL-11 (the design it called for is now built, minus the
+canvas), and PL-54 / the rest of PL-28.
 
 **Still open in those batches:** PL-24's remaining ~90-string sweep (the anatomy now has a helper and
 ⓘ slot on every editor field, but the other surfaces' strings were not rewritten wholesale), and
@@ -527,6 +528,46 @@ showed only two unrelated, non-required rows.
 the server rule exactly. Chose that over scoping requiredness to the type, which would contradict the
 server and let resources save without their required tags. **S — but it made create unusable for
 affected types.**
+
+### PL-54 — a resource type's tag template was unreachable from the app ⚑ **FIXED**
+
+**PL-28's missing half.** PL-28's scope said *"must cover `ShortCode`/`IconKey` … **and the
+`ResourceTypeTag` entry-point template**."* The first part shipped and the browser pass marked PL-28
+confirmed on the strength of the screen existing. The template part was never built.
+
+The Resource Types list has always **shown a "Tag Template" count per type** while offering no way to
+change it — and the gap went all the way down: no write path existed anywhere, only
+`ResourceTypeTag_GetAll`. The only editor was a seed script. A column advertising data the app
+forbids you to touch is the PL-25b shape again.
+
+Why it mattered more than completeness:
+
+- these rows decide **which tags a new resource of a type is prompted for**
+- `IsDefaultPrimary` decides **which Link tag becomes that resource's click-through link** — the
+  star/radio of PL-35 — and was settable only by re-running SQL
+- it is the **proper fix for what caused PL-53**: a type whose template omits a globally-required tag
+  is now editable, instead of the editor having to compensate
+
+**Built the whole path:** `ResourceTypeTagList` TVP + `ResourceTypeTag_SetForType` (replace
+semantics, MERGE so unchanged rows keep their identity), `SetEntryPointTemplatesAsync` on the
+repository, `GetEntryPointTemplatesAsync` on the service, `EntryPointTags` on
+`SaveResourceTypeRequest`, and a template section in the Edit dialog (rows + per-type requirement
+override + default-primary radio + remove + add).
+
+Three sproc guards, each a constraint violation waiting to happen: the default-primary flag is
+cleared across the type **before** the MERGE (promoting B while A still holds it violates
+`UX_ResourceTypeTag_DefaultPrimary` mid-statement); duplicate `TagDefinitionId`s and extra primaries
+are collapsed so a caller bug cannot trip either unique constraint; and `NOT MATCHED BY SOURCE` is
+**scoped to the type** — unscoped it would delete every other type's rows.
+
+**`EntryPointTags` is null-vs-empty sensitive on purpose.** Null = "leave the template alone", which
+is how the editor's inline *Create new type…* opts out (it has no template UI). Treating null as
+"clear" would have silently wiped a template on every inline create. An empty **list** still means
+"no tags", which is a real edit.
+
+Two deliberate UI constraints: only Link tags get the primary radio (a text tag cannot be a
+click-through link — text rows show a dash explaining why), and Domain/system tags are excluded from
+the picker for the same reason the editor excludes them (PL-04/PL-21).
 
 ### Regression caught and fixed in the same pass
 
