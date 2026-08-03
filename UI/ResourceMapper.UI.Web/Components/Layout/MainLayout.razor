@@ -8,13 +8,21 @@
 <MudLayout>
     <MudAppBar Elevation="0" Color="Color.Surface" Dense="true"
                Style="border-bottom:1px solid var(--mud-palette-divider);">
+        @* PL-08: there was no route back to the grid from the editor or the explorer other than the
+           browser's Back button. Two exits now: a Home entry at the top of the menu, and the product
+           title itself, which is what most people reach for first. *@
         <MudMenu Icon="@Icons.Material.Outlined.Menu" Color="Color.Inherit" Dense="true" AriaLabel="Application menu">
+            <MudMenuItem Href="/" Icon="@Icons.Material.Outlined.Home">Home</MudMenuItem>
+            <MudDivider />
             <MudMenuItem Href="/resources" Icon="@Icons.Material.Outlined.Add">Create Resource</MudMenuItem>
+            <MudMenuItem Href="/resource-types" Icon="@Icons.Material.Outlined.Category">Resource Types</MudMenuItem>
             <MudMenuItem Href="/import" Icon="@Icons.Material.Outlined.UploadFile">Import…</MudMenuItem>
         </MudMenu>
-        <MudText Typo="Typo.subtitle1" Class="ml-2" Style="font-weight:600;letter-spacing:.2px;">
+        <MudLink Href="/" Typo="Typo.subtitle1" Color="Color.Inherit" Underline="Underline.Hover"
+                 Class="ml-2" Style="font-weight:600;letter-spacing:.2px;"
+                 aria-label="Hashtag Resource Mapper — back to the resource list">
             Hashtag Resource Mapper
-        </MudText>
+        </MudLink>
         <MudSpacer />
     </MudAppBar>
 

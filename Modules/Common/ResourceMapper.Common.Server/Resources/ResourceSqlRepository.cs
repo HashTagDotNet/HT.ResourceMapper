@@ -158,10 +158,22 @@ namespace ResourceMapper.Common.Server.Resources
             using var cmd = _db.RO.SprocCommand("[HTResourceMapper].TagDefinition_GetAll");
             var keys = await _db.Execute.ExecuteQueryAsync(
                 cmd,
-                reader => GetStringOrNull(reader, "TagDefinitionKey"),
+                reader => new
+                {
+                    Key = GetStringOrNull(reader, "TagDefinitionKey"),
+                    IsSystemTag = reader.GetBoolean(reader.GetOrdinal("IsSystemTag")),
+                    IsDomainTag = reader.GetBoolean(reader.GetOrdinal("IsDomainTag"))
+                },
                 cancellationToken: cancellationToken);
 
-            return keys.Where(k => !string.IsNullOrEmpty(k)).Select(k => k!).ToList();
+            // PL-04: these keys feed the home grid's Add-filter picker, so internal plumbing tags must
+            // not appear there. Only "Domain" qualifies today, but filtering on the flags rather than
+            // on a name means any future system tag is excluded the moment it is defined, instead of
+            // leaking into the UI until someone notices.
+            return keys
+                .Where(k => !string.IsNullOrEmpty(k.Key) && !k.IsSystemTag && !k.IsDomainTag)
+                .Select(k => k.Key!)
+                .ToList();
         }
 
         public async Task<ResourceDetail?> GetResourceByUidAsync(string resourceUid, CancellationToken cancellationToken)

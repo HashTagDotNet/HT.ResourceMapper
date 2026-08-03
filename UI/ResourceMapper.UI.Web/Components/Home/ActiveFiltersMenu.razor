@@ -1,0 +1,126 @@
+@using ResourceMapper.Common.Shared.HomePage.Filtering
+
+@* PL-10: a single place to see and manage everything currently narrowing the grid.
+   Chips already edit (click) and remove (×) one at a time, but there was no clear-all and no
+   one list of what is active — and once chips wrap onto a second row they stop reading as a set.
+   Scope is the CURRENT filters only; saved/named filter sets are deliberately not here.
+
+   Built on the same MudPopover + transparent MudOverlay pattern as FilterChip rather than MudMenu,
+   because each row needs two independent actions (edit / remove) and MudMenuItem gives one. *@
+
+@if (HasAny)
+{
+    <div style="position:relative;display:inline-block;">
+        <MudButton Variant="Variant.Text" Size="Size.Small"
+                   StartIcon="@Icons.Material.Outlined.Tune" OnClick="Toggle"
+                   Class="rm-managefilters" aria-label="Manage active filters"
+                   title="Manage active filters">
+            @($"Filters ({ActiveCount})")
+        </MudButton>
+
+        <MudPopover Open="_open" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft"
+                    Class="rm-filter-popover" Elevation="8">
+            @if (_open)
+            {
+                <div class="rm-manage-panel pa-3" @onclick:stopPropagation="true">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Active filters</MudText>
+
+                    @if (!string.IsNullOrWhiteSpace(State.SearchFor))
+                    {
+                        @* The search box constrains the grid just as much as a chip does, so it belongs
+                           in the same list — otherwise "clear all" would leave results still narrowed. *@
+                        <div class="rm-manage-row">
+                            <span class="rm-manage-label">Any field contains &ldquo;@State.SearchFor&rdquo;</span>
+                            <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small"
+                                           aria-label="Clear the search text" OnClick="ClearSearch" />
+                        </div>
+                    }
+
+                    @foreach (var filter in State.Filters.ToList())
+                    {
+                        var current = filter;
+                        <div class="rm-manage-row">
+                            <MudButton Variant="Variant.Text" Size="Size.Small"
+                                       Class="rm-manage-label-btn" OnClick="@(() => Edit(current))"
+                                       aria-label="@($"Edit {ResourceFilterState.ColumnDisplay(current)} filter")">
+                                @ResourceFilterState.ChipLabel(current)
+                            </MudButton>
+                            <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small"
+                                           aria-label="@($"Remove {ResourceFilterState.ColumnDisplay(current)} filter")"
+                                           OnClick="@(() => Remove(current))" />
+                        </div>
+                    }
+
+                    <div class="d-flex justify-end mt-3" style="gap:8px;">
+                        <MudButton Size="Size.Small" OnClick="Close">Close</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Outlined.ClearAll" OnClick="ClearAll">
+                            Clear all
+                        </MudButton>
+                    </div>
+                </div>
+            }
+        </MudPopover>
+    </div>
+
+    @if (_open)
+    {
+        <MudOverlay Visible="true" OnClick="Close" AutoClose="false" Class="rm-filter-overlay" />
+    }
+}
+
+@code {
+    [Parameter] public ResourceFilterState State { get; set; } = default!;
+
+    /// <summary>Open the chip editor for this filter.</summary>
+    [Parameter] public EventCallback<ActiveFilter> OnEdit { get; set; }
+
+    /// <summary>Remove this single filter (and reload).</summary>
+    [Parameter] public EventCallback<ActiveFilter> OnRemove { get; set; }
+
+    /// <summary>Remove every filter and the search text (and reload).</summary>
+    [Parameter] public EventCallback OnClearAll { get; set; }
+
+    /// <summary>Clear only the search text (and reload).</summary>
+    [Parameter] public EventCallback OnClearSearch { get; set; }
+
+    private bool _open;
+
+    private int ActiveCount =>
+        State.Filters.Count(ResourceFilterState.IsConstraining)
+        + (string.IsNullOrWhiteSpace(State.SearchFor) ? 0 : 1);
+
+    private bool HasAny => ActiveCount > 0;
+
+    private void Toggle() => _open = !_open;
+
+    private void Close() => _open = false;
+
+    private async Task Edit(ActiveFilter filter)
+    {
+        _open = false;
+        await OnEdit.InvokeAsync(filter);
+    }
+
+    private async Task Remove(ActiveFilter filter)
+    {
+        // Closing when the last one goes keeps the panel from lingering over an empty list — the
+        // button that owns it stops rendering at that point anyway.
+        if (ActiveCount <= 1)
+            _open = false;
+        await OnRemove.InvokeAsync(filter);
+    }
+
+    private async Task ClearSearch()
+    {
+        if (ActiveCount <= 1)
+            _open = false;
+        await OnClearSearch.InvokeAsync();
+    }
+
+    private async Task ClearAll()
+    {
+        _open = false;
+        await OnClearAll.InvokeAsync();
+    }
+}

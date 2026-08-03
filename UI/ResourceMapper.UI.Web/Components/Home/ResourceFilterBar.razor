@@ -8,14 +8,21 @@
                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="rm-search" Style="max-width:320px;"
                   aria-label="Filter for any field" />
 
+    @* @key is (Column, TagKey) — the pair that uniquely identifies a filter — and NOT the ActiveFilter
+       object, which has value-based equality: keying on the object made its key change every time the
+       user altered a selection, remounting the chip mid-edit. *@
     @foreach (var filter in State.Filters)
     {
-        <FilterChip @key="filter" Filter="filter" FacetLoader="FacetLoader"
-                    AutoOpen="@(ReferenceEquals(filter, _newFilter))"
+        <FilterChip @key="@FilterKey(filter)" Filter="filter" FacetLoader="FacetLoader"
+                    IsNew="@(ReferenceEquals(filter, _newFilter))"
+                    OpenToken="@(ReferenceEquals(filter, _openRequest) ? _openToken : 0)"
                     OnChanged="OnFilterApplied" OnRemove="RemoveFilter" />
     }
 
     <AddFilterMenu State="State" TagKeys="TagKeys" OnAdd="OnFilterAdded" />
+
+    <ActiveFiltersMenu State="State" OnEdit="RequestOpen" OnRemove="RemoveFilter"
+                       OnClearAll="ClearAll" OnClearSearch="ClearSearch" />
 
     @* Right-aligned group: ml-auto pushes it flush to the grid's right edge. *@
     <div class="d-flex align-center ml-auto" style="gap:12px;">
@@ -51,6 +58,13 @@
 
     private ActiveFilter? _newFilter;
 
+    // Which chip has been asked to open its editor, and a monotonic token so the same chip can be
+    // asked more than once (a bool would only ever fire on the first request).
+    private ActiveFilter? _openRequest;
+    private int _openToken;
+
+    private static string FilterKey(ActiveFilter f) => f.Column + "|" + (f.TagKey ?? "");
+
     private async Task OnSearchChanged(string? value)
     {
         State.SearchFor = string.IsNullOrWhiteSpace(value) ? null : value;
@@ -61,6 +75,14 @@
     {
         // The chip opens its editor automatically; no reload until the user Applies.
         _newFilter = filter;
+        RequestOpen(filter);
+    }
+
+    /// <summary>Ask the chip owning <paramref name="filter"/> to open its editor popover.</summary>
+    private void RequestOpen(ActiveFilter filter)
+    {
+        _openRequest = filter;
+        _openToken++;
         StateHasChanged();
     }
 
@@ -75,6 +97,25 @@
         State.Filters.Remove(filter);
         if (ReferenceEquals(filter, _newFilter))
             _newFilter = null;
+        if (ReferenceEquals(filter, _openRequest))
+            _openRequest = null;
+        await OnReload.InvokeAsync(true);
+    }
+
+    /// <summary>PL-10: drop every filter and the search term in one action, then reload once.</summary>
+    private async Task ClearAll()
+    {
+        State.Filters.Clear();
+        State.SearchFor = null;
+        _newFilter = null;
+        _openRequest = null;
+        // Pushed, not replaced — clearing everything is a destination the user may well want Back from.
+        await OnReload.InvokeAsync(true);
+    }
+
+    private async Task ClearSearch()
+    {
+        State.SearchFor = null;
         await OnReload.InvokeAsync(true);
     }
 

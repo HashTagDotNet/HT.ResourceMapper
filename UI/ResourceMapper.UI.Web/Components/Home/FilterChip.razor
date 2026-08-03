@@ -3,7 +3,9 @@
 
 <div style="position:relative;display:inline-block;">
     <div class="rm-chip @(_open ? "rm-chip-open" : "")">
-        <MudButton Variant="Variant.Text" Size="Size.Small" Class="rm-chip-label" DisableElevation="true"
+        @* No DisableElevation: MudBlazor 9 has no such parameter, so it was splatting onto the DOM as a
+           dead attribute (MUD0002) — Variant.Text has no shadow to disable in the first place. *@
+        <MudButton Variant="Variant.Text" Size="Size.Small" Class="rm-chip-label"
                    OnClick="Toggle" aria-label="@($"Edit {ResourceFilterState.ColumnDisplay(Filter)} filter")">
             @ResourceFilterState.ChipLabel(Filter)
         </MudButton>
@@ -37,11 +39,23 @@
     [Parameter] public Func<ActiveFilter, Task<ResourceGridFacetResponse?>> FacetLoader { get; set; } = default!;
     [Parameter] public EventCallback OnChanged { get; set; }
     [Parameter] public EventCallback<ActiveFilter> OnRemove { get; set; }
-    /// <summary>Open the editor immediately (used when a brand-new filter is added).</summary>
-    [Parameter] public bool AutoOpen { get; set; }
+
+    /// <summary>
+    /// True while this filter is brand-new and has never been applied. Governs the revert-and-remove
+    /// behaviour on Cancel — a filter the user never actually constrained shouldn't squat a slot.
+    /// </summary>
+    [Parameter] public bool IsNew { get; set; }
+
+    /// <summary>
+    /// Open-editor request from the parent, as a monotonically increasing token (0 = no request).
+    /// A token rather than a bool because the request has to be *repeatable*: the manage-filters
+    /// panel can ask to edit the same chip any number of times, and a one-shot bool only ever fires
+    /// once per component instance.
+    /// </summary>
+    [Parameter] public int OpenToken { get; set; }
 
     private bool _open;
-    private bool _autoOpenHandled;
+    private int _lastOpenToken;
 
     // Snapshot for cancel-revert.
     private HashSet<string> _snapValues = new();
@@ -51,16 +65,18 @@
 
     protected override void OnParametersSet()
     {
-        if (AutoOpen && !_autoOpenHandled)
+        if (OpenToken != 0 && OpenToken != _lastOpenToken)
         {
-            _autoOpenHandled = true;
+            _lastOpenToken = OpenToken;
             Open();
         }
     }
 
-    private void Toggle()
+    // Awaited: Cancel() can invoke OnRemove, and firing it and forgetting swallowed both the
+    // continuation and any exception it raised (CS4014).
+    private async Task Toggle()
     {
-        if (_open) Cancel();
+        if (_open) await Cancel();
         else Open();
     }
 
@@ -96,7 +112,7 @@
         Filter.Text = _snapText;
 
         // If this was a brand-new, never-applied filter, remove it on cancel.
-        if (!ResourceFilterState.IsConstraining(Filter) && AutoOpen)
+        if (!ResourceFilterState.IsConstraining(Filter) && IsNew)
             await OnRemove.InvokeAsync(Filter);
     }
 

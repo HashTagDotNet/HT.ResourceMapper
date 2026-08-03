@@ -32,8 +32,16 @@
     <Columns>
         <PropertyColumn Property="x => x.ResourceName" Title="Name" InitialDirection="SortDirection.Ascending" />
         <PropertyColumn Property="x => x.ResourceType" Title="Type" />
-        <PropertyColumn Property="x => x.Description" Title="Description" />
-        <TemplateColumn Title="Tags" Sortable="false">
+        @* PL-12(a): the raw text wrapped to 5–6 lines and tripled row height. The cell template clamps
+           it to a couple of lines (see .rm-desc) and carries the full text in `title`, so nothing is
+           lost. PropertyColumn keeps its sorting — only the rendering changes. *@
+        <PropertyColumn Property="x => x.Description" Title="Description" CellClass="rm-desc-cell">
+            <CellTemplate>
+                <span class="rm-desc" title="@context.Item.Description">@context.Item.Description</span>
+            </CellTemplate>
+        </PropertyColumn>
+        @* PL-12(b): size-to-content so an empty Tags column stops reserving width from Description. *@
+        <TemplateColumn Title="Tags" Sortable="false" CellClass="rm-tags-cell" HeaderClass="rm-tags-cell">
             <CellTemplate>
                 @if (context.Item.Tags is null || context.Item.Tags.Count == 0)
                 {
@@ -134,6 +142,10 @@
     private MudDataGrid<ResourceGridItemModel>? _grid;
     private bool _pushNext;
     private string _lastQuery = "";
+
+    // Counts last pushed to ResourceFilterBar. -1 forces the first load to render (see NotifyCountsChanged).
+    private int _shownRendered = -1;
+    private int _totalRendered = -1;
 
     // Sort intent parsed from the URL, captured before the grid's initial load can mutate _state.
     private string _urlOrderBy = "ResourceName";
@@ -278,7 +290,30 @@
         UpdateUrl(_pushNext);
         _pushNext = false;
 
+        NotifyCountsChanged();
+
         return new GridData<ResourceGridItemModel> { Items = _items, TotalItems = _total };
+    }
+
+    // PL-A1: MudDataGrid repaints itself from the GridData returned above, but ResourceFilterBar is a
+    // *sibling* — nothing re-rendered this page, so the bar kept the previous pass's numbers and read
+    // "Showing 0 of 0" over a full grid. Only a re-render of Home can push new Total/Shown parameters
+    // down to the bar, so the repaint has to happen here.
+    //
+    // Loop safety: this is called from the grid's own ServerData callback, and re-rendering Home also
+    // re-renders MudDataGrid. MudDataGrid does not reload on a parameter refresh (reloads come from
+    // sort/page/filter changes or an explicit ReloadServerData), but the equality guard makes that
+    // guarantee unnecessary — a second pass would find the counts unchanged and not request another
+    // render, so any cycle terminates after one iteration instead of spinning.
+    private void NotifyCountsChanged()
+    {
+        var shown = _items?.Count ?? 0;
+        if (shown == _shownRendered && _total == _totalRendered)
+            return;
+
+        _shownRendered = shown;
+        _totalRendered = _total;
+        StateHasChanged();
     }
 
     private async Task<ResourceGridFacetResponse?> LoadFacet(ActiveFilter filter)

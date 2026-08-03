@@ -88,6 +88,21 @@ html, body {
     visibility: visible;
 }
 
+/* PL-12(c): the hover-reveal above is deliberate (the GitHub-style row-actions pattern from
+   UX-Plan-V2) and keyboard users are already covered by :focus-within — but a coarse pointer has
+   no hover state at all, so on touch the row actions and the tag copy button were simply
+   unreachable. Where the primary pointer can't hover, reveal them permanently rather than
+   abandoning the pattern for everyone. */
+@media (hover: none), (pointer: coarse) {
+    .rm-actions {
+        visibility: visible;
+    }
+
+    .rm-tag .rm-copy {
+        visibility: visible;
+    }
+}
+
 .rm-actions .mud-icon-button,
 .rm-actions .mud-icon-button .mud-icon-root {
     padding: 3px;
@@ -97,6 +112,47 @@ html, body {
 .rm-actions .mud-icon-button .mud-icon-root {
     padding: 0;
     font-size: 1.05rem;
+}
+
+/* PL-12(a): Description was the runaway column — free-flowing text wrapped to 5–6 lines and tripled
+   row height, so ~6 rows were visible at 768px against ~22 at 1600px. Clamping to two lines caps the
+   worst case at roughly double the minimum row height; the full text stays available via the cell's
+   `title`. This is a density fix, not an overflow fix — there was no horizontal overflow to begin with. */
+.rm-desc {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+}
+
+.rm-desc-cell {
+    /* Give Description first claim on the slack the Tags column gives up. */
+    min-width: 16rem;
+}
+
+/* PL-12(b): the Tags column was taking a proportional share of the table even on rows where it
+   holds only an em dash, starving Description. `width: 1%` under the table's auto layout means
+   "shrink to content", so empty tag cells now cost almost nothing and full ones still fit. */
+.rm-tags-cell {
+    width: 1%;
+}
+
+/* Narrow viewports: one line of description, tighter tag spacing. Below this width the row-count
+   loss from a second description line matters more than the extra text. */
+@media (max-width: 900px) {
+    .rm-desc {
+        -webkit-line-clamp: 1;
+        line-clamp: 1;
+    }
+
+    .rm-desc-cell {
+        min-width: 10rem;
+    }
+
+    .rm-tags {
+        gap: .2rem .5rem;
+    }
 }
 
 .rm-linkitem {
@@ -155,6 +211,46 @@ html, body {
 .rm-filter-all {
     border-bottom: 1px solid var(--mud-palette-divider);
     margin-bottom: .25rem;
+}
+
+/* PL-10: the "Filters (n)" panel — one list of everything currently narrowing the grid, with
+   per-row edit / remove and a clear-all. */
+.rm-managefilters {
+    text-transform: none;
+}
+
+.rm-manage-panel {
+    min-width: 280px;
+    max-width: 360px;
+}
+
+.rm-manage-row {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+    border-bottom: 1px solid var(--mud-palette-divider);
+}
+
+.rm-manage-row:last-of-type {
+    border-bottom: none;
+}
+
+/* The label is the edit affordance, so it fills the row and reads as text, not as a button. */
+.rm-manage-row .rm-manage-label-btn {
+    flex: 1 1 auto;
+    justify-content: flex-start;
+    text-transform: none;
+    text-align: left;
+    min-width: 0;
+    font-weight: 400;
+}
+
+.rm-manage-row .rm-manage-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: .875rem;
+    padding: 6px 8px;
+    overflow-wrap: anywhere;
 }
 
 /* Editor/details: compact tabbed shell (General/Review), consistent with the home page. */
