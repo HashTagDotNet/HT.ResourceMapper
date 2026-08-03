@@ -9,8 +9,9 @@
             @foreach (var v in ActiveValues())
             {
                 @* Each value carries its own copy affordance: the multi-valued tags are Runbook and
-                   Documentation, i.e. exactly the URLs worth copying. Always visible rather than
-                   hover-revealed - hover-only actions are unreachable on touch (cf. PL-12c). *@
+                   Documentation, i.e. exactly the URLs worth copying. Revealed on row hover (see
+                   .rm-tag-copy) with :focus-within for keyboard and a coarse-pointer fallback, so
+                   hiding it does not make it unreachable on touch (PL-12c). *@
                 <span class="rm-tag-chipwrap">
                     <MudChip T="string" Value="@v.EditedValue" OnClose="@(() => RemoveValue(v))" Disabled="@ReadOnlyEffective">@v.EditedValue</MudChip>
                     <MudTooltip Text="Copy value">

@@ -101,6 +101,11 @@ html, body {
     .rm-tag .rm-copy {
         visibility: visible;
     }
+
+    /* Same reasoning for the tag editor's copy-value buttons. */
+    .rm-tag-copy {
+        opacity: 1;
+    }
 }
 
 .rm-actions .mud-icon-button,
@@ -366,14 +371,47 @@ html, body {
     align-items: center;
 }
 
+/* Copy stays out of the way until the row is under the pointer — the same hover-reveal the home
+   grid's row actions use, so the two surfaces behave alike. Hover is scoped to the whole
+   .rm-tag-row (not the button's own wrapper), so pointing anywhere in the row reveals it.
+
+   `opacity`, not `visibility: hidden`: a visibility-hidden element is removed from the tab order,
+   so on the read-only details view — where every field is disabled and the button is the row's only
+   focusable thing — a keyboard user could never reach it, and :focus-within could never fire to
+   un-hide it. At opacity 0 the button stays tabbable and :focus-visible brings it into view. The
+   box is reserved either way, so revealing it never reflows the input or shifts the row.
+   Trade-off accepted: the target is clickable while invisible, but it sits in its own slot outside
+   the input and the snackbar confirms what happened. */
 .rm-tag-copy {
     flex: 0 0 auto;
-    padding: 2px;
-    color: var(--mud-palette-text-secondary);
+    padding: 1px;
+    /* text-disabled, not text-secondary: the same lighter tone the grid's row actions use. This is
+       an operation, and operations stay visually subordinate to the data (UX-Plan rule). */
+    color: var(--mud-palette-text-disabled);
+    opacity: 0;
+    transition: opacity .1s linear;
+}
+
+.rm-tag-row:hover .rm-tag-copy,
+.rm-tag-row:focus-within .rm-tag-copy,
+.rm-tag-copy:focus-visible {
+    opacity: 1;
+}
+
+/* Smaller than MudBlazor's Size.Small default (~1.25rem): this is a secondary, per-row action and
+   at full size it competed with the value itself. */
+.rm-tag-copy,
+.rm-tag-copy .mud-icon-root {
+    color: var(--mud-palette-text-disabled);
+}
+
+.rm-tag-copy .mud-icon-root {
+    padding: 0;
+    font-size: .95rem;
 }
 
 .rm-tag-chipwrap .rm-tag-copy {
-    margin-left: -2px;
+    margin-left: -1px;
 }
 
 .rm-tag-add-row {
