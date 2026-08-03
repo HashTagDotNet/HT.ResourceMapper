@@ -4,10 +4,14 @@
 @inject IResourceService ResourceService
 @inject IDialogService DialogService
 
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-    Tags carry a resource's links and metadata. Fill in the ones that apply; empty rows are
-    dropped when you save. Only one Link tag can be the primary (the click-through link).
-</MudText>
+@* §3: heading + description outrank the field labels below them. Before this the panel subtitle
+   used the same Typo.body2 + Color.Secondary as every tag label, so nothing outranked anything
+   (PL-31). *@
+<div class="rm-section-heading">Tags</div>
+<div class="rm-section-desc">
+    Links and metadata for this resource. Fill in the ones that apply — empty rows are dropped when
+    you save. The star marks the primary link: the one opened from the grid and the explorer.
+</div>
 
 <MudRadioGroup T="int?" Value="@Model.PrimaryTagDefinitionId" ValueChanged="OnPrimaryRadioChanged">
     <div class="rm-tags-editor">

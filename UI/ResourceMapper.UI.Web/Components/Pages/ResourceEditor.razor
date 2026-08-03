@@ -25,22 +25,31 @@ else if (_loadError is not null)
 }
 else if (_model is not null && _response is not null)
 {
-    <div class="d-flex align-center mb-3">
-        <MudText Typo="Typo.h5" Style="font-weight:600;">@PageTitleText</MudText>
-        <MudSpacer />
-        @if (_model.IsPersisted)
-        {
-            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Outlined.Delete"
-                       Disabled="@_deleting" OnClick="DeleteAsync" Class="mr-2">Delete</MudButton>
-        }
-        @if (_mode == "View")
-        {
-            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Edit" OnClick="EnterEditMode">Edit</MudButton>
-        }
-    </div>
+    @* azure-ux-design-v1 §5 "Azure footer" shell: breadcrumb + title + tab strip are fixed, ONE
+       region scrolls, actions sit in a fixed footer. Fixes PL-34 (the whole page used to scroll,
+       carrying the tab strip and Save away with it) and PL-08 (the breadcrumb is a more natural
+       route back to the grid than a menu item). *@
+    <div class="rm-page-shell">
+        <div class="rm-shell-head">
+            <MudBreadcrumbs Items="Breadcrumbs" Class="rm-breadcrumb" Separator="›" />
+            <div class="d-flex align-center">
+                <h1 class="rm-shell-title">@PageTitleText</h1>
+                <MudSpacer />
+                @if (_model.IsPersisted)
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Outlined.Delete"
+                               Disabled="@_deleting" OnClick="DeleteAsync" Class="mr-2">Delete</MudButton>
+                }
+                @if (_mode == "View")
+                {
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Edit" OnClick="EnterEditMode">Edit</MudButton>
+                }
+            </div>
+        </div>
 
-    <MudPaper Elevation="0" Class="pa-4 rm-editor-paper">
-        <MudTabs Class="rm-editor-tabs">
+        @* @bind-ActivePanelIndex is the prerequisite §5 calls out: nothing drove the tabs
+           programmatically before, so the footer's Previous/Next had nothing to move. *@
+        <MudTabs @bind-ActivePanelIndex="_activeTab" Class="rm-editor-tabs rm-page-shell" PanelClass="rm-shell-body">
             <MudTabPanel Text="General">
                 <GeneralTab Model="_model" ResourceTypes="_response.ResourceTypes" DomainAllowedValues="_response.DomainAllowedValues"
                             DomainLabel="@DomainLabel" ReadOnly="@(_mode == "View")" DomainLocked="_domainLocked"
@@ -77,16 +86,31 @@ else if (_model is not null && _response is not null)
             *@
         </MudTabs>
 
-        @if (_mode != "View")
-        {
-            <div class="d-flex justify-end mt-4 rm-editor-footer">
-                <MudButton Variant="Variant.Text" OnClick="Cancel" Class="mr-2" Disabled="@_saving">Cancel</MudButton>
+        @* §5 footer. Wizard nav (PL-15) reads "Next : <destination>" so the button names where it
+           goes rather than making you guess. Previous is disabled on the first tab, Next on the
+           last. The primary action stays reachable from every tab.
+           Known trade, accepted in §5: Azure's bar belongs to a create wizard, while this editor is
+           mostly used to edit, where bottom-right Save is the stronger convention. Kept for
+           consistency with the reference. In View mode the nav still shows — paging through a
+           record you are reading is just as useful as through one you are filling in. *@
+        <div class="rm-shell-foot">
+            @if (_mode != "View")
+            {
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@_saving" OnClick="SaveAsync">
                     @(_saving ? "Saving…" : "Save")
                 </MudButton>
-            </div>
-        }
-    </MudPaper>
+            }
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.ChevronLeft"
+                       Disabled="@(_activeTab <= 0)" OnClick="GoPreviousTab">Previous</MudButton>
+            <MudButton Variant="Variant.Outlined" EndIcon="@Icons.Material.Outlined.ChevronRight"
+                       Disabled="@(_activeTab >= TabNames.Length - 1)" OnClick="GoNextTab">@NextTabLabel</MudButton>
+            <MudSpacer />
+            @if (_mode != "View")
+            {
+                <MudButton Variant="Variant.Text" OnClick="Cancel" Disabled="@_saving">Cancel</MudButton>
+            }
+        </div>
+    </div>
 }
 
 @code {
@@ -107,6 +131,38 @@ else if (_model is not null && _response is not null)
     private bool _saving;
     private bool _deleting;
     private bool _domainLocked;
+
+    // --- §5 shell: tab strip driven programmatically so the footer can page through it (PL-15) ---
+
+    /// <summary>Must stay in the same order as the MudTabPanels above — the footer indexes into it.</summary>
+    private static readonly string[] TabNames = ["General", "Tags", "Dependencies", "Dependent On", "Review"];
+
+    private int _activeTab;
+
+    /// <summary>PL-15: name the destination rather than leaving "Next" to be guessed at.</summary>
+    private string NextTabLabel =>
+        _activeTab >= TabNames.Length - 1 ? "Next" : $"Next : {TabNames[_activeTab + 1]}";
+
+    private void GoPreviousTab()
+    {
+        if (_activeTab > 0) _activeTab--;
+    }
+
+    private void GoNextTab()
+    {
+        if (_activeTab < TabNames.Length - 1) _activeTab++;
+    }
+
+    /// <summary>
+    /// PL-08 via §5: a breadcrumb is a more natural route back to the grid than a menu item. The
+    /// last crumb is the current record and is deliberately not a link.
+    /// </summary>
+    private List<BreadcrumbItem> Breadcrumbs =>
+    [
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Resources", href: "/"),
+        new BreadcrumbItem(PageTitleText, href: null, disabled: true)
+    ];
 
     /// <summary>
     /// PL-33: the user-facing name of the domain/boundary field, read from the domain tag's own

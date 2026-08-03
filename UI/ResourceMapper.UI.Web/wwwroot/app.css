@@ -264,10 +264,6 @@ html, body {
     max-width: 960px;
 }
 
-.rm-editor-tabs .mud-tabs-panels {
-    padding: 1rem .25rem 0;
-}
-
 .rm-editor-fields {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -568,4 +564,217 @@ html, body {
     margin-top: 6px;
     background: rgba(255, 255, 255, 0.75);
     border-radius: 4px;
+}
+
+/* ============================================================================================
+   Azure-inspired form + shell primitives — azure-ux-design-v1.md step 1.
+   Layer 2 of the customization boundary (§1): layout CSS around Mud, not overrides of it.
+   The two layer-4 exceptions are margin-only, scoped, and labelled where they occur.
+   ============================================================================================ */
+
+/* --- Field anatomy (§2) -------------------------------------------------------------------
+   Label * ⓘ      [ value                    ]
+                    helper text
+   The label lives in its own 128px column (§4) — that column, not spacing, is what makes
+   Azure's blade read denser at the same font size. Inputs therefore drop MudBlazor's floating
+   `Label` and carry an `aria-label` instead, so screen readers (and Playwright's getByLabel)
+   still resolve them.                                                                        */
+/* The field column is capped rather than fluid. A blade's inputs do not grow to the width of the
+   monitor — a 1400px-wide text box is harder to read, not more capable — and the old .rm-editor-paper
+   used to cap this at 960px before the shell replaced it. */
+.rm-form-row {
+    display: grid;
+    grid-template-columns: 128px minmax(0, 560px);
+    align-items: start;
+    column-gap: .75rem;
+    margin-bottom: 7px;          /* §4 row gap */
+}
+
+.rm-form-label {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-size: .72rem;           /* ~11.5px per §4 */
+    line-height: 1.2;
+    margin-bottom: 1px;          /* §4b layer-2 compression */
+    color: var(--mud-palette-text-primary);
+    /* Optically centres the label against Mud's 40px dense field (§4a: 40px is the floor). */
+    padding-top: 11px;
+}
+
+.rm-form-label-req {
+    color: var(--mud-palette-error);
+}
+
+/* The ⓘ carries WHY the field exists; HelperText carries HOW to fill it (§2). Two jobs, two
+   slots, so neither crowds the other and the format guidance is never hover-only. */
+.rm-form-info {
+    color: var(--mud-palette-text-disabled);
+    font-size: .85rem;
+    cursor: help;
+}
+
+.rm-form-field {
+    min-width: 0;                /* grid default min-width:auto would let a long value push out */
+}
+
+/* Field text (~12.5px, §4) via LAYER 3 — a scoped CSS variable, no Mud internals overridden.
+   CORRECTION to §4a: that measurement concluded there was no variable lever, but it tested
+   `--mud-typography-input-size`, which MudBlazor does not define. The real chain is
+   `.mud-input > input.mud-input-root { font: inherit }` inheriting from `.mud-input`, which is
+   sized by `--mud-typography-subtitle1-size` — MudBlazor styles inputs as subtitle1, not "input".
+   Setting that variable HERE rather than in the theme keeps the app-bar title (also Typo.subtitle1)
+   at its own size. A plain `.rm-form-field input` rule would not have worked regardless: Mud's
+   `.mud-input>input.mud-input-root` is (0,2,1) and outranks it. */
+.rm-form-field {
+    --mud-typography-subtitle1-size: .78rem;
+}
+
+/* §4b, layer-4 exception (accepted, margin-only): Mud reserves helper-text space under every
+   input and spaces it for a 56px control. Scoped to .rm-form-field so nothing else shifts. A
+   MudBlazor upgrade can move this spacing; it cannot break the layout. */
+.rm-form-field .mud-input-control {
+    margin-bottom: 0;
+}
+
+.rm-form-field .mud-input-helper-text {
+    margin-top: 1px;
+    line-height: 1.25;
+    font-size: .7rem;
+}
+
+/* --- Sections (§3) -----------------------------------------------------------------------
+   heading -> description -> field label -> helper. The real 3-level hierarchy is what fixes
+   PL-31/PL-32: before this every panel used one Typo.body2 + Color.Secondary for both its
+   subtitle and its field labels, so nothing outranked anything. */
+.rm-section {
+    margin-bottom: 1.5rem;
+}
+
+.rm-section:last-child {
+    margin-bottom: 0;
+}
+
+.rm-section-heading {
+    font-size: .8125rem;
+    font-weight: 600;
+    color: var(--mud-palette-text-primary);
+    line-height: 1.3;
+}
+
+.rm-section-desc {
+    font-size: .72rem;
+    color: var(--mud-palette-text-secondary);
+    line-height: 1.35;
+    margin: 1px 0 .6rem;
+    /* Matches the form's own width so the prose wraps with the fields, not across the whole page. */
+    max-width: 700px;
+}
+
+/* --- Page shell (§5) ---------------------------------------------------------------------
+   Fixed breadcrumb + title + tabs, ONE scrolling region, fixed action footer. This is what
+   fixes PL-34: the editor previously let .rm-main scroll the entire page, so the tab strip and
+   the Save button scrolled away with the form. */
+.rm-page-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.rm-shell-head,
+.rm-shell-foot {
+    flex: 0 0 auto;
+}
+
+.rm-shell-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: .25rem;       /* keeps the scrollbar off the fields */
+}
+
+/* The editor's scrolling region is MudTabs' own panel container. MudTabs renders exactly two
+   children — .mud-tabs-tabbar and .mud-tabs-panels — and its PanelClass parameter does NOT land on
+   that container, so the class cannot be attached from the markup side. Making the tab strip stay
+   put therefore means addressing .mud-tabs-panels directly: LAYER 4, structural (flex + overflow),
+   and the reason PL-34's "pattern already exists on Home" was not simply reusable here. */
+.rm-editor-tabs {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.rm-editor-tabs .mud-tabs-panels {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1rem .5rem 0 .25rem;
+}
+
+.rm-shell-foot {
+    border-top: 1px solid var(--mud-palette-divider);
+    padding-top: .6rem;
+    margin-top: .6rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.rm-breadcrumb {
+    font-size: .72rem;
+    padding: 0;
+}
+
+.rm-breadcrumb .mud-breadcrumb-item,
+.rm-breadcrumb .mud-breadcrumbs-separator {
+    font-size: .72rem;
+}
+
+.rm-shell-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    line-height: 1.25;
+    margin: 2px 0 0;
+}
+
+/* --- Responsive (§8) ---------------------------------------------------------------------
+   A 128px label column cannot survive a narrow screen, so below ~900px the label stacks above
+   its field. Distinct from PL-12, which is the grid table's density collapse (stays in B10). */
+@media (max-width: 900px) {
+    .rm-form-row {
+        grid-template-columns: minmax(0, 1fr);
+        margin-bottom: 10px;
+    }
+
+    .rm-form-label {
+        padding-top: 0;
+    }
+}
+
+/* Identity preview as a form row rather than a separate card: it is a derived field, so it reads
+   better sitting in the same label column as the three fields it composes. */
+.rm-identity-inline {
+    font-size: .78rem;
+    padding: 10px 0 0;
+    color: var(--mud-palette-text-primary);
+    overflow-wrap: anywhere;
+}
+
+/* PL-32: the Review tab's section headers were bare <th> cells — no fill, no extra weight — so
+   "Tags" and "Dependencies" read as data rows rather than as the headings of the blocks beneath
+   them. Fill + weight + letter-spacing is the minimum that makes the grouping legible. */
+.rm-review-table .rm-review-section {
+    background: var(--mud-palette-background-grey);
+    font-weight: 600;
+    font-size: .72rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--mud-palette-text-secondary);
+}
+
+/* The review tables are reference content, not a form, so they get the form's width budget. */
+.rm-review-table {
+    max-width: 700px;
 }

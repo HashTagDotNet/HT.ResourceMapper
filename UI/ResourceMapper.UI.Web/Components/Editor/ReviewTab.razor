@@ -1,8 +1,10 @@
 @using ResourceMapper.Common.Shared.Editor
 
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-    Review before saving. The record isn't saved until Save succeeds.
-</MudText>
+@* §3: heading + description outranking the table content below (PL-31). *@
+<div class="rm-section-heading">Review</div>
+<div class="rm-section-desc">
+    Everything this record will contain. Nothing is written until Save succeeds.
+</div>
 
 @* Every row ends in a copy cell, revealed on row hover (see .rm-copybtn in app.css). The cell is
    always present even where there is no value, so the value column keeps one consistent width down
@@ -21,7 +23,7 @@
 
 <MudSimpleTable Dense="true" Elevation="0" Class="mt-3 rm-review-table" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
     <thead>
-        <tr><th colspan="3">Tags</th></tr>
+        <tr><th colspan="3" class="rm-review-section">Tags</th></tr>
     </thead>
     <tbody>
         @{
@@ -59,7 +61,7 @@
 
 <MudSimpleTable Dense="true" Elevation="0" Class="mt-3 rm-review-table" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
     <thead>
-        <tr><th colspan="3">Dependencies</th></tr>
+        <tr><th colspan="3" class="rm-review-section">Dependencies</th></tr>
     </thead>
     <tbody>
         @{
@@ -87,7 +89,7 @@
 
 <MudSimpleTable Dense="true" Elevation="0" Class="mt-3 rm-review-table" Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
     <thead>
-        <tr><th colspan="3">Dependent On</th></tr>
+        <tr><th colspan="3" class="rm-review-section">Dependent On</th></tr>
     </thead>
     <tbody>
         @{

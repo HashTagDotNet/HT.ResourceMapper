@@ -1,0 +1,50 @@
+@*
+    The one field shape used everywhere (azure-ux-design-v1 §2):
+
+        Label * ⓘ      [ value                    ]
+                         helper text
+
+    The label sits in its own 128px column — that column, not spacing, is what makes Azure's blade
+    read denser at the same font size (§4). Callers therefore pass the input WITHOUT MudBlazor's
+    floating `Label`, and give it an `aria-label` instead so assistive tech (and Playwright's
+    getByLabel) can still resolve it.
+
+    Info vs HelperText is a load-bearing split, not decoration: the ⓘ says WHY the field exists and
+    what it affects, HelperText says HOW to fill it. Keeping them apart means neither crowds the
+    other, and the format guidance stays visible rather than hiding behind a hover that does not
+    exist on touch. Prefer examples over definitions.
+*@
+
+<div class="rm-form-row">
+    <div class="rm-form-label">
+        <span>@Label</span>
+        @if (Required)
+        {
+            <span class="rm-form-label-req" aria-hidden="true">*</span>
+        }
+        @if (!string.IsNullOrWhiteSpace(Info))
+        {
+            <MudTooltip Text="@Info" Placement="Placement.Top">
+                <MudIcon Icon="@Icons.Material.Outlined.Info" Class="rm-form-info"
+                         aria-label="@($"About {Label}")" />
+            </MudTooltip>
+        }
+    </div>
+    <div class="rm-form-field">
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    /// <summary>Field label, rendered in the left column.</summary>
+    [Parameter] public string Label { get; set; } = string.Empty;
+
+    /// <summary>Adds the red required marker. Purely visual — validation lives on the input.</summary>
+    [Parameter] public bool Required { get; set; }
+
+    /// <summary>ⓘ tooltip: why this field exists / what it affects. Omit to render no icon.</summary>
+    [Parameter] public string? Info { get; set; }
+
+    /// <summary>The input itself, plus any inline action that belongs with it.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

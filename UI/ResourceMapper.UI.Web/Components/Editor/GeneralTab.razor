@@ -3,32 +3,39 @@
 @using ResourceMapper.UI.Web.Components.ResourceTypes
 @inject IDialogService DialogService
 
-@* PL-30: fields run @DomainLabel -> Resource Type -> Key, the same order the Identity preview
-   below composes them in ("prod / Database / CATALOG-DB"). The sentence names them in that order
-   too, so the prose and the form agree. *@
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-    Identity is set by @DomainLabel, Resource Type, and Key together — once saved, @DomainLabel
-    and Resource Type can't be changed.
-</MudText>
+@* azure-ux-design-v1 step 3 — first full application of the field anatomy (§2), sections (§3),
+   single column and PL-30 order (§6). Inputs drop MudBlazor's floating Label because the label now
+   lives in its own column; each carries an aria-label instead, so screen readers and Playwright's
+   getByLabel still resolve them. *@
 
-<div class="rm-editor-fields">
-    <MudSelect T="string" Value="@Model.Domain.EditedValue" ValueChanged="OnDomainChanged"
-               Label="@DomainLabel" Required="true" Disabled="@(ReadOnly || Model.IsPersisted || DomainLocked)"
-               Variant="Variant.Outlined" Margin="Margin.Dense"
-               HelperText="@(DomainLocked ? $"Locked to the parent resource's {DomainLabel}" : null)"
-               Error="@(Model.Domain.Level == EditorFieldLevel.Error)"
-               ErrorText="@Model.Domain.Messages.FirstOrDefault()?.Message">
-        @foreach (var value in DomainAllowedValues)
-        {
-            <MudSelectItem Value="@value">@value</MudSelectItem>
-        }
-    </MudSelect>
+<div class="rm-section">
+    <div class="rm-section-heading">Identity</div>
+    <div class="rm-section-desc">
+        How this resource is uniquely identified. @DomainLabel, Resource Type and Key together form
+        the identity — @DomainLabel and Resource Type are fixed once saved.
+    </div>
 
-    @* Wrapper keeps the select + its inline-create action in a single .rm-editor-fields cell. *@
-    <div>
-        <MudSelect T="int?" Value="@Model.ResourceTypeId" ValueChanged="OnTypeChanged"
-                   Label="Resource Type" Required="true" Disabled="@(ReadOnly || Model.IsPersisted)"
+    <FormRow Label="@DomainLabel" Required="true"
+             Info="@($"The boundary this resource lives in. Resources can only depend on others in the same {DomainLabel}.")">
+        <MudSelect T="string" Value="@Model.Domain.EditedValue" ValueChanged="OnDomainChanged"
+                   aria-label="@DomainLabel" Disabled="@(ReadOnly || Model.IsPersisted || DomainLocked)"
                    Placeholder="Select…" Variant="Variant.Outlined" Margin="Margin.Dense"
+                   HelperText="@DomainHelper"
+                   Error="@(Model.Domain.Level == EditorFieldLevel.Error)"
+                   ErrorText="@Model.Domain.Messages.FirstOrDefault()?.Message">
+            @foreach (var value in DomainAllowedValues)
+            {
+                <MudSelectItem Value="@value">@value</MudSelectItem>
+            }
+        </MudSelect>
+    </FormRow>
+
+    <FormRow Label="Resource Type" Required="true"
+             Info="Determines which tags this resource is prompted for, and the icon and short code it draws with in the explorer.">
+        <MudSelect T="int?" Value="@Model.ResourceTypeId" ValueChanged="OnTypeChanged"
+                   aria-label="Resource Type" Disabled="@(ReadOnly || Model.IsPersisted)"
+                   Placeholder="Select…" Variant="Variant.Outlined" Margin="Margin.Dense"
+                   HelperText="@(Model.IsPersisted ? "Fixed after save." : "e.g. Azure App Service, Database, Queue")"
                    Error="@(Model.ResourceType.Level == EditorFieldLevel.Error)"
                    ErrorText="@Model.ResourceType.Messages.FirstOrDefault()?.Message">
             @foreach (var option in ResourceTypes)
@@ -47,32 +54,46 @@
                 Create new type…
             </MudButton>
         }
-    </div>
+    </FormRow>
 
-    <MudTextField T="string" Value="@Model.Name.EditedValue" ValueChanged="OnNameChanged"
-                  Label="Name" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense"
-                  Error="@(Model.Name.Level == EditorFieldLevel.Error)"
-                  ErrorText="@Model.Name.Messages.FirstOrDefault()?.Message" />
+    <FormRow Label="Key" Required="true"
+             Info="The stable identifier used by import, export and permalinks. Renaming it re-points those references.">
+        <MudTextField T="string" Value="@Model.Key.EditedValue" ValueChanged="OnKeyChanged" OnBlur="OnKeyBlurred"
+                      aria-label="Key" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      HelperText="@(Model.IsPersisted ? "e.g. ORDERS-API" : "Auto-filled from Name — edit to override. e.g. ORDERS-API")"
+                      Error="@(Model.Key.Level == EditorFieldLevel.Error)"
+                      ErrorText="@Model.Key.Messages.FirstOrDefault()?.Message" />
+    </FormRow>
 
-    <MudTextField T="string" Value="@Model.Key.EditedValue" ValueChanged="OnKeyChanged" OnBlur="OnKeyBlurred"
-                  Label="Key" Required="true" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense"
-                  HelperText="@(Model.IsPersisted ? null : "Auto-filled from Name — edit to override")"
-                  Error="@(Model.Key.Level == EditorFieldLevel.Error)"
-                  ErrorText="@Model.Key.Messages.FirstOrDefault()?.Message" />
-
-    <MudTextField T="string" Value="@Model.Description.EditedValue" ValueChanged="OnDescriptionChanged"
-                  Label="Description" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense"
-                  Lines="3" Class="rm-editor-fullwidth" />
+    <FormRow Label="Identity" Info="The three fields above, combined. This is what uniqueness is checked against.">
+        <div class="rm-identity-inline">
+            @(string.IsNullOrEmpty(Model.IdentityPreview.Display) ? "—" : Model.IdentityPreview.Display)
+        </div>
+    </FormRow>
 </div>
 
-<MudPaper Elevation="0" Class="pa-3 mt-3 rm-identity-preview">
-    <MudText Typo="Typo.caption" Color="Color.Secondary">Identity</MudText>
-    <MudText Typo="Typo.body2">@(string.IsNullOrEmpty(Model.IdentityPreview.Display) ? "—" : Model.IdentityPreview.Display)</MudText>
-</MudPaper>
+<div class="rm-section">
+    <div class="rm-section-heading">Description</div>
+    <div class="rm-section-desc">How people recognise this resource in the catalog.</div>
+
+    <FormRow Label="Name" Info="The human-readable name shown in the grid and the explorer.">
+        <MudTextField T="string" Value="@Model.Name.EditedValue" ValueChanged="OnNameChanged"
+                      aria-label="Name" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      HelperText="e.g. Orders API"
+                      Error="@(Model.Name.Level == EditorFieldLevel.Error)"
+                      ErrorText="@Model.Name.Messages.FirstOrDefault()?.Message" />
+    </FormRow>
+
+    <FormRow Label="Description" Info="Shown in the grid's Description column and on hover.">
+        <MudTextField T="string" Value="@Model.Description.EditedValue" ValueChanged="OnDescriptionChanged"
+                      aria-label="Description" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Lines="3" HelperText="What it does and who relies on it — one or two lines." />
+    </FormRow>
+</div>
 
 @if (Model.IsPersisted)
 {
-    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+    <MudText Typo="Typo.caption" Color="Color.Secondary">
         Created @Model.CreatedOn?.ToString("g")
         @if (Model.UpdatedOn is not null)
         {
@@ -113,6 +134,15 @@
 
     /// <summary>PL-29: inline type create is only offered where the Type select is enabled.</summary>
     private bool CanCreateType => !ReadOnly && !Model.IsPersisted;
+
+    /// <summary>
+    /// PL-25b: the nested-create case genuinely is locked, so say why. Otherwise say what "fixed
+    /// after save" means for this field rather than leaving the helper slot empty.
+    /// </summary>
+    private string DomainHelper =>
+        DomainLocked ? $"Locked to the parent resource's {DomainLabel}."
+        : Model.IsPersisted ? "Fixed after save."
+        : "Pick the boundary first — it limits which resources this one can depend on.";
 
     /// <summary>
     /// Inline "create new type", shaped exactly like TagsTab.OpenCreateDialog: show the same

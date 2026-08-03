@@ -1,7 +1,9 @@
 @using ResourceMapper.Common.Shared.Editor
 @using ResourceMapper.Common.Shared.Editor.Contracts
 
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">@HelpText</MudText>
+@* §3: heading + description, so the panel subtitle outranks the row text below it (PL-31). *@
+<div class="rm-section-heading">@Heading</div>
+<div class="rm-section-desc">@HelpText</div>
 
 <div class="rm-deps-editor">
     @{
@@ -48,6 +50,10 @@
     [Parameter] public List<DependencyRowEditor> Rows { get; set; } = new();
     [Parameter] public string Direction { get; set; } = string.Empty; // "DependsOn" | "DependentOn"
     [Parameter] public string HelpText { get; set; } = string.Empty;
+
+    /// <summary>Section heading (§3). Derived from Direction so the two usages can't be labelled
+    /// inconsistently by their call sites.</summary>
+    private string Heading => Direction == "DependentOn" ? "Dependent On" : "Dependencies";
     [Parameter] public string? Domain { get; set; }
 
     /// <summary>User-facing name of the domain field, passed through to ResourcePicker (PL-33).</summary>

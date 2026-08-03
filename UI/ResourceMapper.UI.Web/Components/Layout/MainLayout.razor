@@ -54,6 +54,24 @@
         LayoutProperties = new LayoutProperties
         {
             DefaultBorderRadius = "8px"
+        },
+        // azure-ux-design-v1 step 1, layer 1 (MudTheme in C# — the most upgrade-safe lever).
+        // The density table asks for ~11.5px labels / ~12.5px field text / ~10.5px helper. Field
+        // HEIGHT is padding-driven and stays at Mud's 40px dense floor (§4a finding 1) — this only
+        // sets the type scale.
+        //
+        // MEASURED ADDENDUM to §4a: there is NO layer-1 lever for field text either.
+        // `Typography.Input` does not exist in MudBlazor 9 (CS0117), and §4a already found the
+        // `--mud-typography-input-size` variable inert. Field text is therefore set in layer 2,
+        // scoped to .rm-form-field in app.css. Inputs otherwise inherit Default.
+        Typography = new Typography
+        {
+            Default = new DefaultTypography { FontSize = ".8125rem" },   // 13px base
+            Body1 = new Body1Typography { FontSize = ".8125rem" },
+            Body2 = new Body2Typography { FontSize = ".75rem" },         // 12px
+            Caption = new CaptionTypography { FontSize = ".6875rem" },   // 11px helper/meta
+            Subtitle2 = new Subtitle2Typography { FontSize = ".8125rem", FontWeight = "600" },
+            Button = new ButtonTypography { FontSize = ".75rem" }
         }
     };
 }
