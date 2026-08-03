@@ -8,9 +8,9 @@
 }
 else
 {
-    <MudAutocomplete T="ResourcePickerItem" Value="null" ValueChanged="OnItemPicked"
+    <MudAutocomplete T="ResourcePickerItem" @key="_pickerKey" Value="null" ValueChanged="OnItemPicked"
                       SearchFunc="SearchAsync" ToStringFunc="@FormatItem"
-                      Placeholder="Add resource…" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Placeholder="Add existing resource…" Variant="Variant.Outlined" Margin="Margin.Dense"
                       Clearable="true" ResetValueOnEmptyText="true" CoerceValue="false" Class="rm-deps-picker">
         <NoItemsTemplate>
             <div class="pa-2 rm-picker-no-items">
@@ -32,6 +32,8 @@ else
 
     /// <summary>Fired when the user asks to create a new target from the "no matches" state.</summary>
     [Parameter] public EventCallback OnCreateNewRequested { get; set; }
+
+    private int _pickerKey;
 
     private static string FormatItem(ResourcePickerItem? item) =>
         item is null ? string.Empty : $"{item.ResourceName} · {item.ResourceTypeName} · {item.Domain}";
@@ -57,6 +59,7 @@ else
     private async Task OnItemPicked(ResourcePickerItem? item)
     {
         if (item is null) return;
+        _pickerKey++; // PL-16: force the autocomplete to remount so it visually resets to the placeholder
         await OnPicked.InvokeAsync(item);
     }
 }

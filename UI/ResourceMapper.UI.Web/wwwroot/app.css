@@ -199,21 +199,29 @@ html, body {
     gap: .5rem;
 }
 
+/* PL-17: all four cells share one centre line. The per-cell `padding-top` nudges this replaces
+   were compensating for the input's height individually, so label / radio / remove each landed on
+   a different baseline; `align-items: center` on the grid centres them against the value cell
+   whatever its height (single input or a wrapped chip set). */
 .rm-tag-row {
     display: grid;
     grid-template-columns: 160px 1fr 40px 40px;
-    align-items: start;
+    align-items: center;
     gap: .5rem;
     padding: .35rem 0;
     border-bottom: 1px solid var(--mud-palette-divider);
 }
 
 .rm-tag-label {
-    padding-top: .5rem;
     font-size: .875rem;
     color: var(--mud-palette-text-secondary);
     display: flex;
     align-items: center;
+}
+
+.rm-tag-value {
+    /* Grid's default `min-width: auto` lets a long value push the 1fr column past the row. */
+    min-width: 0;
 }
 
 .rm-tag-required {
@@ -226,7 +234,6 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding-top: .25rem;
 }
 
 .rm-tag-multivalue {
@@ -296,6 +303,11 @@ html, body {
     display: flex;
     align-items: center;
     padding: 8px 4px;
+}
+/* Two intents live in this bar: diagram lifecycle (left) and canvas view (right of the divider). */
+.rm-explorer-bar-group {
+    display: flex;
+    align-items: center;
 }
 .rm-explorer-canvas {
     position: relative;
@@ -367,4 +379,12 @@ html, body {
     color: #64748b;
     margin-top: 2px;
     text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+}
+/* Edge-style key. Rendered from the same SVG fragment that is composited into PNG/SVG/print
+   exports, so what is on screen and what ships in the picture cannot drift apart. */
+.rm-explorer-title .rm-title-legend {
+    display: block;
+    margin-top: 6px;
+    background: rgba(255, 255, 255, 0.75);
+    border-radius: 4px;
 }

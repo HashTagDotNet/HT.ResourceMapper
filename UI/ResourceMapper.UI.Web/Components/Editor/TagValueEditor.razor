@@ -11,10 +11,12 @@
         </MudChipSet>
         @if (!ReadOnlyEffective)
         {
+            @* PL-20: this in-row control is how a multi-valued tag takes more than one value —
+               it was being missed, so the placeholder names that explicitly once a value exists. *@
             @if (Row.IsControlledVocab)
             {
                 <MudSelect T="string" @key="_vocabSelectKey" Value="@_pendingValue" ValueChanged="OnPendingVocabSelected"
-                           Placeholder="Add value…" Margin="Margin.Dense" Variant="Variant.Outlined">
+                           Placeholder="@AddValuePlaceholder" Margin="Margin.Dense" Variant="Variant.Outlined">
                     @foreach (var opt in AvailableVocabValues())
                     {
                         <MudSelectItem Value="@opt">@opt</MudSelectItem>
@@ -24,10 +26,13 @@
             else
             {
                 <div class="d-flex align-center rm-tag-add-row">
-                    <MudTextField T="string" @bind-Value="_pendingValue" Placeholder="Add value…"
+                    <MudTextField T="string" @bind-Value="_pendingValue" Placeholder="@AddValuePlaceholder"
                                   Margin="Margin.Dense" Variant="Variant.Outlined" Immediate="true" />
-                    <MudIconButton Icon="@Icons.Material.Outlined.Add" Size="Size.Small"
-                                   Disabled="@string.IsNullOrWhiteSpace(_pendingValue)" OnClick="AddPendingValue" />
+                    <MudTooltip Text="Add this value to the tag">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Add" Size="Size.Small" Color="Color.Primary"
+                                       aria-label="Add this value to the tag"
+                                       Disabled="@string.IsNullOrWhiteSpace(_pendingValue)" OnClick="AddPendingValue" />
+                    </MudTooltip>
                 </div>
             }
         }
@@ -69,6 +74,11 @@ else
     private int _vocabSelectKey;
 
     private bool ReadOnlyEffective => ReadOnly || !Row.IsEditable;
+
+    /// <summary>Names the multi-value affordance for what it is once the row already holds a
+    /// value — "Add value…" alone read as the row's only input, so the ability to hold several
+    /// values in one row was being missed.</summary>
+    private string AddValuePlaceholder => ActiveValues().Any() ? "Add another value…" : "Add value…";
 
     private SingleValueEditor EnsureSingleValue()
     {
