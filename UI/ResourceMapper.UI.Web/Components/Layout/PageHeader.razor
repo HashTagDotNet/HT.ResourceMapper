@@ -10,7 +10,12 @@
 *@
 
 <div class="rm-shell-head">
-    <MudBreadcrumbs Items="@Crumbs" Class="rm-breadcrumb" Separator="›" />
+    @* A one-item trail is just the page title again in grey, directly above the page title —
+       which is what Home rendered. Only show the breadcrumb when it actually leads somewhere. *@
+    @if (Crumbs.Count > 1)
+    {
+        <MudBreadcrumbs Items="@Crumbs" Class="rm-breadcrumb" Separator="›" />
+    }
     <div class="d-flex align-center">
         <h1 class="rm-shell-title">@Title</h1>
         @if (Actions is not null)
@@ -44,9 +49,10 @@
     /// <summary>True on the Home page itself, where a "Home › Home" trail would be silly.</summary>
     [Parameter] public bool IsHome { get; set; }
 
-    private List<BreadcrumbItem> Crumbs
+    private List<BreadcrumbItem> Crumbs => BuildCrumbs();
+
+    private List<BreadcrumbItem> BuildCrumbs()
     {
-        get
         {
             var crumbs = new List<BreadcrumbItem>();
             if (!IsHome) crumbs.Add(new BreadcrumbItem("Home", href: "/"));

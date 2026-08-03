@@ -4,6 +4,78 @@
 > batch **B11** (PL-11) and absorbs **B4** (PL-15, PL-30, PL-31, PL-32, PL-34) and parts of
 > **B7** (PL-23, PL-24, PL-35, PL-07) and **B10** (PL-08).
 > Mockups: `.superpowers/brainstorm/906-1785728872/content/` (`form-density.html`, `page-chrome.html`).
+>
+> **IMPLEMENTED 2026-08-03 — steps 1–7 of 8.** Step 8 (explorer canvas) not started; see
+> "Implementation status" below for what shipped, what was skipped, and four measured corrections
+> to §4a that this document's own numbers got wrong.
+
+## Implementation status (2026-08-03)
+
+| Step | State | Notes |
+|---|---|---|
+| 1 Theme + primitives | **Done** | `MudTheme.Typography`; `.rm-form-row` / `.rm-section` / `.rm-page-shell` |
+| 2 Page shell | **Done** | PL-34, PL-15, PL-08. `@bind-ActivePanelIndex` added |
+| 3 General tab | **Done** | PL-30 complete. New `FormRow` component carries §2's anatomy |
+| 4 Remaining tabs + dialogs | **Done** | PL-31, PL-32; `TagDefinitionDialog` converted |
+| 5 Copy pass | **Done** | PL-23, PL-07 (PL-33, PL-35 landed just before) |
+| 6 Other page shells | **Done** | New `PageHeader` on Home, Import, Types, Explorer, editor |
+| 7 Grid table density | **Done** | Cell padding + header treatment; behaviour untouched |
+| 8 Explorer canvas | **NOT STARTED** | Deliberately skipped — see below |
+
+**Step 8 skipped, deliberately.** Its gate has opened (PL-37/PL-39 are fixed and browser-verified),
+so it is no longer blocked. It was skipped because it is the one step this document describes as
+needing *visual iteration* — cytoscape node/edge styling lives in `explorer-canvas.js`, is composited
+into PNG/SVG/print exports (slice 9d), and cannot be judged from a DOM measurement the way every
+other step here was. Restyling it unreviewed risks the PL-38 trap this document itself warns about.
+It needs a session with eyes on renders between attempts.
+
+### Corrections to §4a — measured during implementation
+
+§4a's own numbers superseded the mockups; these supersede §4a. All four found by measuring, not
+reasoning.
+
+1. **`Typography.Input` does not exist in MudBlazor 9** (CS0117). The fallback §4a implied — "set it
+   in the theme instead" — was never available.
+2. **There IS a CSS-variable lever; §4a tested the wrong name.** It tried
+   `--mud-typography-input-size`, which MudBlazor does not define. The real chain is
+   `.mud-input > input.mud-input-root { font: inherit }` inheriting from `.mud-input`, which is sized
+   by `--mud-typography-subtitle1-size` — **MudBlazor styles inputs as subtitle1**. Set scoped on
+   `.rm-form-field` (layer 3, no overrides), which also keeps the app-bar title — also
+   `Typo.subtitle1` — at its own size.
+3. **"40px is padding-driven so no font lever moves it" is half wrong.** The box is `height: 1lh`, so
+   the smaller field font took it **40px → 36px**. The floor is real, but it is not font-independent.
+4. **One layer-4 exception beyond the two §4b anticipated.** MudTabs renders exactly
+   `.mud-tabs-tabbar` + `.mud-tabs-panels`, and its `PanelClass` parameter does **not** land on the
+   panel container — so the scroll region cannot be attached from markup. `.mud-tabs-panels` is
+   addressed directly, structural (flex + overflow) only. This is precisely why PL-34's "the pattern
+   already exists on Home" was not simply reusable.
+
+Also: field width is capped at **560px**. The old `.rm-editor-paper` capped the form at 960px, and
+the shell that replaced it initially let inputs span the full monitor.
+
+### Two defects the implementation exposed
+
+- **PL-53** (new) — a required tag could be **impossible to satisfy**. The server requires every
+  `RequirementLevel='Error'` definition on every resource, but the editor seeded rows only from the
+  resource type's template, so a type without that template rendered a form that could never save.
+  Fixed; see the punchlist.
+- **Tab state regression** — `@bind-ActivePanelIndex` made the active tab component state, and every
+  editor route is `/resources[/{uid}]`, so Blazor reuses the instance and the tab persisted across
+  records. Now reset on record change only.
+
+### Verification actually run
+
+- Six routes driven in Chrome, all 200, each with title + breadcrumb, no error alerts
+- **Only the content region scrolls**: at a 560px-tall viewport the document does not scroll and
+  `.mud-tabs-panels` does; after scrolling, title / tab strip / footer are at identical positions
+- **§8 responsive**: `128px 560px` at 1600, collapsing to one stacked column at 900, no horizontal
+  overflow at either width
+- Footer nav: Previous disabled on tab 1, `Next : Tags` moves and relabels to `Next : Dependencies`
+- `dotnet test` — **473** tests (not 416; the count grew with export / type CRUD), 2 known PL-01
+  failures
+- `npm run test:e2e` — **8/8 green**, from 0/8. The doc's plan to "run once after step 2 to isolate
+  the blast radius" was not usable: the suite was already red before this work started (PL-52), so
+  there was no baseline to compare against. Specs were fixed at the end, as §Verification intended.
 
 ## Context
 

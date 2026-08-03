@@ -483,6 +483,59 @@ that suite since PL-45 was not actually verified. **S, and it blocks B14 (ship).
 Also observed: **PL-A3 reproduced** — one console `404` on first load of `/`. Previously "did not
 reproduce". Still not chased down.
 
+---
+
+## Session 2026-08-03 (later still) — Azure UX steps 1–7 built
+
+`azure-ux-design-v1.md` steps **1–7 of 8** are implemented; that doc now carries the authoritative
+status table, four measured corrections to its own §4a, and the reason step 8 was skipped.
+
+**Closed by this work:** PL-34, PL-15, PL-31, PL-32, PL-30 (fully), PL-23, PL-07, PL-08 (second
+route, via breadcrumb), PL-11 (the design it called for is now built, minus the canvas).
+
+**Still open in those batches:** PL-24's remaining ~90-string sweep (the anatomy now has a helper and
+ⓘ slot on every editor field, but the other surfaces' strings were not rewritten wholesale), and
+step 8, the explorer canvas.
+
+### PL-52 — **CLOSED.** Playwright suite 8/8, from 0/8
+
+Four spec-side fixes, all consequences of this branch's own changes rather than test rot: a
+`fillRequiredTags` helper (driven off the rendered `.rm-tag-required` marker, not a hardcoded tag
+name, so the next required tag does not break them again); `clickSelect` retaught where labels live;
+`.rm-identity-preview` → `.rm-identity-inline`; `h5.mud-typography-h5` → `.rm-shell-title`.
+
+Also hardened `clickSelect` against a real cold-start race: the first select interaction of a run can
+swallow its click while the server pays JIT + first-circuit setup. `delete.spec`'s first test timed
+out at 60s twice and passed in 16s warm. A missed click looks exactly like a slow one, so a longer
+timeout cannot fix it — the helper now confirms the popover opened and re-clicks once.
+
+### PL-53 — a required tag could be impossible to satisfy ⚑ (new, high severity)
+
+**Found while chasing PL-52; it is what was actually breaking every create-and-save spec.**
+
+The server requires **every** `RequirementLevel='Error'` definition on **every** resource
+(`ResourceService.ValidateTags` → `'{name}' is required`). The editor seeded tag rows only from the
+resource **type's** `ResourceTypeTag` template. So for any type lacking a template for such a tag,
+the form offered **no row for it** and Save was refused for a field the user could not fill — a dead
+end with no way to comply. Same class as PL-25b: the app forbids what it demands.
+
+Reachable on any resource type created after the vocabulary seed ran, which is exactly what the e2e
+fixture's `E2eDepType` is. The error surfaced as `'Owning Team' is required` on a Tags tab that
+showed only two unrelated, non-required rows.
+
+**Fixed** by seeding a row for every globally-required definition regardless of template, mirroring
+the server rule exactly. Chose that over scoping requiredness to the type, which would contradict the
+server and let resources save without their required tags. **S — but it made create unusable for
+affected types.**
+
+### Regression caught and fixed in the same pass
+
+`@bind-ActivePanelIndex` (needed for PL-15's footer nav) made the active tab component state. Every
+editor route is `/resources` or `/resources/{uid}`, so Blazor reuses the instance and the tab
+persisted across records — a nested "Create new…" opened on **Dependencies** with its identity fields
+unseen. Now reset on record / nested-level change only, so View → Edit on the same record still keeps
+your place.
+
 ## Coverage gaps in this capture
 
 Findings here are only as good as what was exercised. Not covered:
@@ -589,8 +642,8 @@ shape. Adding agents does not move that floor.
 
 - `dotnet test` — expect **473** tests, 2 known failures (PL-01 `NotFound`→404), no new ones.
   (Was 416 at capture; the count grew with the export / type-CRUD work.)
-- `cd tools/e2e && npm run test:e2e` — **currently 0/8, red since PL-45. See PL-52.** Do not read a
-  green run here as a regression signal until the specs are fixed.
+- `cd tools/e2e && npm run test:e2e` — expect **8/8**. Was 0/8 from PL-45 until PL-52 closed it;
+  a red run is now a real signal again.
 - Drive the app: `ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS="http://localhost:5200" dotnet run --project UI/ResourceMapper.UI.Web --no-launch-profile`
 - **Stop the app before building** — it locks build output
 - Screenshot driver: `tools/e2e` helpers; from Git Bash use `MSYS_NO_PATHCONV=1` or a `/` route
