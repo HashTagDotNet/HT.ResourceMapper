@@ -1025,6 +1025,208 @@ namespace ResourceMapper.Common.Server.Tests.Resources
 
         #endregion
 
+        #region AddAllowedValueAsync
+
+        [Fact]
+        public async Task AddAllowedValueAsync_EmptyValue_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var response = await _sut.AddAllowedValueAsync(new AddAllowedValueRequest { TagDefinitionId = 7, Value = "  " }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because a blank value would add an unselectable choice to the list");
+            _repo.Verify(r => r.UpdateTagDefinitionAllowedValuesAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+                Times.Never, "because validation must short-circuit before the repository is called");
+        }
+
+        [Fact]
+        public async Task AddAllowedValueAsync_UnknownDefinition_ReturnsNotFound()
+        {
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<TagDefinition>());
+
+            var response = await _sut.AddAllowedValueAsync(new AddAllowedValueRequest { TagDefinitionId = 7, Value = "prod" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because there is no definition to add the value to");
+        }
+
+        [Fact]
+        public async Task AddAllowedValueAsync_FreeTextDefinition_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>
+                {
+                    new() { TagDefinitionId = 7, TagDefinitionKey = "Runbook", ContentType = "Text", AllowCustomValue = true }
+                });
+
+            var response = await _sut.AddAllowedValueAsync(new AddAllowedValueRequest { TagDefinitionId = 7, Value = "prod" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because a free-text tag renders no list, so a stored vocabulary could never be seen");
+            _repo.Verify(r => r.UpdateTagDefinitionAllowedValuesAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+                Times.Never, "because writing a vocabulary onto a free-text definition must be refused before the repository is called");
+        }
+
+        [Fact]
+        public async Task AddAllowedValueAsync_DuplicateIgnoringCase_ReturnsDefinitionUnchangedAndDoesNotCallRepo()
+        {
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>
+                {
+                    new() { TagDefinitionId = 7, TagDefinitionKey = "Subscription", ContentType = "Text",
+                            AllowCustomValue = false, AllowedValues = "[\"prod\",\"non-prod\"]" }
+                });
+
+            var response = await _sut.AddAllowedValueAsync(new AddAllowedValueRequest { TagDefinitionId = 7, Value = "PROD" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because adding a value the list already offers is a no-op, not a failure");
+            response.ApiResponse.Data!.AllowedValues.Should().BeEquivalentTo(new[] { "prod", "non-prod" },
+                "because the existing spelling wins rather than being duplicated by case");
+            _repo.Verify(r => r.UpdateTagDefinitionAllowedValuesAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+                Times.Never, "because a duplicate needs no write");
+        }
+
+        [Fact]
+        public async Task AddAllowedValueAsync_NewValue_AppendsToExistingListAndReturnsRefreshedDefinition()
+        {
+            var before = new TagDefinition
+            {
+                TagDefinitionId = 7, TagDefinitionKey = "Subscription", ContentType = "Text",
+                AllowCustomValue = false, IsMultiValued = false, AllowedValues = "[\"prod\"]", IsDomainTag = true
+            };
+            var after = new TagDefinition
+            {
+                TagDefinitionId = 7, TagDefinitionKey = "Subscription", ContentType = "Text",
+                AllowCustomValue = false, IsMultiValued = false, AllowedValues = "[\"prod\",\"sandbox\"]", IsDomainTag = true
+            };
+
+            _repo.SetupSequence(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition> { before })
+                .ReturnsAsync(new List<TagDefinition> { after });
+            _repo.Setup(r => r.UpdateTagDefinitionAllowedValuesAsync(
+                    "Subscription", "Text", false, false, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync("updated");
+
+            var response = await _sut.AddAllowedValueAsync(new AddAllowedValueRequest { TagDefinitionId = 7, Value = " sandbox " }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because appending a new choice to a controlled vocabulary is valid");
+            response.ApiResponse.Data!.AllowedValues.Should().BeEquivalentTo(new[] { "prod", "sandbox" },
+                "because the stored list is re-read after the write rather than patched in memory");
+            _repo.Verify(r => r.UpdateTagDefinitionAllowedValuesAsync(
+                "Subscription", "Text", false, false, "[\"prod\",\"sandbox\"]", It.IsAny<CancellationToken>()),
+                Times.Once, "because the whole list is written back with the trimmed value appended, preserving the existing entries");
+        }
+
+        [Fact]
+        public async Task AddAllowedValueAsync_RepoReportsError_ReturnsFailure()
+        {
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>
+                {
+                    new() { TagDefinitionId = 7, TagDefinitionKey = "Subscription", ContentType = "Text",
+                            AllowCustomValue = false, AllowedValues = "[\"prod\"]" }
+                });
+            _repo.Setup(r => r.UpdateTagDefinitionAllowedValuesAsync(
+                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync("error");
+
+            var response = await _sut.AddAllowedValueAsync(new AddAllowedValueRequest { TagDefinitionId = 7, Value = "sandbox" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because a failed write must not be reported to the caller as a successful add");
+        }
+
+        [Fact]
+        public async Task AddAllowedValueAsync_SystemManagedDefinition_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>
+                {
+                    new() { TagDefinitionId = 1, TagDefinitionKey = "Domain", ContentType = "Text",
+                            AllowCustomValue = false, IsDomainTag = true, IsSystemTag = true,
+                            AllowedValues = "[\"prod\",\"non-prod\"]" }
+                });
+
+            var response = await _sut.AddAllowedValueAsync(new AddAllowedValueRequest { TagDefinitionId = 1, Value = "sandbox" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because TagDefinition_Upsert refuses system-managed tags, so this path could only ever report a failure the user cannot act on");
+            _repo.Verify(r => r.UpdateTagDefinitionAllowedValuesAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+                Times.Never, "because a system tag's shape is deployment-owned and must not be rewritten from the editor");
+        }
+
+        #endregion
+
+        #region CreateDomainValueAsync
+
+        [Fact]
+        public async Task CreateDomainValueAsync_BlankValue_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var response = await _sut.CreateDomainValueAsync("   ", CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because a blank domain value would be an unusable identity component");
+            _repo.Verify(r => r.AddDomainValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never,
+                "because validation must short-circuit before the repository is called");
+        }
+
+        [Fact]
+        public async Task CreateDomainValueAsync_TooLong_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var response = await _sut.CreateDomainValueAsync(new string('x', 201), CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because the value must fit DomainValue_Add's 200-character parameter");
+            _repo.Verify(r => r.AddDomainValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never,
+                "because an over-long value must be rejected before the repository is called");
+        }
+
+        [Fact]
+        public async Task CreateDomainValueAsync_Added_TrimsValueAndReturnsRefreshedList()
+        {
+            _repo.Setup(r => r.AddDomainValueAsync("sandbox", It.IsAny<CancellationToken>())).ReturnsAsync("added");
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>
+                {
+                    new() { TagDefinitionId = 1, TagDefinitionKey = "Domain", ContentType = "Text",
+                            IsDomainTag = true, IsSystemTag = true, AllowedValues = "[\"prod\",\"non-prod\",\"sandbox\"]" }
+                });
+
+            var response = await _sut.CreateDomainValueAsync("  sandbox  ", CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because appending a new domain value is valid");
+            response.ApiResponse.Data.Should().BeEquivalentTo(new[] { "prod", "non-prod", "sandbox" },
+                "because the caller's picker is refreshed from the stored list, not from its own copy plus one");
+            _repo.Verify(r => r.AddDomainValueAsync("sandbox", It.IsAny<CancellationToken>()), Times.Once,
+                "because the value is trimmed before it reaches the vocabulary");
+        }
+
+        [Fact]
+        public async Task CreateDomainValueAsync_AlreadyExists_ReturnsSuccessWithStoredList()
+        {
+            _repo.Setup(r => r.AddDomainValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("exists");
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>
+                {
+                    new() { TagDefinitionId = 1, TagDefinitionKey = "Domain", ContentType = "Text",
+                            IsDomainTag = true, IsSystemTag = true, AllowedValues = "[\"prod\",\"non-prod\"]" }
+                });
+
+            var response = await _sut.CreateDomainValueAsync("PROD", CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because a value that already exists leaves the caller able to select it, which is what it asked for");
+            response.ApiResponse.Data.Should().BeEquivalentTo(new[] { "prod", "non-prod" },
+                "because the existing spelling is kept rather than duplicated by case");
+        }
+
+        [Fact]
+        public async Task CreateDomainValueAsync_RepoReportsError_ReturnsFailure()
+        {
+            _repo.Setup(r => r.AddDomainValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("error");
+
+            var response = await _sut.CreateDomainValueAsync("sandbox", CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because no domain tag designated (or an overflowing list) must not be reported as a successful create");
+        }
+
+        #endregion
+
         #region AddRelationshipAsync
 
         [Fact]

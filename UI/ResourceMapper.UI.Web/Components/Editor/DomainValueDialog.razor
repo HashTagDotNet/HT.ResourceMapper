@@ -1,0 +1,102 @@
+@using ResourceMapper.Common.Server.Resources.Interfaces
+@inject IResourceService ResourceService
+
+@* Creating a domain value (a Subscription here). Same shape as the tag rows' add-a-choice dialog on
+   purpose — one field, Enter confirms, commit on OK, caller ends up back on the field it started
+   from with the new value selected — but a separate component because it is a separate operation:
+   the domain tag is system-managed, so this goes through DomainValue_Add (append-only) rather than
+   the tag-definition write path, which refuses system tags outright. The tag machinery therefore
+   only ever *selects* an existing subscription; creating one lives here. *@
+<MudDialog>
+    <DialogContent>
+        <div class="rm-section-desc">
+            Adds a @FieldLabel.ToLowerInvariant() to the catalog's list. It becomes available to every
+            resource from then on — @FieldLabel is part of a resource's identity, so add one only when
+            it genuinely exists.
+        </div>
+
+        <FormRow Label="@FieldLabel" Required="true"
+                 Info="The name exactly as it should appear in the picker.">
+            <MudTextField T="string" @bind-Value="_value" aria-label="@FieldLabel"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
+                          HelperText="e.g. prod, non-prod, sandbox"
+                          Error="@(_error is not null)" ErrorText="@_error"
+                          OnKeyDown="OnKeyDown" />
+        </FormRow>
+
+        @if (ExistingValues.Any())
+        {
+            <FormRow Label="Already there" Info="The values the picker already offers.">
+                <div class="rm-allowed-existing">@string.Join(" · ", ExistingValues)</div>
+            </FormRow>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit"
+                   Disabled="@(_saving || string.IsNullOrWhiteSpace(_value))">
+            @(_saving ? "Creating…" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>What the domain field is called in this deployment ("Subscription").</summary>
+    [Parameter] public string FieldLabel { get; set; } = "Domain";
+
+    /// <summary>The list as the caller knows it — shown for reference, and used to catch a duplicate
+    /// without a round trip.</summary>
+    [Parameter] public List<string> ExistingValues { get; set; } = new();
+
+    private string? _value;
+    private string? _error;
+    private bool _saving;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task OnKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter" && !_saving && !string.IsNullOrWhiteSpace(_value))
+            await Submit();
+    }
+
+    private async Task Submit()
+    {
+        _error = null;
+        var value = _value?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            _error = $"Enter a {FieldLabel.ToLowerInvariant()}.";
+            return;
+        }
+
+        if (ExistingValues.Any(v => string.Equals(v, value, StringComparison.OrdinalIgnoreCase)))
+        {
+            _error = $"\"{value}\" is already in the list.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var response = await ResourceService.CreateDomainValueAsync(value, CancellationToken.None);
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+            {
+                MudDialog.Close(DialogResult.Ok(new DomainValueResult(response.ApiResponse.Data, value)));
+                return;
+            }
+
+            var message = response.ApiResponse?.Errors?.FirstOrDefault();
+            _error = message?.Details ?? message?.Title ?? $"Could not create the {FieldLabel.ToLowerInvariant()}.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    /// <summary>The refreshed list plus the value just created, so the caller can offer and select it.</summary>
+    public record DomainValueResult(List<string> AllowedValues, string Value);
+}

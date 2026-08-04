@@ -49,9 +49,11 @@ else if (_model is not null && _response is not null)
         <MudTabs @bind-ActivePanelIndex="_activeTab" Class="rm-editor-tabs rm-page-shell" PanelClass="rm-shell-body">
             <MudTabPanel Text="General">
                 <GeneralTab Model="_model" ResourceTypes="_response.ResourceTypes" DomainAllowedValues="_response.DomainAllowedValues"
+                            HasDomainTag="@HasDomainTag"
                             DomainLabel="@DomainLabel" ReadOnly="@(_mode == "View")" DomainLocked="_domainLocked"
                             OnFieldChanged="OnGeneralFieldChanged" OnCheckUniqueness="CheckUniquenessAsync"
-                            OnResourceTypeChanged="OnResourceTypeChanged" OnResourceDomainChanged="OnResourceDomainChanged" />
+                            OnResourceTypeChanged="OnResourceTypeChanged" OnResourceDomainChanged="OnResourceDomainChanged"
+                            OnAddResourceRequested="InitiateSiblingCreate" />
             </MudTabPanel>
             <MudTabPanel Text="Tags">
                 <TagsTab Model="_model" TagDictionary="_response.TagDictionary" ReadOnly="@(_mode == "View")"
@@ -175,6 +177,12 @@ else if (_model is not null && _response is not null)
     private string DomainLabel =>
         _response?.TagDictionary?.FirstOrDefault(t => t.IsDomainTag)?.DisplayName ?? "Domain";
 
+    /// <summary>Whether a domain tag is designated at all, gating General's "Create {Domain}…" action:
+    /// DomainValue_Add appends to that tag's vocabulary, so with no such tag there is nothing to
+    /// append to. Being system-managed is deliberately NOT a reason to hide it — the append-only
+    /// procedure is exactly what makes creating a value safe on a deployment-owned vocabulary.</summary>
+    private bool HasDomainTag => _response?.TagDictionary?.Any(t => t.IsDomainTag) == true;
+
     private bool _hasLoadedOnce;
     private string? _lastLoadedUid;
     private int? _lastNestedLevel;
@@ -248,6 +256,10 @@ else if (_model is not null && _response is not null)
         _lastLoadedUid = ResourceUid;
         _lastNestedLevel = NestedLevel;
 
+        // Back to the tab that launched the descent, not General. Safe to set here precisely because
+        // this path returns before LoadAsync, which is where the level-change tab reset lives.
+        _activeTab = frame.ParentTab;
+
         if (frame.Returned is not null)
         {
             LinkReturnedChild(frame.Direction, frame.Returned);
@@ -285,6 +297,16 @@ else if (_model is not null && _response is not null)
         });
     }
 
+    /// <summary>
+    /// General's "Add Resource": catalogue the next resource without linking it to this one. It goes
+    /// through the same frame stack as a dependency create for one reason — the way back. A plain
+    /// href here (the first cut) left no frame, so Cancel fell through to its no-frame branch and
+    /// dumped you on the resource list instead of the record you started from. Every "+ Add …" that
+    /// NAVIGATES has to push a frame; the ones that open a modal never leave the page and so need no
+    /// frame at all.
+    /// </summary>
+    private void InitiateSiblingCreate() => InitiateNestedCreate(EditorFrame.NoLink);
+
     /// <summary>Pushes the CURRENT (parent) state onto the stack before navigating — the reused
     /// component instance's _response is about to be overwritten by the nested load, so the
     /// parent's live edits must be stashed first (RD4).</summary>
@@ -297,7 +319,8 @@ else if (_model is not null && _response is not null)
             Response = _response,
             ParentRoute = CurrentRelativePath(),
             Direction = direction,
-            ParentMode = _mode
+            ParentMode = _mode,
+            ParentTab = _activeTab
         });
         _suppressNavGuard = true;
         Navigation.NavigateTo($"/resources?n={Stack.Depth}");
@@ -343,8 +366,12 @@ else if (_model is not null && _response is not null)
                 // A nested create (has a ?n marker AND an ancestor frame) is domain-locked to its
                 // immediate parent (RD7) — reading Peek() here means a multi-level chain stays
                 // same-domain, since each ancestor was itself already locked to its own parent.
+                // ...but an "Add Resource" descent (EditorFrame.NoLink) is NOT a dependency target, so
+                // the same-domain rule does not apply to it: it must be free to pick its own
+                // Subscription, and pre-filling the parent's would be wrong rather than helpful.
                 _domainLocked = false;
-                if (NestedLevel is not null && Stack.HasFrames)
+                if (NestedLevel is not null && Stack.HasFrames
+                    && !string.Equals(Stack.Peek().Direction, EditorFrame.NoLink, StringComparison.Ordinal))
                 {
                     var parentDomain = Stack.Peek().Response.EditorModel.Domain.EditedValue;
                     // Set BOTH Original and Edited so this system pre-fill does not itself count
@@ -427,7 +454,7 @@ else if (_model is not null && _response is not null)
         {
             // Discarding a nested child: pop back to the parent, linking nothing (Returned stays null).
             _suppressNavGuard = true;
-            Navigation.NavigateTo(Stack.Peek().ParentRoute);
+            Navigation.NavigateTo(Stack.Peek().ParentRoute, replace: true);
         }
         else if (_model?.IsPersisted == true)
         {
@@ -660,15 +687,27 @@ else if (_model is not null && _response is not null)
     {
         if (_model is null) return;
         var frame = Stack.Peek();
-        frame.Returned = new ReturnedChild
+
+        // An "Add Resource" descent reports nothing back: the resource it created is a peer, not a
+        // dependency, so linking it into the parent's rows would invent a relationship the user never
+        // asked for. Leaving Returned null is what makes the ascent a pure "return to where I was".
+        if (!string.Equals(frame.Direction, EditorFrame.NoLink, StringComparison.Ordinal))
         {
-            ResourceUid = uid,
-            Name = _model.Name.EditedValue,
-            TypeName = _model.ResourceType.EditedValue,
-            Domain = _model.Domain.EditedValue
-        };
+            frame.Returned = new ReturnedChild
+            {
+                ResourceUid = uid,
+                Name = _model.Name.EditedValue,
+                TypeName = _model.ResourceType.EditedValue,
+                Domain = _model.Domain.EditedValue
+            };
+        }
+
         _suppressNavGuard = true;
-        Navigation.NavigateTo(frame.ParentRoute);
+        // replace, NOT push: the descent's history entry belongs to a child that no longer exists, and
+        // leaving it behind means Back walks FORWARD into an abandoned create form whose frame has
+        // already been popped — from which Cancel would dump the user on the resource list, the very
+        // thing the frame was added to prevent. Popping the stack pops the history entry with it.
+        Navigation.NavigateTo(frame.ParentRoute, replace: true);
     }
 
     private static List<SaveTagValue> FlattenTags(ResourceEditorModel model)
@@ -746,7 +785,7 @@ else if (_model is not null && _response is not null)
             { nameof(ConfirmDeleteDialog.ResourceName), _model.Name.EditedValue },
             { nameof(ConfirmDeleteDialog.Dependents), dependents }
         };
-        var dialog = await DialogService.ShowAsync<ConfirmDeleteDialog>("Delete resource", parameters);
+        var dialog = await DialogService.ShowAsync<ConfirmDeleteDialog>("Delete Resource", parameters);
         var result = await dialog.Result;
         if (result is null || result.Canceled) return;
 
@@ -822,14 +861,21 @@ else if (_model is not null && _response is not null)
         }
 
         _suppressNavGuard = true; // discard, or a save with nothing more to link → let the re-nav through
-        Navigation.NavigateTo(target);
+        // Ascending replaces rather than pushes, for the same reason CommitChildAndReturn does: a
+        // popped child must leave history with it. Any other target keeps normal push semantics.
+        Navigation.NavigateTo(target, replace: IsAscentTarget(target));
     }
+
+    /// <summary>True when a navigation target is the frame we would ascend to — i.e. this navigation
+    /// is a stack pop, not a fresh move.</summary>
+    private bool IsAscentTarget(string target) =>
+        Stack.HasFrames && string.Equals(NormalizeRoute(target), Stack.Peek().ParentRoute, StringComparison.Ordinal);
 
     private async Task<string?> ShowUnsavedDialogAsync()
     {
         var name = string.IsNullOrWhiteSpace(_model?.Name.EditedValue) ? "this resource" : _model!.Name.EditedValue;
         var parameters = new DialogParameters { { nameof(UnsavedChangesDialog.ResourceName), name } };
-        var dialog = await DialogService.ShowAsync<UnsavedChangesDialog>("Unsaved changes", parameters);
+        var dialog = await DialogService.ShowAsync<UnsavedChangesDialog>("Unsaved Changes", parameters);
         var result = await dialog.Result;
         if (result is null || result.Canceled) return "cancel"; // dismissed unexpectedly → fail safe, stay put
         return result.Data as string;

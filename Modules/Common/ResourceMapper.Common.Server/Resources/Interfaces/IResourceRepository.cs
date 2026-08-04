@@ -111,6 +111,23 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
             string contentType, bool allowCustomValue, bool isMultiValued, string? allowedValuesJson,
             string? displayName, string requirementLevel, int displayOrder, CancellationToken cancellationToken);
 
+        // Appends one choice to the DOMAIN tag's vocabulary (a Subscription here) and nothing else.
+        // Deliberately NOT routed through TagDefinition_Upsert: that path refuses system-managed tags
+        // because it rewrites the whole row, and the domain tag is system-managed. DomainValue_Add
+        // touches AllowedValues only, so it cannot alter the tag's shape or flags.
+        // Result is 'added' | 'exists' | 'error'.
+        Task<string> AddDomainValueAsync(string value, CancellationToken cancellationToken);
+
+        // Rewrites an EXISTING definition's vocabulary in place, leaving its presentation metadata
+        // (DisplayName / RequirementLevel / DisplayOrder / the Domain and System flags) untouched —
+        // TagDefinition_Upsert reads NULL on those as "caller has no opinion" (PL-49). Separate from
+        // CreateTagDefinitionAsync because that one is pinned to OnConflict='skip', which is exactly
+        // the wrong answer here: the row always already exists.
+        // Result is 'updated' | 'error'.
+        Task<string> UpdateTagDefinitionAllowedValuesAsync(string tagKey, string contentType,
+            bool allowCustomValue, bool isMultiValued, string? allowedValuesJson,
+            CancellationToken cancellationToken);
+
         // Every ResourceTypeTag row (all types) — drives the Tags tab's pre-seed + client-side
         // re-seed on type change with no round trip.
         Task<List<ResourceTypeTag>> GetAllEntryPointTemplatesAsync(CancellationToken cancellationToken);

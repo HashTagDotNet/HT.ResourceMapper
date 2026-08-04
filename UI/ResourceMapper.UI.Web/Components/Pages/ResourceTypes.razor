@@ -170,7 +170,9 @@ else
             }
         };
 
-        var title = existing is null ? "New resource type" : $"Edit {existing.TypeName}";
+        // "Edit App" alone read as if it were editing an app; the title has to name what kind of
+        // record is open, the way the create title already does.
+        var title = existing is null ? "New Resource Type" : $"Edit Resource Type {existing.TypeName}";
 
         // Medium, not the default Small: the tag-template table added a four-column grid, and at
         // Small the "Expected?" selects truncated their longest option to "Inherit (recomme…", which
@@ -193,7 +195,7 @@ else
     {
         // Plain-string message (not MarkupString): the type name is user-supplied.
         var confirmed = await DialogService.ShowMessageBoxAsync(
-            "Delete resource type",
+            "Delete Resource Type",
             $"Delete '{type.TypeName}'? Its tag template ({type.EntryPointTagCount} " +
             $"{(type.EntryPointTagCount == 1 ? "entry" : "entries")}) is removed with it. This cannot be undone.",
             yesText: "Delete", cancelText: "Cancel");

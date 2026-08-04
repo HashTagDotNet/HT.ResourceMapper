@@ -188,7 +188,7 @@
         {
             { nameof(TagDefinitionDialog.ExistingKeys), TagDictionary.Select(t => t.TagDefinitionKey).ToList() }
         };
-        var dialog = await DialogService.ShowAsync<TagDefinitionDialog>("Create tag definition", parameters);
+        var dialog = await DialogService.ShowAsync<TagDefinitionDialog>("Create Tag Definition", parameters);
         var result = await dialog.Result;
         if (result is null || result.Canceled) return;
 

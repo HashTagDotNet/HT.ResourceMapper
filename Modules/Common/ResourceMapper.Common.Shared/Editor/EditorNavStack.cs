@@ -32,11 +32,31 @@ namespace ResourceMapper.Common.Shared.Editor
         /// <summary>Base-relative path+query (no leading slash) the parent was at before descending.</summary>
         public required string ParentRoute { get; init; }
 
-        /// <summary>"DependsOn" | "DependentOn" — which tab's picker initiated the nested create.</summary>
+        /// <summary>
+        /// "DependsOn" | "DependentOn" — which tab's picker initiated the nested create — or
+        /// <see cref="NoLink"/> for a descent that creates an unrelated resource and links nothing.
+        /// </summary>
         public required string Direction { get; init; }
+
+        /// <summary>
+        /// Direction for a descent that must NOT link its child into the parent: the General tab's
+        /// "Add Resource", which catalogues the next resource rather than a dependency of this one.
+        /// It still gets a frame, because the return journey is the same either way — pop back to the
+        /// caller's exact route, mode and tab. Only the linking differs.
+        /// </summary>
+        public const string NoLink = "None";
 
         /// <summary>"Create" | "Edit" — the parent's mode, restored on ascent.</summary>
         public required string ParentMode { get; init; }
+
+        /// <summary>
+        /// Index of the tab the parent was on when it descended, so the ascent returns to the picker
+        /// that started the whole thing. Without it the parent reloads on General: ResourceEditor
+        /// resets the active tab whenever the nested level changes, and coming back up is exactly
+        /// such a change — so the one tab you could not be returned to was the Dependencies or
+        /// Dependent On tab you left from.
+        /// </summary>
+        public required int ParentTab { get; init; }
 
         /// <summary>Set by the child on a successful save; consumed (and cleared) when popped.</summary>
         public ReturnedChild? Returned { get; set; }

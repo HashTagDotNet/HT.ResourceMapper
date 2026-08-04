@@ -282,7 +282,7 @@
     private async Task SaveAsAsync()
     {
         var parameters = new DialogParameters { ["Name"] = _diagramName };
-        var dialog = await DialogService.ShowAsync<DiagramNameDialog>("Save diagram as", parameters);
+        var dialog = await DialogService.ShowAsync<DiagramNameDialog>("Save Diagram As", parameters);
         var result = await dialog.Result;
         if (result is null || result.Canceled) return;
         var name = result.Data as string;
@@ -322,7 +322,7 @@
     {
         _error = null;
         var parameters = new DialogParameters { ["ClientId"] = _clientId };
-        var dialog = await DialogService.ShowAsync<OpenDiagramDialog>("Open diagram", parameters);
+        var dialog = await DialogService.ShowAsync<OpenDiagramDialog>("Open Diagram", parameters);
         var result = await dialog.Result;
         if (result is null || result.Canceled) return;
         var shareId = result.Data as string;
@@ -455,7 +455,7 @@
         if (!_canDeleteCurrent) return;
         // Plain-string message (not MarkupString): the diagram name is user-supplied.
         var confirmed = await DialogService.ShowMessageBoxAsync(
-            "Delete diagram?",
+            "Delete Diagram?",
             $"“{_diagramName}” will be permanently deleted. The picture stays on screen but is no longer saved.",
             yesText: "Delete", cancelText: "Cancel");
         if (confirmed != true) return;

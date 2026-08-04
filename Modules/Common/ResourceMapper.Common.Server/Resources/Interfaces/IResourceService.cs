@@ -37,6 +37,17 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
         Task<ApiServiceResponse<TagDefinitionModel>> CreateTagDefinitionAsync(CreateTagDefinitionRequest request, CancellationToken cancellationToken = default);
 
         /// <summary>Full tag dictionary for the "Add tag" picker / refresh after inline create.</summary>
+        /// <summary>Appends one choice to a controlled-vocabulary definition's list and returns the
+        /// updated definition. Backs the tag rows' "Add {tag}…" affordance. Refuses system-managed
+        /// definitions — the domain/Subscription vocabulary has its own narrow path below.</summary>
+        Task<ApiServiceResponse<TagDefinitionModel>> AddAllowedValueAsync(AddAllowedValueRequest request, CancellationToken cancellationToken = default);
+
+        /// <summary>Creates a new domain value (a Subscription here) and returns the full refreshed
+        /// list, so the caller's picker can offer it and select it. Separate from AddAllowedValueAsync
+        /// because the domain tag is system-managed: this goes through DomainValue_Add, which can
+        /// append to the vocabulary but cannot touch the tag's shape or flags.</summary>
+        Task<ApiServiceResponse<List<string>>> CreateDomainValueAsync(string value, CancellationToken cancellationToken = default);
+
         Task<ApiServiceResponse<List<TagDefinitionModel>>> GetTagDictionaryAsync(CancellationToken cancellationToken = default);
 
         /// <summary>Adds a DependsOn edge between two resources (idempotent; rejects self-loops).</summary>

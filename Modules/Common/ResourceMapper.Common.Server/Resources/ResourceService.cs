@@ -504,6 +504,157 @@ namespace ResourceMapper.Common.Server.Resources
             }
         }
 
+        public async Task<ApiServiceResponse<TagDefinitionModel>> AddAllowedValueAsync(AddAllowedValueRequest request, CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<TagDefinitionModel>();
+            try
+            {
+                if (request == null)
+                {
+                    builder.Validation.AddValidation("request", "Is required");
+                    return builder.BuildResponse();
+                }
+
+                var value = request.Value?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(value))
+                    builder.Validation.AddValidation("request.Value", "Value is required");
+
+                if (!builder.IsOk)
+                    return builder.BuildResponse();
+
+                var dictionary = await _repo.GetAllTagDefinitionsAsync(cancellationToken);
+                var definition = dictionary.FirstOrDefault(d => d.TagDefinitionId == request.TagDefinitionId);
+                if (definition == null)
+                {
+                    builder.Errors.AddError(CallStatusCode.NotFound, "Tag definition not found.", null, "TagDefinitionId");
+                    return builder.BuildResponse();
+                }
+
+                // A free-text definition has no list to extend, and the editor would never render the
+                // list even if one were stored (TagRowEditor.IsControlledVocab tests AllowCustomValue).
+                // Refusing here keeps a caller from writing a vocabulary that can never be seen.
+                if (definition.AllowCustomValue)
+                {
+                    builder.Validation.AddValidation("request.TagDefinitionId",
+                        "This tag takes free text, so it has no list of choices to add to");
+                    return builder.BuildResponse();
+                }
+
+                // A system-managed definition's shape is owned by deployment, and TagDefinition_Upsert
+                // (which this path uses) refuses to write one — it would answer 'skipped' and the
+                // caller would be told "could not add" with nothing actionable in it. Say why instead.
+                // The domain/Subscription vocabulary is reachable through CreateDomainValueAsync,
+                // which appends without being able to alter the definition.
+                if (definition.IsSystemTag)
+                {
+                    builder.Validation.AddValidation("request.TagDefinitionId",
+                        "This tag is system-managed, so its list of choices cannot be edited here");
+                    return builder.BuildResponse();
+                }
+
+                var existing = ParseAllowedValues(definition.AllowedValues) ?? new List<string>();
+
+                // Idempotent by design: two people adding "prod" from two tabs should converge on one
+                // entry, not two that differ only by case. The existing spelling wins.
+                if (existing.Any(v => string.Equals(v, value, StringComparison.OrdinalIgnoreCase)))
+                {
+                    builder.Data.Set(MapToTagDefinitionModel(definition));
+                    return builder.BuildResponse();
+                }
+
+                var updated = new List<string>(existing) { value };
+                var allowedValuesJson = JsonSerializer.Serialize(updated);
+                if (allowedValuesJson.Length > MaxAllowedValuesLength)
+                {
+                    builder.Validation.AddValidation("request.Value",
+                        $"The list would exceed {MaxAllowedValuesLength} characters once serialized");
+                    return builder.BuildResponse();
+                }
+
+                // ContentType is denormalized onto the row by TagDefinition_GetAll and the sproc
+                // resolves it back to an id, so an empty one would come back as a bare 'error' with
+                // nothing to explain it. Say so here instead.
+                if (string.IsNullOrWhiteSpace(definition.ContentType))
+                {
+                    builder.Errors.AddError(CallStatusCode.InternalError,
+                        "Tag definition has no content type.", null, "ContentType");
+                    return builder.BuildResponse();
+                }
+
+                var result = await _repo.UpdateTagDefinitionAllowedValuesAsync(
+                    definition.TagDefinitionKey, definition.ContentType!, definition.AllowCustomValue,
+                    definition.IsMultiValued, allowedValuesJson, cancellationToken);
+
+                if (!string.Equals(result, "updated", StringComparison.Ordinal))
+                {
+                    builder.Errors.AddError(CallStatusCode.InternalError, "Could not add the value.", result, "InternalError");
+                    return builder.BuildResponse();
+                }
+
+                // Re-read rather than patching the in-memory copy: the stored list is the authority,
+                // and a concurrent add would otherwise be dropped from the caller's picker.
+                var refreshed = await _repo.GetAllTagDefinitionsAsync(cancellationToken);
+                var saved = refreshed.FirstOrDefault(d => d.TagDefinitionId == definition.TagDefinitionId);
+                if (saved == null)
+                {
+                    builder.Errors.AddError(CallStatusCode.InternalError, "Tag definition could not be loaded after update.");
+                    return builder.BuildResponse();
+                }
+
+                builder.Data.Set(MapToTagDefinitionModel(saved));
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        /// <summary>Max length of a single domain value, matching DomainValue_Add's @Value parameter.</summary>
+        private const int MaxDomainValueLength = 200;
+
+        public async Task<ApiServiceResponse<List<string>>> CreateDomainValueAsync(string value, CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<List<string>>();
+            try
+            {
+                var trimmed = value?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(trimmed))
+                    builder.Validation.AddValidation("value", "Is required");
+                else if (trimmed.Length > MaxDomainValueLength)
+                    builder.Validation.AddValidation("value", $"Must be {MaxDomainValueLength} characters or fewer");
+
+                if (!builder.IsOk)
+                    return builder.BuildResponse();
+
+                var result = await _repo.AddDomainValueAsync(trimmed, cancellationToken);
+
+                // 'exists' is a success: two people adding the same subscription should converge, and
+                // the caller's next step (select it) is valid either way. Only 'error' — no domain tag
+                // designated, or the list would overflow the column — is a failure.
+                if (!string.Equals(result, "added", StringComparison.Ordinal)
+                    && !string.Equals(result, "exists", StringComparison.Ordinal))
+                {
+                    builder.Errors.AddError(CallStatusCode.InternalError,
+                        "Could not create the value.", result, "InternalError");
+                    return builder.BuildResponse();
+                }
+
+                // Return the stored list rather than the caller's plus one, so a value added elsewhere
+                // in the meantime shows up in the picker too.
+                var dictionary = await _repo.GetAllTagDefinitionsAsync(cancellationToken);
+                var domainDef = dictionary.FirstOrDefault(d => d.IsDomainTag);
+                builder.Data.Set(ParseAllowedValues(domainDef?.AllowedValues) ?? new List<string>());
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
         public async Task<ApiServiceResponse<List<TagDefinitionModel>>> GetTagDictionaryAsync(CancellationToken cancellationToken = default)
         {
             var builder = new ServiceResponseBuilder<List<TagDefinitionModel>>();

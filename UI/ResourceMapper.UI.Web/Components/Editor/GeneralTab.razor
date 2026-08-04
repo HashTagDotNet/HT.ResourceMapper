@@ -28,6 +28,18 @@
                 <MudSelectItem Value="@value">@value</MudSelectItem>
             }
         </MudSelect>
+
+        @* The FK gap this row had: no way to catalogue a resource in a subscription the list did not
+           already offer, short of leaving the editor for the tag screen. Same shape and placement as
+           "Create new type…" below, and offered only while the select is live — a fixed field has
+           nothing to select into. *@
+        @if (CanCreateDomainValue)
+        {
+            <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
+                       OnClick="OpenCreateDomainValueDialog">
+                Create @DomainLabel…
+            </MudButton>
+        }
     </FormRow>
 
     <FormRow Label="Resource Type" Required="true"
@@ -53,6 +65,25 @@
                        OnClick="OpenCreateTypeDialog">
                 Create new type…
             </MudButton>
+        }
+
+        @* Once the resource is saved the Type select goes fixed and takes its create-new-type action
+           with it, so the right of this row is dead space on every record anyone actually reads.
+           Raises an event rather than linking to /resources directly: the parent pushes a frame so
+           closing the new resource returns HERE — same record, same mode, same tab — instead of
+           falling out to the resource list. Persisted-only: in Create mode you are already on a blank
+           resource, and a link to another one would just discard what you had typed. *@
+        @if (Model.IsPersisted)
+        {
+            <div class="rm-form-field-action">
+                @* A text button, not a MudLink: with OnClick set MudLink renders role="button" with a
+                   javascript: href anyway, and every other "+ Add …" action in the editor is a text
+                   button — so this both matches them and stays keyboard-reachable. *@
+                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
+                           OnClick="@(() => OnAddResourceRequested.InvokeAsync())" Class="rm-form-field-action-btn">
+                    Add Resource
+                </MudButton>
+            </div>
         }
     </FormRow>
 
@@ -130,10 +161,25 @@
     /// rows that were validated same-domain against the old domain (RD6).</summary>
     [Parameter] public EventCallback OnResourceDomainChanged { get; set; }
 
+    /// <summary>Fired by "Add Resource". The parent owns the descent because only it can stash the
+    /// current state on the nav stack, which is what lets the new resource's Save/Cancel come back to
+    /// this exact record and tab.</summary>
+    [Parameter] public EventCallback OnAddResourceRequested { get; set; }
+
     private bool _keyManuallyEdited;
 
     /// <summary>PL-29: inline type create is only offered where the Type select is enabled.</summary>
     private bool CanCreateType => !ReadOnly && !Model.IsPersisted;
+
+    /// <summary>False when the catalog has no domain tag designated — DomainValue_Add would have
+    /// nothing to append to, so the action hides rather than opening a dialog that cannot save.</summary>
+    [Parameter] public bool HasDomainTag { get; set; }
+
+    /// <summary>Mirrors CanCreateType: the same "only where the select is live" rule. DomainLocked
+    /// excluded too — a nested create cannot change its parent's boundary, so a new value there
+    /// would be unselectable.</summary>
+    private bool CanCreateDomainValue =>
+        !ReadOnly && !Model.IsPersisted && !DomainLocked && HasDomainTag;
 
     /// <summary>
     /// PL-25b: the nested-create case genuinely is locked, so say why. Otherwise say what "fixed
@@ -143,6 +189,35 @@
         DomainLocked ? $"Locked to the parent resource's {DomainLabel}."
         : Model.IsPersisted ? "Fixed after save."
         : "Pick the boundary first — it limits which resources this one can depend on.";
+
+    /// <summary>
+    /// Creates a domain value and selects it, so the flow that needed a new subscription ends on the
+    /// same field it started from. The picklist is patched in memory from the list the dialog returns
+    /// — re-fetching the whole editor payload here would throw away the user's other unsaved edits.
+    /// </summary>
+    private async Task OpenCreateDomainValueDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(DomainValueDialog.FieldLabel), DomainLabel },
+            { nameof(DomainValueDialog.ExistingValues), DomainAllowedValues.ToList() }
+        };
+
+        var dialog = await DialogService.ShowAsync<DomainValueDialog>($"Create {DomainLabel}", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        if (result.Data is DomainValueDialog.DomainValueResult created)
+        {
+            foreach (var value in created.AllowedValues)
+            {
+                if (!DomainAllowedValues.Contains(value))
+                    DomainAllowedValues.Add(value);
+            }
+
+            await OnDomainChanged(created.Value);
+        }
+    }
 
     /// <summary>
     /// Inline "create new type", shaped exactly like TagsTab.OpenCreateDialog: show the same
@@ -156,7 +231,7 @@
             { nameof(ResourceTypeDialog.ExistingNames), ResourceTypes.Select(t => t.TypeName).ToList() }
         };
 
-        var dialog = await DialogService.ShowAsync<ResourceTypeDialog>("New resource type", parameters);
+        var dialog = await DialogService.ShowAsync<ResourceTypeDialog>("New Resource Type", parameters);
         var result = await dialog.Result;
         if (result is null || result.Canceled) return;
 

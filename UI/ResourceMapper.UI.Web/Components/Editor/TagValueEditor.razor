@@ -1,4 +1,5 @@
 @using ResourceMapper.Common.Shared.Editor
+@inject IDialogService DialogService
 
 @if (Row.Definition.IsMultiValued)
 {
@@ -29,6 +30,7 @@
                         <MudSelectItem Value="@opt">@opt</MudSelectItem>
                     }
                 </MudSelect>
+                @AddChoiceLink
             }
             else
             {
@@ -71,6 +73,10 @@ else
                     <MudSelectItem Value="@opt">@opt</MudSelectItem>
                 }
             </MudSelect>
+            @if (!ReadOnlyEffective)
+            {
+                @AddChoiceLink
+            }
         }
         else
         {
@@ -89,6 +95,26 @@ else
 
     private string? _pendingValue;
     private int _vocabSelectKey;
+
+    /// <summary>
+    /// The FK gap both vocab pickers had: a controlled list with no way to extend it, so hitting a
+    /// value the list did not offer meant abandoning the resource and going to the tag screen. One
+    /// fragment, rendered under whichever of the two selects is in play, so the single- and
+    /// multi-value rows cannot drift apart. Named after the field so it reads as being about this
+    /// row, not about tags generally.
+    /// </summary>
+    private RenderFragment AddChoiceLink => __builder =>
+    {
+        <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
+                   OnClick="OpenAddChoiceDialog" Class="rm-tag-add-choice">
+            Add @FieldLabel…
+        </MudButton>
+    };
+
+    private string FieldLabel =>
+        string.IsNullOrWhiteSpace(Row.Definition.DisplayName)
+            ? Row.Definition.TagDefinitionKey
+            : Row.Definition.DisplayName!;
 
     private bool ReadOnlyEffective => ReadOnly || !Row.IsEditable;
 
@@ -140,6 +166,44 @@ else
         if (string.IsNullOrWhiteSpace(_pendingValue)) return;
         Row.Values.Add(new SingleValueEditor { OriginalValue = string.Empty, EditedValue = _pendingValue });
         _pendingValue = null;
+        await OnChanged.InvokeAsync();
+    }
+
+    /// <summary>
+    /// Adds a choice to this tag's vocabulary and selects it into the row that asked — for a
+    /// multi-value row that means appending it as a chip, for a single-value row replacing the
+    /// current selection. Definition.AllowedValues is refreshed from the server's copy so the
+    /// dropdown offers the new value immediately, without reloading the editor and losing the
+    /// user's other unsaved edits.
+    /// </summary>
+    private async Task OpenAddChoiceDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(AllowedValueDialog.TagDefinitionId), Row.Definition.TagDefinitionId },
+            { nameof(AllowedValueDialog.FieldLabel), FieldLabel },
+            { nameof(AllowedValueDialog.ExistingValues), (Row.Definition.AllowedValues ?? new List<string>()).ToList() }
+        };
+
+        var dialog = await DialogService.ShowAsync<AllowedValueDialog>($"Add {FieldLabel}", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        if (result.Data is not AllowedValueDialog.AllowedValueResult added) return;
+
+        Row.Definition.AllowedValues = added.Definition.AllowedValues ?? new List<string>();
+
+        if (Row.Definition.IsMultiValued)
+        {
+            Row.Values.Add(new SingleValueEditor { OriginalValue = string.Empty, EditedValue = added.Value });
+            _pendingValue = null;
+            _vocabSelectKey++; // the pending select has to remount or it keeps showing the old text (PL-16)
+        }
+        else
+        {
+            EnsureSingleValue().EditedValue = added.Value;
+        }
+
         await OnChanged.InvokeAsync();
     }
 

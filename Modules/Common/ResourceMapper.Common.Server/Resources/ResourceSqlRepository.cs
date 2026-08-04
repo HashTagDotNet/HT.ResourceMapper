@@ -402,6 +402,40 @@ namespace ResourceMapper.Common.Server.Resources
             return (cmd.ReadString("@Result") ?? "error", cmd.ReadInt("@TagDefinitionId"));
         }
 
+        public async Task<string> AddDomainValueAsync(string value, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].DomainValue_Add")
+                .AddNVarchar("@Value", value)
+                .AddVarchar("@Result", null, 10, ParameterDirection.Output);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+            return cmd.ReadString("@Result") ?? "error";
+        }
+
+        public async Task<string> UpdateTagDefinitionAllowedValuesAsync(string tagKey, string contentType,
+            bool allowCustomValue, bool isMultiValued, string? allowedValuesJson,
+            CancellationToken cancellationToken)
+        {
+            // @TagDefinitionUid is insert-only per the sproc's own contract, and this path only ever
+            // updates, so the value never reaches the row — passing the key keeps it non-null without
+            // minting a Uid that would be misleading if the contract ever changed.
+            // The five presentation/flag params are deliberately omitted: NULL means "leave alone",
+            // which is what protects IsDomainTag on the Subscription definition.
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].TagDefinition_Upsert")
+                .AddNVarchar("@TagDefinitionKey", tagKey)
+                .AddVarchar("@TagDefinitionUid", tagKey)
+                .AddVarchar("@ContentType", contentType)
+                .AddBit("@AllowCustomValue", allowCustomValue)
+                .AddBit("@IsMultiValued", isMultiValued)
+                .AddNVarchar("@AllowedValues", allowedValuesJson)
+                .AddVarchar("@OnConflict", "upsert")
+                .AddInteger("@TagDefinitionId", 0, ParameterDirection.Output)
+                .AddVarchar("@Result", null, 10, ParameterDirection.Output);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+            return cmd.ReadString("@Result") ?? "error";
+        }
+
         public async Task<List<ResourceTypeTag>> GetAllEntryPointTemplatesAsync(CancellationToken cancellationToken)
         {
             using var cmd = _db.RO.SprocCommand("[HTResourceMapper].ResourceTypeTag_GetAll");

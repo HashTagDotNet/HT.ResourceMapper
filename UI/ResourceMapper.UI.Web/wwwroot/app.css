@@ -428,6 +428,15 @@ html, body {
     gap: .25rem;
 }
 
+/* `Class="rm-tag-add-search"` lands on MudAutocomplete's INNER .mud-input-control; its outer
+   .mud-autocomplete wrapper stays width:100% and, as a flex item, ate the whole add row — which
+   flung "Create new tag…" ~900px to the right edge, far enough from the picker to read as missing
+   entirely. Capping the wrapper is what actually keeps the two together. */
+.rm-tag-add > .mud-autocomplete {
+    flex: 0 0 auto;
+    max-width: 320px;
+}
+
 .rm-tag-add-search {
     max-width: 320px;
 }
@@ -634,6 +643,47 @@ html, body {
    MudBlazor upgrade can move this spacing; it cannot break the layout. */
 .rm-form-field .mud-input-control {
     margin-bottom: 0;
+}
+
+/* "Add <field>…" under a vocab picker inside a tag row. The row's own column is narrow, so this
+   pulls tight to the control above it and drops the button's default left padding — otherwise the
+   action reads as belonging to the row below rather than to the picker it extends. */
+.rm-tag-add-choice {
+    margin-top: 1px;
+    padding-left: 4px;
+    padding-right: 4px;
+    min-width: 0;
+}
+
+/* The "already there" reference line in the add-a-choice dialog: secondary to the input above it,
+   and free to wrap, since a long vocabulary would otherwise widen the dialog. */
+.rm-allowed-existing {
+    font-size: .75rem;
+    color: var(--mud-palette-text-secondary);
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+/* An inline action parked at the right of a field, on the helper-text line rather than below it —
+   the negative pull is what keeps it on that line, since the helper text lives inside Mud's own
+   input control and cannot take a sibling. */
+.rm-form-field-action {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: -1.05rem;
+    /* The pull slides this under Mud's full-width helper-text div, which then intercepts the click
+       and leaves a link that looks live and does nothing. Stacking it above is not cosmetic. */
+    position: relative;
+    z-index: 1;
+}
+
+/* Tightens the text button back onto the helper-text line: Mud's own padding would otherwise push
+   it below the row it belongs to. */
+.rm-form-field-action-btn {
+    padding-top: 0;
+    padding-bottom: 0;
+    min-width: 0;
 }
 
 .rm-form-field .mud-input-helper-text {

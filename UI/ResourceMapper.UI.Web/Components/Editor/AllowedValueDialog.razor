@@ -1,0 +1,119 @@
+@using ResourceMapper.Common.Shared.Editor
+@using ResourceMapper.Common.Shared.Editor.Contracts
+@using ResourceMapper.Common.Server.Resources.Interfaces
+@inject IResourceService ResourceService
+
+@* The one "add a choice to a list" dialog, shared by Subscription and both tag-value pickers.
+   Those three controls all read a single TagDefinition.AllowedValues list, so they get a single
+   dialog: same wording, same validation, same commit-on-OK behaviour as "Create new tag…" and
+   "Create new type…" already have. Modal rather than a page: it never leaves the editor, so the
+   caller keeps its tab, its scroll position and its unsaved edits, and can select the new value
+   straight into the field that asked for it. *@
+<MudDialog>
+    <DialogContent>
+        <div class="rm-section-desc">
+            Adds a choice to <strong>@FieldLabel</strong>. The list is shared, so the new value
+            becomes selectable on every resource that carries this tag — it does not change values
+            already saved.
+        </div>
+
+        <FormRow Label="@FieldLabel" Required="true"
+                 Info="The new choice, exactly as people should see it in the dropdown.">
+            <MudTextField T="string" @bind-Value="_value" aria-label="@FieldLabel"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
+                          HelperText="@HelperText"
+                          Error="@(_error is not null)" ErrorText="@_error"
+                          OnKeyDown="OnKeyDown" />
+        </FormRow>
+
+        @if (ExistingValues.Any())
+        {
+            <FormRow Label="Already there" Info="The choices this list already offers.">
+                <div class="rm-allowed-existing">@string.Join(" · ", ExistingValues)</div>
+            </FormRow>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit"
+                   Disabled="@(_saving || string.IsNullOrWhiteSpace(_value))">
+            @(_saving ? "Adding…" : "Add")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>The definition whose vocabulary gains a value.</summary>
+    [Parameter] public int TagDefinitionId { get; set; }
+
+    /// <summary>What the calling field is called on screen ("Subscription", "Owning Team", …) so the
+    /// dialog names the same thing the user just clicked next to.</summary>
+    [Parameter] public string FieldLabel { get; set; } = "Value";
+
+    /// <summary>The list as the caller currently knows it — shown for reference and used to catch a
+    /// duplicate before a round trip.</summary>
+    [Parameter] public List<string> ExistingValues { get; set; } = new();
+
+    private string? _value;
+    private string? _error;
+    private bool _saving;
+
+    private string HelperText => $"e.g. another {FieldLabel.ToLowerInvariant()} to choose from";
+
+    private void Cancel() => MudDialog.Cancel();
+
+    /// <summary>Enter submits: this dialog is one field, and reaching for the mouse to confirm a
+    /// single word is the kind of friction that stops people using the affordance at all.</summary>
+    private async Task OnKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter" && !_saving && !string.IsNullOrWhiteSpace(_value))
+            await Submit();
+    }
+
+    private async Task Submit()
+    {
+        _error = null;
+        var value = _value?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            _error = "Enter a value.";
+            return;
+        }
+
+        // Caught client-side too, so the common typo does not need a round trip to be told about.
+        if (ExistingValues.Any(v => string.Equals(v, value, StringComparison.OrdinalIgnoreCase)))
+        {
+            _error = $"\"{value}\" is already in the list.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var request = new AddAllowedValueRequest { TagDefinitionId = TagDefinitionId, Value = value };
+            var response = await ResourceService.AddAllowedValueAsync(request, CancellationToken.None);
+
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+            {
+                // Both halves matter to the caller: the definition to re-render its picker from, and
+                // the value to select into the field that opened this.
+                MudDialog.Close(DialogResult.Ok(new AllowedValueResult(response.ApiResponse.Data, value)));
+                return;
+            }
+
+            // Surface the server's own wording where there is any — the validation cases it returns
+            // (free-text tag, list too long) say something the generic fallback cannot.
+            var message = response.ApiResponse?.Errors?.FirstOrDefault();
+            _error = message?.Details ?? message?.Title ?? "Could not add the value.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    /// <summary>What the dialog hands back: the refreshed definition plus the value just added.</summary>
+    public record AllowedValueResult(TagDefinitionModel Definition, string Value);
+}

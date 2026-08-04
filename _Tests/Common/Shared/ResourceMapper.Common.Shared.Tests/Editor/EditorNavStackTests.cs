@@ -112,12 +112,21 @@ namespace ResourceMapper.Common.Shared.Tests.Editor
             frame.ParentMode.Should().Be("Edit", "because restoring a frame must resume the parent's mode (Create vs Edit)");
         }
 
-        private static EditorFrame Frame(string parentRoute, string direction, string parentMode) => new()
+        [Fact]
+        public void EditorFrame_CarriesParentTab()
+        {
+            var frame = Frame("resources/parent-uid", "DependsOn", "Edit", parentTab: 2);
+
+            frame.ParentTab.Should().Be(2, "because ascending must return to the tab whose picker started the nested create, not to General");
+        }
+
+        private static EditorFrame Frame(string parentRoute, string direction, string parentMode, int parentTab = 0) => new()
         {
             Response = new OpenEditorResponse(),
             ParentRoute = parentRoute,
             Direction = direction,
-            ParentMode = parentMode
+            ParentMode = parentMode,
+            ParentTab = parentTab
         };
     }
 }
