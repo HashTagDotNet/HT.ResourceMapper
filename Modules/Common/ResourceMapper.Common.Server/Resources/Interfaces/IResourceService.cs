@@ -1,4 +1,6 @@
 using HT.Api.Service.Contracts;
+using ResourceMapper.Common.Shared.Domains;
+using ResourceMapper.Common.Shared.Domains.Contracts;
 using ResourceMapper.Common.Shared.Editor;
 using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
@@ -47,6 +49,18 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
         /// because the domain tag is system-managed: this goes through DomainValue_Add, which can
         /// append to the vocabulary but cannot touch the tag's shape or flags.</summary>
         Task<ApiServiceResponse<List<string>>> CreateDomainValueAsync(string value, CancellationToken cancellationToken = default);
+
+        /// <summary>Every domain value with its resource count, for the management screen. Includes
+        /// values carried by resources but missing from the vocabulary.</summary>
+        Task<ApiServiceResponse<List<DomainValueModel>>> GetDomainValuesAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Renames a domain value in the vocabulary and on every resource carrying it. The
+        /// response reports how many resources were rewritten.</summary>
+        Task<ApiServiceResponse<RenameDomainValueResponse>> RenameDomainValueAsync(RenameDomainValueRequest request, CancellationToken cancellationToken = default);
+
+        /// <summary>Removes a domain value. Refuses while resources carry it, and refuses to leave the
+        /// vocabulary empty — both come back as a normal response with a reason, not an error.</summary>
+        Task<ApiServiceResponse<DeleteDomainValueResponse>> DeleteDomainValueAsync(string value, CancellationToken cancellationToken = default);
 
         Task<ApiServiceResponse<List<TagDefinitionModel>>> GetTagDictionaryAsync(CancellationToken cancellationToken = default);
 

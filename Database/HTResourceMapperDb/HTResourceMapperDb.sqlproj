@@ -72,6 +72,9 @@
     <Build Include="Stored Procedures\Diagram_ListForClient.sql" />
     <Build Include="Stored Procedures\Diagram_Upsert.sql" />
     <Build Include="Stored Procedures\DomainValue_Add.sql" />
+    <Build Include="Stored Procedures\DomainValue_Delete.sql" />
+    <Build Include="Stored Procedures\DomainValue_GetAllWithUsage.sql" />
+    <Build Include="Stored Procedures\DomainValue_Rename.sql" />
     <Build Include="Stored Procedures\Export_GetDependencies.sql" />
     <Build Include="Stored Procedures\Export_GetResources.sql" />
     <Build Include="Stored Procedures\Export_GetResourceTags.sql" />

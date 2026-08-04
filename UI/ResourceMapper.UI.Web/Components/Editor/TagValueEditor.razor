@@ -73,10 +73,6 @@ else
                     <MudSelectItem Value="@opt">@opt</MudSelectItem>
                 }
             </MudSelect>
-            @if (!ReadOnlyEffective)
-            {
-                @AddChoiceLink
-            }
         }
         else
         {
@@ -86,6 +82,14 @@ else
 
         <CopyValueButton Value="@editor.EditedValue" Label="@Row.Definition.DisplayName" />
     </div>
+
+    @* Outside .rm-tag-valuewrap deliberately: that wrapper is a flex ROW (it keeps the copy button
+       beside the value), so anything inside it lands to the RIGHT of the select. The add action
+       belongs under the field it extends. *@
+    @if (Row.IsControlledVocab && !ReadOnlyEffective)
+    {
+        @AddChoiceLink
+    }
 }
 
 @code {
@@ -105,10 +109,12 @@ else
     /// </summary>
     private RenderFragment AddChoiceLink => __builder =>
     {
-        <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
-                   OnClick="OpenAddChoiceDialog" Class="rm-tag-add-choice">
-            Add @FieldLabel…
-        </MudButton>
+        <div class="rm-fk-action">
+            <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
+                       OnClick="OpenAddChoiceDialog" Class="rm-tag-add-choice">
+                Add @FieldLabel…
+            </MudButton>
+        </div>
     };
 
     private string FieldLabel =>

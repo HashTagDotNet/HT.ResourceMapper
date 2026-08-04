@@ -1,0 +1,135 @@
+@using ResourceMapper.Common.Shared.Domains.Contracts
+@using ResourceMapper.Common.Server.Resources.Interfaces
+@inject IResourceService ResourceService
+
+@* Renaming a domain value is not like renaming a resource type. A type is referenced by id, so its
+   name can change freely; a domain value is stored as TEXT on every resource carrying it, and identity
+   is (Domain + Type + Key) — so a rename rewrites those resources and changes what they are. The
+   dialog's job is to say that plainly, with the real count, BEFORE the user commits. *@
+<MudDialog>
+    <DialogContent>
+        <div class="rm-section-desc">
+            Renames <strong>@CurrentValue</strong> everywhere: the @FieldLabel.ToLowerInvariant() list
+            and every resource carrying it.
+        </div>
+
+        @if (ResourceCount > 0)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mb-3">
+                @ResourceCount @(ResourceCount == 1 ? "resource" : "resources") will be updated.
+                @FieldLabel is part of a resource's identity, so their identity changes with it.
+            </MudAlert>
+        }
+
+        @if (IsUnlisted)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-3">
+                This value is used by resources but is not in the @FieldLabel.ToLowerInvariant() list.
+                Renaming it also adds it to the list.
+            </MudAlert>
+        }
+
+        <FormRow Label="@($"New {FieldLabel.ToLowerInvariant()}")" Required="true"
+                 Info="The name exactly as it should appear in the picker and on every resource.">
+            <MudTextField T="string" @bind-Value="_value" aria-label="New name"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
+                          HelperText="@($"Currently '{CurrentValue}'")"
+                          Error="@(_error is not null)" ErrorText="@_error"
+                          OnKeyDown="OnKeyDown" />
+        </FormRow>
+
+        @if (ExistingValues.Any())
+        {
+            <FormRow Label="Already there" Info="The other values the picker offers.">
+                <div class="rm-allowed-existing">@string.Join(" · ", ExistingValues)</div>
+            </FormRow>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit"
+                   Disabled="@(_saving || string.IsNullOrWhiteSpace(_value))">
+            @(_saving ? "Renaming…" : "Rename")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>The deployment's label for the domain field ("Subscription").</summary>
+    [Parameter] public string FieldLabel { get; set; } = "Domain";
+
+    [Parameter] public string CurrentValue { get; set; } = string.Empty;
+
+    /// <summary>Resources that will be rewritten — the number the warning quotes.</summary>
+    [Parameter] public int ResourceCount { get; set; }
+
+    /// <summary>True when the value is live on resources but missing from the vocabulary.</summary>
+    [Parameter] public bool IsUnlisted { get; set; }
+
+    /// <summary>The other values, for the duplicate check and for reference.</summary>
+    [Parameter] public List<string> ExistingValues { get; set; } = new();
+
+    private string? _value;
+    private string? _error;
+    private bool _saving;
+
+    // Pre-filled with the current name: a rename is usually an edit of what is there (a typo fix),
+    // not typing a fresh string from nothing.
+    protected override void OnInitialized() => _value = CurrentValue;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task OnKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter" && !_saving && !string.IsNullOrWhiteSpace(_value))
+            await Submit();
+    }
+
+    private async Task Submit()
+    {
+        _error = null;
+        var value = _value?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            _error = "Enter a name.";
+            return;
+        }
+
+        if (string.Equals(value, CurrentValue, StringComparison.Ordinal))
+        {
+            _error = "That is the current name.";
+            return;
+        }
+
+        // Case-insensitive against the OTHER values only — a pure case change of this value
+        // (prod -> PROD) is a legitimate rename, and the caller excluded it from this list.
+        if (ExistingValues.Any(v => string.Equals(v, value, StringComparison.OrdinalIgnoreCase)))
+        {
+            _error = $"\"{value}\" already exists.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var request = new RenameDomainValueRequest { OldValue = CurrentValue, NewValue = value };
+            var response = await ResourceService.RenameDomainValueAsync(request, CancellationToken.None);
+
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+            {
+                MudDialog.Close(DialogResult.Ok(response.ApiResponse.Data));
+                return;
+            }
+
+            var message = response.ApiResponse?.Errors?.FirstOrDefault();
+            _error = message?.Details ?? message?.Title ?? "Could not rename.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

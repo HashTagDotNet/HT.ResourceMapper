@@ -1,0 +1,238 @@
+@page "/domains"
+@using HT.Api.Client.Contracts.Models
+@using ResourceMapper.Common.Server.Resources.Interfaces
+@using ResourceMapper.Common.Shared.Domains
+@using ResourceMapper.Common.Shared.Domains.Contracts
+@using ResourceMapper.Common.Shared.Editor
+@using ResourceMapper.UI.Web.Components.Editor
+@inject IResourceService ResourceService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+@* Management screen for the domain vocabulary, shaped after /resource-types.
+   The route is /domains (stable, internal term) while everything on screen uses the deployment's own
+   label for the tag — "Subscription" here. Deriving the wording from the tag's DisplayName is the same
+   rule the editor follows (PL-33), and it is why Review once drifted to "Domain" while General said
+   "Subscription". *@
+
+<PageTitle>@PluralLabel — Hashtag Resource Mapper</PageTitle>
+
+<PageHeader Title="@PluralLabel"
+            Description="@($"The boundaries resources live in. A resource's identity is {SingularLabel} + Resource Type + Key, so renaming one rewrites every resource that uses it, and a value can only be deleted once nothing uses it.")">
+    <Actions>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.Add"
+                   Disabled="@(_loading || !_hasDomainTag)" OnClick="OpenCreate">
+            New @SingularLabel
+        </MudButton>
+    </Actions>
+</PageHeader>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+else if (_loadError is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-3">@_loadError</MudAlert>
+}
+else if (!_hasDomainTag)
+{
+    @* Without a domain tag there is no vocabulary to manage, and every write would fail. Say so
+       rather than showing an empty table with a create button that cannot work. *@
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-3">
+        No domain tag is designated in the tag dictionary, so there is no vocabulary to manage.
+    </MudAlert>
+}
+else
+{
+    <MudTable T="DomainValueModel" Items="_values" Dense="true" Hover="true" Striped="false"
+              Elevation="0" Breakpoint="Breakpoint.Sm" AllowUnsorted="false">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel SortBy="@(new Func<DomainValueModel, object?>(v => v.Value))" InitialDirection="SortDirection.Ascending">@SingularLabel</MudTableSortLabel></MudTh>
+            <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="@(new Func<DomainValueModel, object?>(v => v.ResourceCount))">Resources</MudTableSortLabel></MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="text-align:right;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="@SingularLabel">@context.Value</MudTd>
+            <MudTd DataLabel="Resources" Style="text-align:right;">@context.ResourceCount</MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.IsUnlisted)
+                {
+                    @* An import can set a resource's domain without adding it to the vocabulary, so the
+                       value is live on resources but absent from the picker. Renaming it adopts it. *@
+                    <MudTooltip Text="@($"Used by resources but not offered in the {SingularLabel} picker — usually an import. Renaming it adds it to the list.")">
+                        <MudText Typo="Typo.body2" Color="Color.Warning">not in the list</MudText>
+                    </MudTooltip>
+                }
+                else if (context.ResourceCount == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">unused</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Actions" Style="text-align:right;">
+                <MudTooltip Text="@($"Rename this {SingularLabel}")">
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" aria-label="Rename"
+                                   Disabled="@_busy" OnClick="@(() => OpenRename(context))" />
+                </MudTooltip>
+                <MudTooltip Text="@DeleteTooltip(context)">
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error"
+                                   aria-label="Delete" Disabled="@(context.ResourceCount > 0 || _busy)"
+                                   OnClick="@(() => ConfirmDelete(context))" />
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-4">
+                No @PluralLabel.ToLowerInvariant() yet. Create one before cataloguing resources.
+            </MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private List<DomainValueModel> _values = new();
+    private List<TagDefinitionModel> _tagDictionary = new();
+
+    private bool _loading = true;
+    private bool _busy;
+    private string? _loadError;
+
+    /// <summary>The deployment's own name for the domain field ("Subscription"), from the domain tag's
+    /// DisplayName — the same derivation the editor uses, so the two cannot disagree.</summary>
+    private string SingularLabel =>
+        _tagDictionary.FirstOrDefault(t => t.IsDomainTag)?.DisplayName ?? "Domain";
+
+    /// <summary>Naive plural, which is right for every realistic label for this field (Subscription,
+    /// Domain, Environment, Tenant) and cheap to correct if a deployment ever needs otherwise.</summary>
+    private string PluralLabel =>
+        SingularLabel.EndsWith("s", StringComparison.OrdinalIgnoreCase) ? SingularLabel : SingularLabel + "s";
+
+    private bool _hasDomainTag;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadError = null;
+        try
+        {
+            // The dictionary is what names this screen, so it is loaded first and its absence is what
+            // drives the "no domain tag" state.
+            var tags = await ResourceService.GetTagDictionaryAsync(CancellationToken.None);
+            if (tags.IsSuccess() && tags.ApiResponse.Data is not null)
+                _tagDictionary = tags.ApiResponse.Data;
+
+            _hasDomainTag = _tagDictionary.Any(t => t.IsDomainTag);
+
+            var response = await ResourceService.GetDomainValuesAsync(CancellationToken.None);
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+                _values = response.ApiResponse.Data;
+            else
+                _loadError = FirstMessage(response.ApiResponse.Errors) ?? $"Could not load {PluralLabel.ToLowerInvariant()}.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string DeleteTooltip(DomainValueModel value) =>
+        value.ResourceCount > 0
+            ? $"{value.ResourceCount} {(value.ResourceCount == 1 ? "resource uses" : "resources use")} this — reassign them first"
+            : $"Delete this {SingularLabel.ToLowerInvariant()}";
+
+    /// <summary>Create reuses the editor's own dialog, so the two entry points cannot ask for different
+    /// things or validate differently.</summary>
+    private async Task OpenCreate()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(DomainValueDialog.FieldLabel), SingularLabel },
+            { nameof(DomainValueDialog.ExistingValues), _values.Select(v => v.Value).ToList() }
+        };
+
+        var dialog = await DialogService.ShowAsync<DomainValueDialog>($"Create {SingularLabel}", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        if (result.Data is DomainValueDialog.DomainValueResult created)
+        {
+            await LoadAsync();
+            Snackbar.Add($"Added '{created.Value}'.", Severity.Success);
+        }
+    }
+
+    private async Task OpenRename(DomainValueModel value)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(RenameDomainValueDialog.FieldLabel), SingularLabel },
+            { nameof(RenameDomainValueDialog.CurrentValue), value.Value },
+            { nameof(RenameDomainValueDialog.ResourceCount), value.ResourceCount },
+            { nameof(RenameDomainValueDialog.IsUnlisted), value.IsUnlisted },
+            {
+                nameof(RenameDomainValueDialog.ExistingValues),
+                _values.Where(v => !string.Equals(v.Value, value.Value, StringComparison.OrdinalIgnoreCase))
+                       .Select(v => v.Value).ToList()
+            }
+        };
+
+        var dialog = await DialogService.ShowAsync<RenameDomainValueDialog>($"Rename {SingularLabel}", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        if (result.Data is RenameDomainValueResponse renamed)
+        {
+            await LoadAsync();
+            var suffix = renamed.AffectedResources == 1
+                ? "1 resource updated"
+                : $"{renamed.AffectedResources} resources updated";
+            Snackbar.Add($"Renamed to '{renamed.Value}' — {suffix}.", Severity.Success);
+        }
+    }
+
+    private async Task ConfirmDelete(DomainValueModel value)
+    {
+        // Plain-string message (not MarkupString): the value is user-supplied.
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            $"Delete {SingularLabel}",
+            $"Delete '{value.Value}'? It is removed from the {SingularLabel.ToLowerInvariant()} list. " +
+            "This cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirmed != true) return;
+
+        _busy = true;
+        try
+        {
+            var response = await ResourceService.DeleteDomainValueAsync(value.Value, CancellationToken.None);
+            if (!response.IsSuccess() || response.ApiResponse.Data is null)
+            {
+                Snackbar.Add(FirstMessage(response.ApiResponse.Errors) ?? "Could not delete.", Severity.Error);
+                return;
+            }
+
+            var data = response.ApiResponse.Data;
+            if (!data.Deleted)
+            {
+                // A refusal is a normal outcome with a reason attached — surface the reason, not a
+                // generic failure, and re-read so a count that changed under us is corrected.
+                Snackbar.Add(data.Message ?? "Could not delete.", Severity.Warning);
+                await LoadAsync();
+                return;
+            }
+
+            await LoadAsync();
+            Snackbar.Add($"Deleted '{value.Value}'.", Severity.Success);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string? FirstMessage(List<Message>? messages) =>
+        messages?.FirstOrDefault()?.Details ?? messages?.FirstOrDefault()?.Title;
+}

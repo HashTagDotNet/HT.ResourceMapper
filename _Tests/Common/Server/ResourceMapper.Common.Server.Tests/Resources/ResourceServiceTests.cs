@@ -1,6 +1,8 @@
 using ResourceMapper.Common.Server.Resources;
 using ResourceMapper.Common.Server.Resources.Interfaces;
 using ResourceMapper.Common.Server.Resources.Models;
+using ResourceMapper.Common.Shared.Domains;
+using ResourceMapper.Common.Shared.Domains.Contracts;
 using ResourceMapper.Common.Shared.Editor;
 using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
@@ -1223,6 +1225,132 @@ namespace ResourceMapper.Common.Server.Tests.Resources
             var response = await _sut.CreateDomainValueAsync("sandbox", CancellationToken.None);
 
             response.IsSuccess().Should().BeFalse("because no domain tag designated (or an overflowing list) must not be reported as a successful create");
+        }
+
+        #endregion
+
+        #region RenameDomainValueAsync / DeleteDomainValueAsync / GetDomainValuesAsync
+
+        [Fact]
+        public async Task GetDomainValuesAsync_ReturnsRepositoryRowsIncludingUnlisted()
+        {
+            _repo.Setup(r => r.GetDomainValuesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<DomainValueModel>
+                {
+                    new() { Value = "prod", ResourceCount = 55 },
+                    new() { Value = "legacy", ResourceCount = 3, IsUnlisted = true }
+                });
+
+            var response = await _sut.GetDomainValuesAsync(CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because listing the vocabulary is a plain read");
+            response.ApiResponse.Data!.Should().HaveCount(2, "because unlisted-but-used values must appear too, or the screen cannot fix them");
+            response.ApiResponse.Data!.Single(v => v.Value == "legacy").IsUnlisted.Should().BeTrue(
+                "because a value carried by resources but absent from the vocabulary has to be flagged as such");
+        }
+
+        [Fact]
+        public async Task RenameDomainValueAsync_SameName_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var request = new RenameDomainValueRequest { OldValue = "prod", NewValue = " prod " };
+
+            var response = await _sut.RenameDomainValueAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because renaming a value to itself would rewrite every resource for no change");
+            _repo.Verify(r => r.RenameDomainValueAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                Times.Never, "because a no-op rename must not reach the cascade");
+        }
+
+        [Fact]
+        public async Task RenameDomainValueAsync_CaseOnlyChange_IsAllowedThrough()
+        {
+            _repo.Setup(r => r.RenameDomainValueAsync("prod", "PROD", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("renamed", 55));
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>
+                {
+                    new() { TagDefinitionId = 1, TagDefinitionKey = "Domain", ContentType = "Text",
+                            IsDomainTag = true, IsSystemTag = true, AllowedValues = "[\"PROD\",\"non-prod\"]" }
+                });
+
+            var response = await _sut.RenameDomainValueAsync(
+                new RenameDomainValueRequest { OldValue = "prod", NewValue = "PROD" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because correcting the casing of a value is a real rename, not a no-op");
+            response.ApiResponse.Data!.AffectedResources.Should().Be(55,
+                "because the caller warned about that many resources and needs to report what actually changed");
+        }
+
+        [Fact]
+        public async Task RenameDomainValueAsync_TargetExists_ReturnsValidationError()
+        {
+            _repo.Setup(r => r.RenameDomainValueAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("exists", 0));
+
+            var response = await _sut.RenameDomainValueAsync(
+                new RenameDomainValueRequest { OldValue = "prod", NewValue = "non-prod" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because merging two domain values by renaming one onto the other is not what the user asked for");
+        }
+
+        [Fact]
+        public async Task RenameDomainValueAsync_NotFound_ReturnsNotFound()
+        {
+            _repo.Setup(r => r.RenameDomainValueAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("notfound", 0));
+
+            var response = await _sut.RenameDomainValueAsync(
+                new RenameDomainValueRequest { OldValue = "ghost", NewValue = "real" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because there is nothing to rename");
+        }
+
+        [Fact]
+        public async Task DeleteDomainValueAsync_InUse_ReportsRefusalWithCountRatherThanFailing()
+        {
+            _repo.Setup(r => r.DeleteDomainValueAsync("prod", It.IsAny<CancellationToken>())).ReturnsAsync(("inuse", 55));
+
+            var response = await _sut.DeleteDomainValueAsync("prod", CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because an in-use refusal is a normal outcome the screen explains, not a server error");
+            response.ApiResponse.Data!.Deleted.Should().BeFalse("because nothing was deleted");
+            response.ApiResponse.Data!.ResourceCount.Should().Be(55, "because the count is what makes the refusal actionable");
+            response.ApiResponse.Data!.Message.Should().Contain("55", "because the message has to name how many resources are in the way");
+        }
+
+        [Fact]
+        public async Task DeleteDomainValueAsync_LastValue_ReportsRefusalWithReason()
+        {
+            _repo.Setup(r => r.DeleteDomainValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(("last", 0));
+
+            var response = await _sut.DeleteDomainValueAsync("only-one", CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the last-value guard is a normal outcome, not an error");
+            response.ApiResponse.Data!.WasLastValue.Should().BeTrue("because emptying the vocabulary would make every resource unsaveable");
+            response.ApiResponse.Data!.Deleted.Should().BeFalse("because nothing was deleted");
+        }
+
+        [Fact]
+        public async Task DeleteDomainValueAsync_Unused_Deletes()
+        {
+            _repo.Setup(r => r.DeleteDomainValueAsync("sandbox", It.IsAny<CancellationToken>())).ReturnsAsync(("deleted", 0));
+
+            var response = await _sut.DeleteDomainValueAsync("  sandbox  ", CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because an unused value is safe to remove");
+            response.ApiResponse.Data!.Deleted.Should().BeTrue("because the repository confirmed the delete");
+            _repo.Verify(r => r.DeleteDomainValueAsync("sandbox", It.IsAny<CancellationToken>()), Times.Once,
+                "because the value is trimmed before it reaches the vocabulary");
+        }
+
+        [Fact]
+        public async Task DeleteDomainValueAsync_BlankValue_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var response = await _sut.DeleteDomainValueAsync("   ", CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because there is no value to delete");
+            _repo.Verify(r => r.DeleteDomainValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never,
+                "because validation must short-circuit before the repository is called");
         }
 
         #endregion

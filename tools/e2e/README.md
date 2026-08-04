@@ -104,6 +104,12 @@ Each run should:
   MudBlazor rendering/JS-interop nuance tied to an already-active tab panel, not a data bug —
   don't assume a validation binding is broken just because the *same-render* visual state didn't
   refresh; check whether the underlying model actually updated first.
+- **`MudMenu` items are `.mud-menu-item` anchors, not `.mud-list-item`.** The app-bar menu renders into
+  a `.mud-popover` as `<a class="mud-menu-item" href="…">`, so a `.mud-list-item` locator (which is what
+  a MudSelect's popover uses) silently matches nothing and the failure looks like "the menu entry is
+  missing" rather than "the selector is wrong". Use
+  `page.locator('.mud-menu-item', { hasText: /^Subscriptions$/ })`, and note the menu button is reached
+  by its aria-label: `getByRole('button', { name: /Application menu/i })`.
 - **Dialogs**: scope locators to `.mud-dialog` (e.g. `page.locator('.mud-dialog').getByLabel(...)`)
   since a dialog's fields can otherwise collide with same-named fields on the page behind it.
 - **Vocab/multi-value "add" selects**: after picking a value, MudSelect's own displayed value can

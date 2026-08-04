@@ -4,6 +4,7 @@ using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces;
 using Microsoft.Data.SqlClient;
 using ResourceMapper.Common.Server.Resources.Interfaces;
 using ResourceMapper.Common.Server.Resources.Models;
+using ResourceMapper.Common.Shared.Domains;
 using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
 using ResourceMapper.Common.Shared.ResourceTypes.Contracts;
@@ -400,6 +401,41 @@ namespace ResourceMapper.Common.Server.Resources
 
             await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
             return (cmd.ReadString("@Result") ?? "error", cmd.ReadInt("@TagDefinitionId"));
+        }
+
+        public async Task<List<DomainValueModel>> GetDomainValuesAsync(CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].DomainValue_GetAllWithUsage");
+            return await _db.Execute.ExecuteQueryAsync(cmd, dr => new DomainValueModel
+            {
+                Value = dr.ReadString("DomainValue") ?? string.Empty,
+                ResourceCount = dr.ReadInt("ResourceCount"),
+                IsUnlisted = dr.ReadBoolean("IsUnlisted")
+            }, cancellationToken: cancellationToken);
+        }
+
+        public async Task<(string Result, int AffectedResources)> RenameDomainValueAsync(string oldValue, string newValue,
+            CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].DomainValue_Rename")
+                .AddNVarchar("@OldValue", oldValue)
+                .AddNVarchar("@NewValue", newValue)
+                .AddInteger("@AffectedResources", 0, ParameterDirection.Output)
+                .AddVarchar("@Result", null, 10, ParameterDirection.Output);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+            return (cmd.ReadString("@Result") ?? "error", cmd.ReadInt("@AffectedResources"));
+        }
+
+        public async Task<(string Result, int ResourceCount)> DeleteDomainValueAsync(string value, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].DomainValue_Delete")
+                .AddNVarchar("@Value", value)
+                .AddInteger("@ResourceCount", 0, ParameterDirection.Output)
+                .AddVarchar("@Result", null, 10, ParameterDirection.Output);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+            return (cmd.ReadString("@Result") ?? "error", cmd.ReadInt("@ResourceCount"));
         }
 
         public async Task<string> AddDomainValueAsync(string value, CancellationToken cancellationToken)

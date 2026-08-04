@@ -35,10 +35,12 @@
            nothing to select into. *@
         @if (CanCreateDomainValue)
         {
-            <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
-                       OnClick="OpenCreateDomainValueDialog">
-                Create @DomainLabel…
-            </MudButton>
+            <div class="rm-fk-action">
+                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
+                           OnClick="OpenCreateDomainValueDialog">
+                    Create @DomainLabel…
+                </MudButton>
+            </div>
         }
     </FormRow>
 
@@ -61,26 +63,27 @@
            create-and-select action there would have nothing to select into. *@
         @if (CanCreateType)
         {
-            <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
-                       OnClick="OpenCreateTypeDialog">
-                Create new type…
-            </MudButton>
+            <div class="rm-fk-action">
+                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
+                           OnClick="OpenCreateTypeDialog">
+                    Create new type…
+                </MudButton>
+            </div>
         }
 
         @* Once the resource is saved the Type select goes fixed and takes its create-new-type action
-           with it, so the right of this row is dead space on every record anyone actually reads.
+           with it, so this slot under the field is free — and it is where the eye already looks for
+           this row's action. Right-aligning it (the first cut) put it at the far edge of the panel,
+           where it was reliably missed.
            Raises an event rather than linking to /resources directly: the parent pushes a frame so
            closing the new resource returns HERE — same record, same mode, same tab — instead of
            falling out to the resource list. Persisted-only: in Create mode you are already on a blank
            resource, and a link to another one would just discard what you had typed. *@
         @if (Model.IsPersisted)
         {
-            <div class="rm-form-field-action">
-                @* A text button, not a MudLink: with OnClick set MudLink renders role="button" with a
-                   javascript: href anyway, and every other "+ Add …" action in the editor is a text
-                   button — so this both matches them and stays keyboard-reachable. *@
+            <div class="rm-fk-action">
                 <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
-                           OnClick="@(() => OnAddResourceRequested.InvokeAsync())" Class="rm-form-field-action-btn">
+                           OnClick="@(() => OnAddResourceRequested.InvokeAsync())">
                     Add Resource
                 </MudButton>
             </div>

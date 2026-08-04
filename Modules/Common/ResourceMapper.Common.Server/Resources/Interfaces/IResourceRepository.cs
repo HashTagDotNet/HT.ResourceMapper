@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using ResourceMapper.Common.Server.Resources.Models;
+using ResourceMapper.Common.Shared.Domains;
 using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
 using ResourceMapper.Common.Shared.ResourceTypes.Contracts;
@@ -110,6 +111,20 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
         Task<(string Result, int TagDefinitionId)> CreateTagDefinitionAsync(string tagKey, string tagDefinitionUid,
             string contentType, bool allowCustomValue, bool isMultiValued, string? allowedValuesJson,
             string? displayName, string requirementLevel, int displayOrder, CancellationToken cancellationToken);
+
+        // Every domain value with its resource count, including values used by resources but missing
+        // from the vocabulary (IsUnlisted) — import can create those.
+        Task<List<DomainValueModel>> GetDomainValuesAsync(CancellationToken cancellationToken);
+
+        // Renames a domain value in the vocabulary AND on every resource carrying it, in one
+        // transaction. Result is 'renamed' | 'exists' | 'notfound' | 'error'.
+        Task<(string Result, int AffectedResources)> RenameDomainValueAsync(string oldValue, string newValue,
+            CancellationToken cancellationToken);
+
+        // Removes a domain value from the vocabulary. Refuses while resources still carry it, and
+        // refuses to empty the vocabulary entirely.
+        // Result is 'deleted' | 'inuse' | 'last' | 'notfound' | 'error'.
+        Task<(string Result, int ResourceCount)> DeleteDomainValueAsync(string value, CancellationToken cancellationToken);
 
         // Appends one choice to the DOMAIN tag's vocabulary (a Subscription here) and nothing else.
         // Deliberately NOT routed through TagDefinition_Upsert: that path refuses system-managed tags

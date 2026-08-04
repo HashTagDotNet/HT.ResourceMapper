@@ -428,13 +428,34 @@ html, body {
     gap: .25rem;
 }
 
-/* `Class="rm-tag-add-search"` lands on MudAutocomplete's INNER .mud-input-control; its outer
-   .mud-autocomplete wrapper stays width:100% and, as a flex item, ate the whole add row — which
-   flung "Create new tag…" ~900px to the right edge, far enough from the picker to read as missing
-   entirely. Capping the wrapper is what actually keeps the two together. */
-.rm-tag-add > .mud-autocomplete {
-    flex: 0 0 auto;
+/* Every FK "add" action is a column under its field: [ field ] then [ action ], with the action
+   right-aligned to THE FIELD'S right edge — never the panel's. Beside the field it drifted to the far
+   right of the screen and was reliably lost, because `Class=` lands on MudAutocomplete's INNER
+   .mud-input-control and the outer .mud-autocomplete wrapper keeps width:100%, so as a flex sibling it
+   ate the whole row. Capping the column is what ties "right-aligned" to the field instead. */
+.rm-fk-add {
+    display: flex;
+    flex-direction: column;
+    gap: .125rem;
+}
+
+.rm-fk-action {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* The column's width IS the field's width — that is what the action right-aligns against. */
+.rm-tag-add {
     max-width: 320px;
+}
+
+.rm-dep-add {
+    max-width: 400px;
+}
+
+.rm-tag-add > .mud-autocomplete,
+.rm-dep-add > .mud-autocomplete {
+    width: 100%;
 }
 
 .rm-tag-add-search {
@@ -645,9 +666,9 @@ html, body {
     margin-bottom: 0;
 }
 
-/* "Add <field>…" under a vocab picker inside a tag row. The row's own column is narrow, so this
-   pulls tight to the control above it and drops the button's default left padding — otherwise the
-   action reads as belonging to the row below rather than to the picker it extends. */
+/* "Add <field>…" under a vocab picker inside a tag row: tighter than the General tab's, because the
+   row's column is narrow and the rows sit close together — without the trim the action reads as
+   belonging to the row below rather than to the picker it extends. */
 .rm-tag-add-choice {
     margin-top: 1px;
     padding-left: 4px;
@@ -655,35 +676,26 @@ html, body {
     min-width: 0;
 }
 
-/* The "already there" reference line in the add-a-choice dialog: secondary to the input above it,
-   and free to wrap, since a long vocabulary would otherwise widen the dialog. */
+/* The "already there" reference line in the add-a-choice dialogs: secondary to the input above it,
+   and free to wrap, since a long vocabulary would otherwise widen the dialog.
+   The top padding is not decoration — .rm-form-label carries padding-top:11px so it optically centres
+   against Mud's 40px field, and a plain text value with no padding therefore floats ABOVE its own
+   label. Same 10px .rm-identity-inline already uses for exactly this reason, so the two read-only
+   rows in this layout stay consistent. */
 .rm-allowed-existing {
     font-size: .75rem;
     color: var(--mud-palette-text-secondary);
     line-height: 1.4;
     word-break: break-word;
+    padding: 10px 0 0;
 }
 
-/* An inline action parked at the right of a field, on the helper-text line rather than below it —
-   the negative pull is what keeps it on that line, since the helper text lives inside Mud's own
-   input control and cannot take a sibling. */
-.rm-form-field-action {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    margin-top: -1.05rem;
-    /* The pull slides this under Mud's full-width helper-text div, which then intercepts the click
-       and leaves a link that looks live and does nothing. Stacking it above is not cosmetic. */
-    position: relative;
-    z-index: 1;
-}
-
-/* Tightens the text button back onto the helper-text line: Mud's own padding would otherwise push
-   it below the row it belongs to. */
-.rm-form-field-action-btn {
-    padding-top: 0;
-    padding-bottom: 0;
-    min-width: 0;
+/* Label padding is zeroed below 900px (the label stacks above its field), so the matching offset has
+   to go with it or the value would sit oddly low in the stacked layout. */
+@media (max-width: 900px) {
+    .rm-allowed-existing {
+        padding-top: 0;
+    }
 }
 
 .rm-form-field .mud-input-helper-text {

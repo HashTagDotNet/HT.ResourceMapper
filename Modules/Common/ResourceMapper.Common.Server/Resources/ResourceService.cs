@@ -4,6 +4,8 @@ using HT.Api.Service.Contracts;
 using HT.Api.Service.Contracts.BuildersOfT;
 using ResourceMapper.Common.Server.Resources.Interfaces;
 using ResourceMapper.Common.Server.Resources.Models;
+using ResourceMapper.Common.Shared.Domains;
+using ResourceMapper.Common.Shared.Domains.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
 using ResourceMapper.Common.Shared.HomePage;
 using ResourceMapper.Common.Shared.Editor;
@@ -647,6 +649,145 @@ namespace ResourceMapper.Common.Server.Resources
                 var domainDef = dictionary.FirstOrDefault(d => d.IsDomainTag);
                 builder.Data.Set(ParseAllowedValues(domainDef?.AllowedValues) ?? new List<string>());
                 return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<List<DomainValueModel>>> GetDomainValuesAsync(CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<List<DomainValueModel>>();
+            try
+            {
+                builder.Data.Set(await _repo.GetDomainValuesAsync(cancellationToken));
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<RenameDomainValueResponse>> RenameDomainValueAsync(RenameDomainValueRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<RenameDomainValueResponse>();
+            try
+            {
+                if (request == null)
+                {
+                    builder.Validation.AddValidation("request", "Is required");
+                    return builder.BuildResponse();
+                }
+
+                var oldValue = request.OldValue?.Trim() ?? string.Empty;
+                var newValue = request.NewValue?.Trim() ?? string.Empty;
+
+                if (string.IsNullOrWhiteSpace(oldValue))
+                    builder.Validation.AddValidation("request.OldValue", "Is required");
+                if (string.IsNullOrWhiteSpace(newValue))
+                    builder.Validation.AddValidation("request.NewValue", "Is required");
+                else if (newValue.Length > MaxDomainValueLength)
+                    builder.Validation.AddValidation("request.NewValue", $"Must be {MaxDomainValueLength} characters or fewer");
+
+                // A rename to the identical string is a no-op that would still rewrite every resource
+                // row for nothing. A case-only change is NOT caught here: that is a real rename.
+                if (string.Equals(oldValue, newValue, StringComparison.Ordinal))
+                    builder.Validation.AddValidation("request.NewValue", "Is the same as the current name");
+
+                if (!builder.IsOk)
+                    return builder.BuildResponse();
+
+                var (result, affected) = await _repo.RenameDomainValueAsync(oldValue, newValue, cancellationToken);
+
+                switch (result)
+                {
+                    case "exists":
+                        builder.Validation.AddValidation("request.NewValue", $"'{newValue}' already exists");
+                        return builder.BuildResponse();
+                    case "notfound":
+                        builder.Errors.AddError(CallStatusCode.NotFound, $"'{oldValue}' was not found.", null, "OldValue");
+                        return builder.BuildResponse();
+                    case "renamed":
+                        break;
+                    default:
+                        builder.Errors.AddError(CallStatusCode.InternalError, "Could not rename the value.", result, "InternalError");
+                        return builder.BuildResponse();
+                }
+
+                var dictionary = await _repo.GetAllTagDefinitionsAsync(cancellationToken);
+                var domainDef = dictionary.FirstOrDefault(d => d.IsDomainTag);
+
+                builder.Data.Set(new RenameDomainValueResponse
+                {
+                    Value = newValue,
+                    AffectedResources = affected,
+                    AllowedValues = ParseAllowedValues(domainDef?.AllowedValues) ?? new List<string>()
+                });
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<DeleteDomainValueResponse>> DeleteDomainValueAsync(string value,
+            CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<DeleteDomainValueResponse>();
+            try
+            {
+                var trimmed = value?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(trimmed))
+                {
+                    builder.Validation.AddValidation("value", "Is required");
+                    return builder.BuildResponse();
+                }
+
+                var (result, resourceCount) = await _repo.DeleteDomainValueAsync(trimmed, cancellationToken);
+
+                // The two refusals are normal outcomes the screen turns into a sentence, so they come
+                // back as a successful response carrying Deleted = false — mirroring how
+                // DeleteResourceTypeAsync reports its own in-use refusal.
+                switch (result)
+                {
+                    case "deleted":
+                        builder.Data.Set(new DeleteDomainValueResponse { Deleted = true });
+                        return builder.BuildResponse();
+
+                    case "inuse":
+                        builder.Data.Set(new DeleteDomainValueResponse
+                        {
+                            Deleted = false,
+                            ResourceCount = resourceCount,
+                            Message = $"{resourceCount} {(resourceCount == 1 ? "resource still uses" : "resources still use")} " +
+                                      "this value — reassign them first."
+                        });
+                        return builder.BuildResponse();
+
+                    case "last":
+                        builder.Data.Set(new DeleteDomainValueResponse
+                        {
+                            Deleted = false,
+                            WasLastValue = true,
+                            Message = "This is the only value left, and a resource cannot be saved without one."
+                        });
+                        return builder.BuildResponse();
+
+                    case "notfound":
+                        builder.Errors.AddError(CallStatusCode.NotFound, $"'{trimmed}' was not found.", null, "Value");
+                        return builder.BuildResponse();
+
+                    default:
+                        builder.Errors.AddError(CallStatusCode.InternalError, "Could not delete the value.", result, "InternalError");
+                        return builder.BuildResponse();
+                }
             }
             catch (Exception ex)
             {
