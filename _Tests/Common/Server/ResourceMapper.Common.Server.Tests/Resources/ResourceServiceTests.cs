@@ -1,11 +1,13 @@
 using ResourceMapper.Common.Server.Resources;
 using ResourceMapper.Common.Server.Resources.Interfaces;
 using ResourceMapper.Common.Server.Resources.Models;
+using ResourceMapper.Common.Shared.Cascade;
 using ResourceMapper.Common.Shared.Domains;
 using ResourceMapper.Common.Shared.Domains.Contracts;
 using ResourceMapper.Common.Shared.Editor;
 using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
+using ResourceMapper.Common.Shared.Tags.Contracts;
 
 // ReSharper disable InconsistentNaming
 
@@ -1225,6 +1227,296 @@ namespace ResourceMapper.Common.Server.Tests.Resources
             var response = await _sut.CreateDomainValueAsync("sandbox", CancellationToken.None);
 
             response.IsSuccess().Should().BeFalse("because no domain tag designated (or an overflowing list) must not be reported as a successful create");
+        }
+
+        #endregion
+
+        #region "Remove everywhere" cascades
+
+        [Fact]
+        public async Task ForceDeleteTagDefinitionAsync_Deleted_ReportsWhatWasDestroyed()
+        {
+            _repo.Setup(r => r.ForceDeleteTagDefinitionAsync(7, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("deleted", 64, 9, 64));
+
+            var response = await _sut.ForceDeleteTagDefinitionAsync(7, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the cascade is the deliberate override of the in-use guard");
+            var data = response.ApiResponse.Data!;
+            data.Deleted.Should().BeTrue("because the tag is gone");
+            data.ValuesRemoved.Should().Be(64, "because the caller reports what was actually destroyed, not what it predicted");
+            data.TemplatesRemoved.Should().Be(9, "because template entries are part of what the cascade removes");
+            data.PrimaryLinksCleared.Should().Be(64, "because a resource losing its primary link is a visible consequence");
+        }
+
+        [Fact]
+        public async Task ForceDeleteTagDefinitionAsync_SystemManaged_RefusesWithReason()
+        {
+            _repo.Setup(r => r.ForceDeleteTagDefinitionAsync(1, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("system", 0, 0, 0));
+
+            var response = await _sut.ForceDeleteTagDefinitionAsync(1, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the guard is a normal outcome, not a server error");
+            response.ApiResponse.Data!.IsSystemManaged.Should().BeTrue(
+                "because a system tag would be recreated by the next publish while its data stayed destroyed");
+            response.ApiResponse.Data!.Deleted.Should().BeFalse("because nothing was deleted");
+        }
+
+        [Fact]
+        public async Task ForceDeleteTagDefinitionAsync_MissingId_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var response = await _sut.ForceDeleteTagDefinitionAsync(0, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because no tag is identified");
+            _repo.Verify(r => r.ForceDeleteTagDefinitionAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never,
+                "because an irreversible cascade must not be attempted on an unidentified row");
+        }
+
+        [Fact]
+        public async Task ReassignAndDeleteDomainValueAsync_NoReplacement_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var response = await _sut.ReassignAndDeleteDomainValueAsync(
+                new ReassignAndDeleteRequest { From = "non-prod", To = "  " }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because Subscription is required on a resource, so there is nowhere for them to go");
+            _repo.Verify(r => r.ReassignAndDeleteDomainValueAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                Times.Never, "because validation must short-circuit before any rows move");
+        }
+
+        [Fact]
+        public async Task ReassignAndDeleteDomainValueAsync_Reassigned_ReportsMovedCount()
+        {
+            _repo.Setup(r => r.ReassignAndDeleteDomainValueAsync("non-prod", "prod", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("reassigned", 30, 0));
+
+            var response = await _sut.ReassignAndDeleteDomainValueAsync(
+                new ReassignAndDeleteRequest { From = " non-prod ", To = " prod " }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because moving the resources then removing the value is the whole operation");
+            response.ApiResponse.Data!.Succeeded.Should().BeTrue("because the repository confirmed the move");
+            response.ApiResponse.Data!.AffectedResources.Should().Be(30, "because the user was warned about that many resources");
+            _repo.Verify(r => r.ReassignAndDeleteDomainValueAsync("non-prod", "prod", It.IsAny<CancellationToken>()), Times.Once,
+                "because both values are trimmed before they reach the database");
+        }
+
+        [Fact]
+        public async Task ReassignAndDeleteDomainValueAsync_IdentityConflict_ReportsNothingChanged()
+        {
+            _repo.Setup(r => r.ReassignAndDeleteDomainValueAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("conflict", 0, 3));
+
+            var response = await _sut.ReassignAndDeleteDomainValueAsync(
+                new ReassignAndDeleteRequest { From = "non-prod", To = "prod" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because a collision is a real answer the screen explains, not a server error");
+            var data = response.ApiResponse.Data!;
+            data.Succeeded.Should().BeFalse("because the whole operation is refused rather than partially applied");
+            data.Conflicts.Should().Be(3, "because the count is what the user has to resolve");
+            data.AffectedResources.Should().Be(0, "because nothing moved");
+            data.Message.Should().Contain("Nothing was changed",
+                "because the user must know the catalog is untouched rather than half-migrated");
+        }
+
+        [Fact]
+        public async Task ReassignAndDeleteResourceTypeAsync_NonNumericIds_ReturnValidationErrorAndDoNotCallRepo()
+        {
+            var response = await _sut.ReassignAndDeleteResourceTypeAsync(
+                new ReassignAndDeleteRequest { From = "not-an-id", To = "12" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because a resource type is identified by its surrogate id");
+            _repo.Verify(r => r.ReassignAndDeleteResourceTypeAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+                Times.Never, "because validation must short-circuit before any rows move");
+        }
+
+        [Fact]
+        public async Task ReassignAndDeleteResourceTypeAsync_Reassigned_ReportsMovedCount()
+        {
+            _repo.Setup(r => r.ReassignAndDeleteResourceTypeAsync(22009, 22007, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("reassigned", 4, 0));
+
+            var response = await _sut.ReassignAndDeleteResourceTypeAsync(
+                new ReassignAndDeleteRequest { From = "22009", To = "22007" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the move plus delete is the whole operation");
+            response.ApiResponse.Data!.AffectedResources.Should().Be(4, "because the count is reported back for the confirmation message");
+        }
+
+        [Fact]
+        public async Task ReassignAndDeleteResourceTypeAsync_SameType_RefusesWithReason()
+        {
+            _repo.Setup(r => r.ReassignAndDeleteResourceTypeAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("same", 0, 0));
+
+            var response = await _sut.ReassignAndDeleteResourceTypeAsync(
+                new ReassignAndDeleteRequest { From = "5", To = "5" }, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because it is a refusal with a reason, not a failure");
+            response.ApiResponse.Data!.Succeeded.Should().BeFalse("because moving a type onto itself would delete the type its resources need");
+        }
+
+        #endregion
+
+        #region Tag manager: GetTagDefinitionsWithUsageAsync / UpdateTagDefinitionAsync / DeleteTagDefinitionAsync
+
+        [Fact]
+        public async Task GetTagDefinitionsWithUsageAsync_MapsDefinitionAndAllThreeCounts()
+        {
+            _repo.Setup(r => r.GetTagDefinitionsWithUsageAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinitionUsage>
+                {
+                    new()
+                    {
+                        Definition = new TagDefinition { TagDefinitionId = 7, TagDefinitionKey = "PortalUrl", ContentType = "Link" },
+                        ResourceCount = 64, TypeTemplateCount = 9, PrimaryForCount = 64
+                    }
+                });
+
+            var response = await _sut.GetTagDefinitionsWithUsageAsync(CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because listing the dictionary is a plain read");
+            var row = response.ApiResponse.Data!.Single();
+            row.Definition.TagDefinitionKey.Should().Be("PortalUrl", "because the definition itself is what the edit dialog is handed");
+            row.PrimaryForCount.Should().Be(64, "because the primary-link count is what turns a delete into an FK violation, so it must survive mapping");
+            row.IsUnused.Should().BeFalse("because anything referencing the tag blocks delete");
+        }
+
+        [Fact]
+        public async Task UpdateTagDefinitionAsync_SystemManaged_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition>
+                {
+                    new() { TagDefinitionId = 1, TagDefinitionKey = "Domain", ContentType = "Text",
+                            IsDomainTag = true, IsSystemTag = true, AllowCustomValue = false,
+                            AllowedValues = "[\"prod\"]" }
+                });
+
+            var request = new UpdateTagDefinitionRequest
+            {
+                TagDefinitionKey = "Domain", ContentType = "Text",
+                AllowCustomValue = false, AllowedValues = new List<string> { "prod" }
+            };
+
+            var response = await _sut.UpdateTagDefinitionAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because a system-managed tag's shape is owned by deployment");
+            _repo.Verify(r => r.UpdateTagDefinitionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+                It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<int>(),
+                It.IsAny<CancellationToken>()), Times.Never,
+                "because refusing here is what lets the reason be stated instead of a bare 'skipped'");
+        }
+
+        [Fact]
+        public async Task UpdateTagDefinitionAsync_RestrictedToListWithNoValues_ReturnsValidationError()
+        {
+            var request = new UpdateTagDefinitionRequest
+            {
+                TagDefinitionKey = "Tier", ContentType = "Text",
+                AllowCustomValue = false, AllowedValues = null
+            };
+
+            var response = await _sut.UpdateTagDefinitionAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because a list-only tag with an empty list can never be filled in — the same rule create enforces");
+        }
+
+        [Fact]
+        public async Task UpdateTagDefinitionAsync_UnknownKey_ReturnsNotFound()
+        {
+            _repo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<TagDefinition>());
+
+            var request = new UpdateTagDefinitionRequest { TagDefinitionKey = "Ghost", ContentType = "Text", AllowCustomValue = true };
+
+            var response = await _sut.UpdateTagDefinitionAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because there is no definition with that key to edit");
+        }
+
+        [Fact]
+        public async Task UpdateTagDefinitionAsync_HappyPath_WritesEveryEditableFieldAndReturnsRefreshed()
+        {
+            var before = new TagDefinition { TagDefinitionId = 9, TagDefinitionKey = "Tier", ContentType = "Text",
+                                             AllowCustomValue = true, DisplayName = "Tier" };
+            var after = new TagDefinition { TagDefinitionId = 9, TagDefinitionKey = "Tier", ContentType = "Link",
+                                            AllowCustomValue = false, IsMultiValued = true, DisplayName = "Service Tier",
+                                            AllowedValues = "[\"gold\",\"silver\"]", RequirementLevel = "Suggested",
+                                            DisplayOrder = 42 };
+
+            _repo.SetupSequence(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition> { before })
+                .ReturnsAsync(new List<TagDefinition> { after });
+            _repo.Setup(r => r.UpdateTagDefinitionAsync("Tier", "Link", false, true, "[\"gold\",\"silver\"]",
+                    "Service Tier", "Suggested", 42, It.IsAny<CancellationToken>()))
+                .ReturnsAsync("updated");
+
+            var request = new UpdateTagDefinitionRequest
+            {
+                TagDefinitionKey = "Tier", DisplayName = "Service Tier", ContentType = "Link",
+                AllowCustomValue = false, IsMultiValued = true,
+                AllowedValues = new List<string> { "gold", "silver" },
+                RequirementLevel = "Suggested", DisplayOrder = 42
+            };
+
+            var response = await _sut.UpdateTagDefinitionAsync(request, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because every field in the request is editable");
+            response.ApiResponse.Data!.DisplayName.Should().Be("Service Tier",
+                "because the stored row is re-read after the write rather than echoing the request back");
+            _repo.Verify(r => r.UpdateTagDefinitionAsync("Tier", "Link", false, true, "[\"gold\",\"silver\"]",
+                "Service Tier", "Suggested", 42, It.IsAny<CancellationToken>()), Times.Once,
+                "because a shape change must reach the repository exactly as asked");
+        }
+
+        [Fact]
+        public async Task DeleteTagDefinitionAsync_InUse_ReportsEveryBlockerNotJustTheFirst()
+        {
+            _repo.Setup(r => r.DeleteTagDefinitionAsync(7, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("inuse", 64, 9, 64));
+
+            var response = await _sut.DeleteTagDefinitionAsync(7, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because an in-use refusal is a normal outcome the screen explains");
+            response.ApiResponse.Data!.Deleted.Should().BeFalse("because nothing was deleted");
+            response.ApiResponse.Data!.Message.Should().Contain("64 resources carry it", "because the resource blocker must be named");
+            response.ApiResponse.Data!.Message.Should().Contain("tag template", "because the template blocker must be named");
+            response.ApiResponse.Data!.Message.Should().Contain("primary link",
+                "because one trip has to list every blocker, or the user clears one and meets the next");
+        }
+
+        [Fact]
+        public async Task DeleteTagDefinitionAsync_SystemManaged_ReportsRefusalWithReason()
+        {
+            _repo.Setup(r => r.DeleteTagDefinitionAsync(1, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("system", 0, 0, 0));
+
+            var response = await _sut.DeleteTagDefinitionAsync(1, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the system-tag guard is a normal outcome, not an error");
+            response.ApiResponse.Data!.IsSystemManaged.Should().BeTrue("because the screen names that specific reason");
+            response.ApiResponse.Data!.Deleted.Should().BeFalse("because nothing was deleted");
+        }
+
+        [Fact]
+        public async Task DeleteTagDefinitionAsync_Unreferenced_Deletes()
+        {
+            _repo.Setup(r => r.DeleteTagDefinitionAsync(11, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("deleted", 0, 0, 0));
+
+            var response = await _sut.DeleteTagDefinitionAsync(11, CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because nothing referenced it");
+            response.ApiResponse.Data!.Deleted.Should().BeTrue("because the repository confirmed the delete");
+        }
+
+        [Fact]
+        public async Task DeleteTagDefinitionAsync_MissingId_ReturnsValidationErrorAndDoesNotCallRepo()
+        {
+            var response = await _sut.DeleteTagDefinitionAsync(0, CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because there is no tag identified");
+            _repo.Verify(r => r.DeleteTagDefinitionAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never,
+                "because validation must short-circuit before the repository is called");
         }
 
         #endregion

@@ -1,0 +1,103 @@
+@using ResourceMapper.UI.Web.Components.Editor
+
+@* One confirmation for every "remove everywhere" action, across tags, subscriptions and resource types.
+   Shared deliberately: these are the only irreversible operations in the app, there is no audit trail
+   yet, and they must therefore all feel the same and demand the same deliberate act.
+
+   Two things make it deliberate rather than reflexive:
+     * it states what will happen with real counts, gathered by the caller before opening it;
+     * the confirm button stays disabled until the item's name is typed, so it cannot be reached by
+       muscle memory or a stray Enter on a focused button.
+
+   Optionally collects a replacement (Subscription / Resource Type), because for those two the operation
+   is a MOVE — both fields are required on a resource, so there is no empty state to leave behind. *@
+<MudDialog>
+    <DialogContent>
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mb-3">
+            This cannot be undone.
+        </MudAlert>
+
+        <div class="rm-section-desc">@Prompt</div>
+
+        @if (Effects.Any())
+        {
+            <ul class="rm-cascade-effects">
+                @foreach (var effect in Effects)
+                {
+                    <li>@effect</li>
+                }
+            </ul>
+        }
+
+        @if (Replacements.Any())
+        {
+            <FormRow Label="@ReplacementLabel" Required="true"
+                     Info="Every affected resource moves onto this. It must already exist.">
+                <MudSelect T="string" Value="@_replacement" ValueChanged="OnReplacementChanged"
+                           aria-label="@ReplacementLabel" Placeholder="Select…"
+                           Variant="Variant.Outlined" Margin="Margin.Dense"
+                           HelperText="@ReplacementHelperText">
+                    @foreach (var option in Replacements)
+                    {
+                        <MudSelectItem Value="@option.Key">@option.Value</MudSelectItem>
+                    }
+                </MudSelect>
+            </FormRow>
+        }
+
+        <FormRow Label="Confirm" Required="true"
+                 Info="Typing the name is what enables the button — it is the last check before an irreversible change.">
+            <MudTextField T="string" @bind-Value="_typed" aria-label="Confirm"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
+                          HelperText="@($"Type \"{ConfirmWord}\" to continue")" />
+        </FormRow>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Confirm" Disabled="@(!CanConfirm)">
+            @ActionText
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>Sentence describing the operation, e.g. "Removes the tag Cost Center from everywhere it appears."</summary>
+    [Parameter] public string Prompt { get; set; } = string.Empty;
+
+    /// <summary>Bulleted, concrete consequences with counts. The caller owns the wording because only it
+    /// knows which counts apply.</summary>
+    [Parameter] public List<string> Effects { get; set; } = new();
+
+    /// <summary>The exact string that must be typed — the item's own name, so it reads as a deliberate act
+    /// about THIS item rather than a generic "DELETE".</summary>
+    [Parameter] public string ConfirmWord { get; set; } = string.Empty;
+
+    /// <summary>Label for the confirm button, e.g. "Remove everywhere" or "Reassign and delete".</summary>
+    [Parameter] public string ActionText { get; set; } = "Remove everywhere";
+
+    /// <summary>Replacement options as key → display. Empty for a straight cascade with nothing to move to.</summary>
+    [Parameter] public Dictionary<string, string> Replacements { get; set; } = new();
+
+    [Parameter] public string ReplacementLabel { get; set; } = "Replacement";
+
+    [Parameter] public string? ReplacementHelperText { get; set; }
+
+    private string? _replacement;
+    private string? _typed;
+
+    /// <summary>Both gates: the typed name must match (trimmed, case-insensitive — this is a speed bump,
+    /// not a password), and where a replacement is offered one must be chosen.</summary>
+    private bool CanConfirm =>
+        string.Equals(_typed?.Trim(), ConfirmWord, StringComparison.OrdinalIgnoreCase)
+        && (!Replacements.Any() || !string.IsNullOrWhiteSpace(_replacement));
+
+    private void OnReplacementChanged(string value) => _replacement = value;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    /// <summary>Returns the chosen replacement (null when none was offered). The caller performs the
+    /// service call, so this component stays reusable and knows nothing about what it is confirming.</summary>
+    private void Confirm() => MudDialog.Close(DialogResult.Ok(_replacement));
+}

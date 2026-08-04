@@ -74,6 +74,7 @@
     <Build Include="Stored Procedures\DomainValue_Add.sql" />
     <Build Include="Stored Procedures\DomainValue_Delete.sql" />
     <Build Include="Stored Procedures\DomainValue_GetAllWithUsage.sql" />
+    <Build Include="Stored Procedures\DomainValue_ReassignAndDelete.sql" />
     <Build Include="Stored Procedures\DomainValue_Rename.sql" />
     <Build Include="Stored Procedures\Export_GetDependencies.sql" />
     <Build Include="Stored Procedures\Export_GetResources.sql" />
@@ -86,6 +87,7 @@
     <Build Include="Stored Procedures\ResourceType_Delete.sql" />
     <Build Include="Stored Procedures\ResourceType_GetAll.sql" />
     <Build Include="Stored Procedures\ResourceType_GetAllWithUsage.sql" />
+    <Build Include="Stored Procedures\ResourceType_ReassignAndDelete.sql" />
     <Build Include="Stored Procedures\ResourceType_Save.sql" />
     <Build Include="Stored Procedures\ResourceType_Upsert.sql" />
     <Build Include="Stored Procedures\Resource_CheckUnique.sql" />
@@ -101,7 +103,10 @@
     <Build Include="Stored Procedures\Resource_Upsert.sql" />
     <Build Include="Stored Procedures\ResourceTag_GetForResource.sql" />
     <Build Include="Stored Procedures\ResourceTypeTag_GetAll.sql" />
+    <Build Include="Stored Procedures\TagDefinition_Delete.sql" />
+    <Build Include="Stored Procedures\TagDefinition_ForceDelete.sql" />
     <Build Include="Stored Procedures\TagDefinition_GetAll.sql" />
+    <Build Include="Stored Procedures\TagDefinition_GetAllWithUsage.sql" />
     <Build Include="Stored Procedures\TagDefinition_Upsert.sql" />
     <Build Include="Tables\ClientSetting.sql" />
     <Build Include="Tables\Diagram.sql" />

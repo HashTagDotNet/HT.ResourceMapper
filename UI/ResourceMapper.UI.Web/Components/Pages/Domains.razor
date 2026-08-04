@@ -1,10 +1,12 @@
 @page "/domains"
 @using HT.Api.Client.Contracts.Models
 @using ResourceMapper.Common.Server.Resources.Interfaces
+@using ResourceMapper.Common.Shared.Cascade
 @using ResourceMapper.Common.Shared.Domains
 @using ResourceMapper.Common.Shared.Domains.Contracts
 @using ResourceMapper.Common.Shared.Editor
 @using ResourceMapper.UI.Web.Components.Editor
+@using ResourceMapper.UI.Web.Components.Shared
 @inject IResourceService ResourceService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -80,6 +82,16 @@ else
                                    aria-label="Delete" Disabled="@(context.ResourceCount > 0 || _busy)"
                                    OnClick="@(() => ConfirmDelete(context))" />
                 </MudTooltip>
+                @* Offered only where the plain delete is refused. There must also be somewhere to move the
+                   resources TO: with a single value left, this operation has no target. *@
+                @if (context.ResourceCount > 0 && _values.Count > 1)
+                {
+                    <MudTooltip Text="@($"Remove everywhere — moves all {context.ResourceCount} resources onto another {SingularLabel.ToLowerInvariant()}, then deletes this one")">
+                        <MudIconButton Icon="@Icons.Material.Outlined.DeleteForever" Size="Size.Small" Color="Color.Error"
+                                       aria-label="Remove everywhere" Disabled="@_busy"
+                                       OnClick="@(() => ConfirmReassignAndDelete(context))" />
+                    </MudTooltip>
+                }
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
@@ -226,6 +238,74 @@ else
 
             await LoadAsync();
             Snackbar.Add($"Deleted '{value.Value}'.", Severity.Success);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>
+    /// "Remove everywhere" for a domain value. A MOVE, not a destruction: @SingularLabel is required on a
+    /// resource, so the resources have to land somewhere — the dialog therefore makes a replacement
+    /// mandatory alongside the typed confirmation.
+    /// </summary>
+    private async Task ConfirmReassignAndDelete(DomainValueModel value)
+    {
+        var replacements = _values
+            .Where(v => !string.Equals(v.Value, value.Value, StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(v => v.Value, v => v.ResourceCount > 0 ? $"{v.Value} ({v.ResourceCount})" : v.Value);
+
+        var lower = SingularLabel.ToLowerInvariant();
+        var effects = new List<string>
+        {
+            $"{value.ResourceCount} {(value.ResourceCount == 1 ? "resource moves" : "resources move")} onto the replacement",
+            $"'{value.Value}' is removed from the {lower} list",
+            $"{SingularLabel} is part of a resource's identity, so their identity changes",
+            "no resources are deleted"
+        };
+
+        var parameters = new DialogParameters
+        {
+            { nameof(ConfirmCascadeDialog.Prompt), $"Moves every resource in '{value.Value}' onto another {lower}, then removes '{value.Value}'." },
+            { nameof(ConfirmCascadeDialog.Effects), effects },
+            { nameof(ConfirmCascadeDialog.ConfirmWord), value.Value },
+            { nameof(ConfirmCascadeDialog.ActionText), "Reassign and delete" },
+            { nameof(ConfirmCascadeDialog.Replacements), replacements },
+            { nameof(ConfirmCascadeDialog.ReplacementLabel), $"Move to {lower}" },
+            { nameof(ConfirmCascadeDialog.ReplacementHelperText), "Resource counts shown in brackets." }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmCascadeDialog>($"Remove {SingularLabel} {value.Value} Everywhere", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+        if (result.Data is not string replacement || string.IsNullOrWhiteSpace(replacement)) return;
+
+        _busy = true;
+        try
+        {
+            var request = new ReassignAndDeleteRequest { From = value.Value, To = replacement };
+            var response = await ResourceService.ReassignAndDeleteDomainValueAsync(request, CancellationToken.None);
+
+            if (!response.IsSuccess() || response.ApiResponse.Data is null)
+            {
+                Snackbar.Add(FirstMessage(response.ApiResponse.Errors) ?? "Could not complete the change.", Severity.Error);
+                return;
+            }
+
+            var data = response.ApiResponse.Data;
+            await LoadAsync();
+
+            if (!data.Succeeded)
+            {
+                // The identity-collision case lands here. Nothing was changed, and the message says how
+                // many resources would have collided — a warning, not an error, because it is a real answer.
+                Snackbar.Add(data.Message ?? "Could not complete the change.", Severity.Warning);
+                return;
+            }
+
+            var moved = data.AffectedResources == 1 ? "1 resource moved" : $"{data.AffectedResources} resources moved";
+            Snackbar.Add($"Removed '{value.Value}' — {moved} to '{replacement}'.", Severity.Success);
         }
         finally
         {

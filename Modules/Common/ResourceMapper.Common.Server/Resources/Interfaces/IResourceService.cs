@@ -1,4 +1,5 @@
 using HT.Api.Service.Contracts;
+using ResourceMapper.Common.Shared.Cascade;
 using ResourceMapper.Common.Shared.Domains;
 using ResourceMapper.Common.Shared.Domains.Contracts;
 using ResourceMapper.Common.Shared.Editor;
@@ -6,6 +7,8 @@ using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
 using ResourceMapper.Common.Shared.ResourceTypes;
 using ResourceMapper.Common.Shared.ResourceTypes.Contracts;
+using ResourceMapper.Common.Shared.Tags;
+using ResourceMapper.Common.Shared.Tags.Contracts;
 
 namespace ResourceMapper.Common.Server.Resources.Interfaces
 {
@@ -38,7 +41,6 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
         /// <summary>Inline tag-definition create (search-existing-first; Domain/System flags forced off).</summary>
         Task<ApiServiceResponse<TagDefinitionModel>> CreateTagDefinitionAsync(CreateTagDefinitionRequest request, CancellationToken cancellationToken = default);
 
-        /// <summary>Full tag dictionary for the "Add tag" picker / refresh after inline create.</summary>
         /// <summary>Appends one choice to a controlled-vocabulary definition's list and returns the
         /// updated definition. Backs the tag rows' "Add {tag}…" affordance. Refuses system-managed
         /// definitions — the domain/Subscription vocabulary has its own narrow path below.</summary>
@@ -62,7 +64,32 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
         /// vocabulary empty — both come back as a normal response with a reason, not an error.</summary>
         Task<ApiServiceResponse<DeleteDomainValueResponse>> DeleteDomainValueAsync(string value, CancellationToken cancellationToken = default);
 
+        /// <summary>Full tag dictionary for the "Add tag" picker / refresh after inline create.</summary>
         Task<ApiServiceResponse<List<TagDefinitionModel>>> GetTagDictionaryAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>"Remove everywhere" for a tag: deletes it and every reference — recorded values,
+        /// template entries, primary-link choices — reporting what was destroyed. Never deletes resources,
+        /// and still refuses system-managed tags.</summary>
+        Task<ApiServiceResponse<ForceDeleteTagResponse>> ForceDeleteTagDefinitionAsync(int tagDefinitionId, CancellationToken cancellationToken = default);
+
+        /// <summary>"Remove everywhere" for a domain value: moves its resources onto another value, then
+        /// deletes it. Refuses when the move would duplicate an identity.</summary>
+        Task<ApiServiceResponse<ReassignAndDeleteResponse>> ReassignAndDeleteDomainValueAsync(ReassignAndDeleteRequest request, CancellationToken cancellationToken = default);
+
+        /// <summary>"Remove everywhere" for a resource type: moves its resources onto another type, then
+        /// deletes it and its entry-point template. Refuses on identity collisions.</summary>
+        Task<ApiServiceResponse<ReassignAndDeleteResponse>> ReassignAndDeleteResourceTypeAsync(ReassignAndDeleteRequest request, CancellationToken cancellationToken = default);
+
+        /// <summary>Every tag definition with the three counts that reference it, for the tag manager.</summary>
+        Task<ApiServiceResponse<List<TagDefinitionUsageModel>>> GetTagDefinitionsWithUsageAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Edits an existing tag definition. The key identifies it and is not itself editable —
+        /// import and export documents name it. Refuses system-managed definitions.</summary>
+        Task<ApiServiceResponse<TagDefinitionModel>> UpdateTagDefinitionAsync(UpdateTagDefinitionRequest request, CancellationToken cancellationToken = default);
+
+        /// <summary>Deletes a tag definition only when nothing references it. Refusals come back as a
+        /// normal response naming every reference in the way, not as an error.</summary>
+        Task<ApiServiceResponse<DeleteTagDefinitionResponse>> DeleteTagDefinitionAsync(int tagDefinitionId, CancellationToken cancellationToken = default);
 
         /// <summary>Adds a DependsOn edge between two resources (idempotent; rejects self-loops).</summary>
         Task<ApiServiceResponse<object>> AddRelationshipAsync(string fromResourceUid, string toResourceUid, CancellationToken cancellationToken = default);

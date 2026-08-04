@@ -1,5 +1,6 @@
 @using ResourceMapper.Common.Shared.Editor
 @using ResourceMapper.Common.Shared.Editor.Contracts
+@using ResourceMapper.Common.Shared.Tags.Contracts
 @using ResourceMapper.Common.Server.Resources.Interfaces
 @inject IResourceService ResourceService
 
@@ -11,9 +12,27 @@
            "Allow custom value" with "Allowed Values". *@
         <div class="rm-section-desc">
             A tag definition describes a kind of metadata — its name, what sort of value it holds,
-            and whether resources are expected to fill it in. Reuse beats duplication: if a tag with
-            this name already exists, that one is used instead of a second copy.
+            and whether resources are expected to fill it in.
+            @if (!IsEdit)
+            {
+                <span>Reuse beats duplication: if a tag with this name already exists, that one is used
+                instead of a second copy.</span>
+            }
         </div>
+
+        @* Editing the SHAPE of a tag that is already carrying data cannot convert or re-validate what
+           is stored: switching to "only values from a list" leaves existing values off-list and
+           unselectable, and switching to "a link" makes non-URL values render as broken links. Neither
+           is corrupt data, but both are surprises, so the count is stated up front rather than
+           discovered later. *@
+        @if (IsEdit && ResourceCount > 0)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mb-3">
+                @ResourceCount @(ResourceCount == 1 ? "resource" : "resources") already carry this tag.
+                Changing what it holds, or restricting it to a list, does not convert or re-check values
+                already saved.
+            </MudAlert>
+        }
 
         <FormRow Label="Name" Required="true"
                  Info="What people see on the resource editor and in the grid's Tags column.">
@@ -22,10 +41,14 @@
                           HelperText="e.g. Owning Team, Runbook, Cost Center" />
         </FormRow>
 
+        @* Read-only once the tag exists: the key is what import and export documents name, so changing
+           it would silently stop those documents matching this tag. Shown rather than hidden, because it
+           is what an import author has to type. *@
         <FormRow Label="Key" Required="true"
                  Info="The stable internal identifier used by import and export. Not shown to users.">
             <MudTextField T="string" @bind-Value="_key" aria-label="Key" Variant="Variant.Outlined" Margin="Margin.Dense"
-                          HelperText="@(KeyHelperText ?? "No spaces — e.g. OwningTeam")"
+                          Disabled="@IsEdit"
+                          HelperText="@(IsEdit ? "Fixed — import and export documents reference it." : (KeyHelperText ?? "No spaces — e.g. OwningTeam"))"
                           Error="@_keyError" ErrorText="Key is required" />
         </FormRow>
 
@@ -96,7 +119,7 @@
     <DialogActions>
         <MudButton OnClick="Cancel">Cancel</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_saving">
-            @(_saving ? "Creating…" : "Create")
+            @(_saving ? (IsEdit ? "Saving…" : "Creating…") : (IsEdit ? "Save" : "Create"))
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -104,6 +127,15 @@
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter] public List<string> ExistingKeys { get; set; } = new();
+
+    /// <summary>The definition being edited, or null to create. Supplying it switches the dialog to edit
+    /// mode: the key locks, the button reads Save, and Submit goes to the update path.</summary>
+    [Parameter] public TagDefinitionModel? Existing { get; set; }
+
+    /// <summary>Resources already carrying this tag, for the shape-change warning. Edit mode only.</summary>
+    [Parameter] public int ResourceCount { get; set; }
+
+    private bool IsEdit => Existing is not null;
 
     private string _key = string.Empty;
     private string? _displayName;
@@ -123,6 +155,26 @@
     /// condition TagRowEditor.IsControlledVocab tests.
     /// </summary>
     private bool _restrictToList;
+
+    /// <summary>
+    /// Edit mode seeds every field from the stored definition, including the derived _restrictToList
+    /// (AllowCustomValue is the inverse — PL-23's single decision behind two stored fields).
+    /// </summary>
+    protected override void OnInitialized()
+    {
+        if (Existing is null) return;
+
+        _key = Existing.TagDefinitionKey;
+        _displayName = Existing.DisplayName;
+        _contentType = string.IsNullOrWhiteSpace(Existing.ContentType) ? "Text" : Existing.ContentType!;
+        _requirementLevel = string.IsNullOrWhiteSpace(Existing.RequirementLevel) ? "Optional" : Existing.RequirementLevel;
+        _isMultiValued = Existing.IsMultiValued;
+        _displayOrder = Existing.DisplayOrder;
+        _restrictToList = !Existing.AllowCustomValue;
+        _allowedValuesCsv = Existing.AllowedValues is { Count: > 0 }
+            ? string.Join(", ", Existing.AllowedValues)
+            : null;
+    }
 
     /// <summary>Clearing the list when switching back to free text stops a stale list being saved
     /// against a definition that no longer uses one.</summary>
@@ -160,28 +212,43 @@
                 ? null
                 : _allowedValuesCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
-            var request = new CreateTagDefinitionRequest
-            {
-                TagDefinitionKey = _key.Trim(),
-                DisplayName = string.IsNullOrWhiteSpace(_displayName) ? null : _displayName,
-                ContentType = _contentType,
-                // The list is the only choice <=> custom values are not allowed. One decision,
-                // two fields (PL-23).
-                AllowCustomValue = !_restrictToList,
-                IsMultiValued = _isMultiValued,
-                AllowedValues = allowedValues,
-                RequirementLevel = _requirementLevel,
-                DisplayOrder = _displayOrder
-            };
+            // Same payload either way, only the destination differs: create mints a row (and reuses one
+            // on a duplicate key), update edits the row this key already identifies.
+            var response = IsEdit
+                ? await ResourceService.UpdateTagDefinitionAsync(new UpdateTagDefinitionRequest
+                {
+                    TagDefinitionKey = _key.Trim(),
+                    DisplayName = string.IsNullOrWhiteSpace(_displayName) ? null : _displayName,
+                    ContentType = _contentType,
+                    AllowCustomValue = !_restrictToList,
+                    IsMultiValued = _isMultiValued,
+                    AllowedValues = allowedValues,
+                    RequirementLevel = _requirementLevel,
+                    DisplayOrder = _displayOrder
+                }, CancellationToken.None)
+                : await ResourceService.CreateTagDefinitionAsync(new CreateTagDefinitionRequest
+                {
+                    TagDefinitionKey = _key.Trim(),
+                    DisplayName = string.IsNullOrWhiteSpace(_displayName) ? null : _displayName,
+                    ContentType = _contentType,
+                    // The list is the only choice <=> custom values are not allowed. One decision,
+                    // two fields (PL-23).
+                    AllowCustomValue = !_restrictToList,
+                    IsMultiValued = _isMultiValued,
+                    AllowedValues = allowedValues,
+                    RequirementLevel = _requirementLevel,
+                    DisplayOrder = _displayOrder
+                }, CancellationToken.None);
 
-            var response = await ResourceService.CreateTagDefinitionAsync(request, CancellationToken.None);
             if (response.IsSuccess() && response.ApiResponse.Data is not null)
             {
                 MudDialog.Close(DialogResult.Ok(response.ApiResponse.Data));
             }
             else
             {
-                _error = "Could not create tag definition.";
+                var message = response.ApiResponse?.Errors?.FirstOrDefault();
+                _error = message?.Details ?? message?.Title
+                         ?? (IsEdit ? "Could not save the tag." : "Could not create tag definition.");
             }
         }
         finally

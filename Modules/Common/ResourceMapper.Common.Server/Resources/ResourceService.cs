@@ -4,6 +4,7 @@ using HT.Api.Service.Contracts;
 using HT.Api.Service.Contracts.BuildersOfT;
 using ResourceMapper.Common.Server.Resources.Interfaces;
 using ResourceMapper.Common.Server.Resources.Models;
+using ResourceMapper.Common.Shared.Cascade;
 using ResourceMapper.Common.Shared.Domains;
 using ResourceMapper.Common.Shared.Domains.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
@@ -12,6 +13,8 @@ using ResourceMapper.Common.Shared.Editor;
 using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.ResourceTypes;
 using ResourceMapper.Common.Shared.ResourceTypes.Contracts;
+using ResourceMapper.Common.Shared.Tags;
+using ResourceMapper.Common.Shared.Tags.Contracts;
 
 namespace ResourceMapper.Common.Server.Resources
 {
@@ -649,6 +652,325 @@ namespace ResourceMapper.Common.Server.Resources
                 var domainDef = dictionary.FirstOrDefault(d => d.IsDomainTag);
                 builder.Data.Set(ParseAllowedValues(domainDef?.AllowedValues) ?? new List<string>());
                 return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<ForceDeleteTagResponse>> ForceDeleteTagDefinitionAsync(int tagDefinitionId,
+            CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<ForceDeleteTagResponse>();
+            try
+            {
+                if (tagDefinitionId <= 0)
+                {
+                    builder.Validation.AddValidation("tagDefinitionId", "Is required");
+                    return builder.BuildResponse();
+                }
+
+                var (result, values, templates, primaries) =
+                    await _repo.ForceDeleteTagDefinitionAsync(tagDefinitionId, cancellationToken);
+
+                switch (result)
+                {
+                    case "deleted":
+                        builder.Data.Set(new ForceDeleteTagResponse
+                        {
+                            Deleted = true,
+                            ValuesRemoved = values,
+                            TemplatesRemoved = templates,
+                            PrimaryLinksCleared = primaries
+                        });
+                        return builder.BuildResponse();
+
+                    case "system":
+                        builder.Data.Set(new ForceDeleteTagResponse
+                        {
+                            Deleted = false,
+                            IsSystemManaged = true,
+                            Message = "This tag is system-managed, so it cannot be removed."
+                        });
+                        return builder.BuildResponse();
+
+                    case "notfound":
+                        builder.Errors.AddError(CallStatusCode.NotFound, "Tag definition not found.", null, "TagDefinitionId");
+                        return builder.BuildResponse();
+
+                    default:
+                        builder.Errors.AddError(CallStatusCode.InternalError, "Could not remove the tag.", result, "InternalError");
+                        return builder.BuildResponse();
+                }
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<ReassignAndDeleteResponse>> ReassignAndDeleteDomainValueAsync(
+            ReassignAndDeleteRequest request, CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<ReassignAndDeleteResponse>();
+            try
+            {
+                var from = request?.From?.Trim() ?? string.Empty;
+                var to = request?.To?.Trim() ?? string.Empty;
+
+                if (string.IsNullOrWhiteSpace(from))
+                    builder.Validation.AddValidation("request.From", "Is required");
+                if (string.IsNullOrWhiteSpace(to))
+                    builder.Validation.AddValidation("request.To", "A replacement is required");
+
+                if (!builder.IsOk)
+                    return builder.BuildResponse();
+
+                var (result, affected, conflicts) =
+                    await _repo.ReassignAndDeleteDomainValueAsync(from, to, cancellationToken);
+
+                builder.Data.Set(MapReassignResult(result, affected, conflicts, from, to,
+                    notFoundMessage: $"'{from}' was not found.",
+                    missingTargetMessage: $"'{to}' is not one of the available values."));
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<ReassignAndDeleteResponse>> ReassignAndDeleteResourceTypeAsync(
+            ReassignAndDeleteRequest request, CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<ReassignAndDeleteResponse>();
+            try
+            {
+                if (!int.TryParse(request?.From, out var fromId) || fromId <= 0)
+                    builder.Validation.AddValidation("request.From", "Is required");
+                if (!int.TryParse(request?.To, out var toId) || toId <= 0)
+                    builder.Validation.AddValidation("request.To", "A replacement is required");
+
+                if (!builder.IsOk)
+                    return builder.BuildResponse();
+
+                var (result, affected, conflicts) =
+                    await _repo.ReassignAndDeleteResourceTypeAsync(fromId, toId, cancellationToken);
+
+                builder.Data.Set(MapReassignResult(result, affected, conflicts, request!.From, request.To,
+                    notFoundMessage: "That resource type was not found.",
+                    missingTargetMessage: "The replacement resource type was not found."));
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        /// <summary>
+        /// One place to turn a reassign procedure's result code into a response, because Subscription and
+        /// Resource Type answer with the same vocabulary and must explain themselves identically. Every
+        /// refusal is a normal response with a reason — only a genuinely unexpected code is an error.
+        /// </summary>
+        private static ReassignAndDeleteResponse MapReassignResult(string result, int affected, int conflicts,
+            string from, string to, string notFoundMessage, string missingTargetMessage) => result switch
+        {
+            "reassigned" => new ReassignAndDeleteResponse { Succeeded = true, AffectedResources = affected },
+
+            // Nothing moved: the whole operation is refused rather than partially applied, so the count is
+            // what the user has to resolve, not a progress report.
+            "conflict" => new ReassignAndDeleteResponse
+            {
+                Succeeded = false,
+                Conflicts = conflicts,
+                Message = $"{conflicts} {(conflicts == 1 ? "resource" : "resources")} would end up with a duplicate " +
+                          $"identity in '{to}' (same type and key already there). Nothing was changed."
+            },
+
+            "same" => new ReassignAndDeleteResponse
+            {
+                Succeeded = false,
+                Message = "The replacement is the same as what is being removed."
+            },
+
+            "notfound" => new ReassignAndDeleteResponse { Succeeded = false, Message = notFoundMessage },
+
+            "nonewvalue" or "nonewtype" => new ReassignAndDeleteResponse { Succeeded = false, Message = missingTargetMessage },
+
+            _ => new ReassignAndDeleteResponse { Succeeded = false, Message = "Could not complete the change." }
+        };
+
+        public async Task<ApiServiceResponse<List<TagDefinitionUsageModel>>> GetTagDefinitionsWithUsageAsync(CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<List<TagDefinitionUsageModel>>();
+            try
+            {
+                var rows = await _repo.GetTagDefinitionsWithUsageAsync(cancellationToken);
+                builder.Data.Set(rows.Select(r => new TagDefinitionUsageModel
+                {
+                    Definition = MapToTagDefinitionModel(r.Definition),
+                    ResourceCount = r.ResourceCount,
+                    TypeTemplateCount = r.TypeTemplateCount,
+                    PrimaryForCount = r.PrimaryForCount
+                }).ToList());
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<TagDefinitionModel>> UpdateTagDefinitionAsync(UpdateTagDefinitionRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<TagDefinitionModel>();
+            try
+            {
+                if (request == null)
+                {
+                    builder.Validation.AddValidation("request", "Is required");
+                    return builder.BuildResponse();
+                }
+
+                if (string.IsNullOrWhiteSpace(request.TagDefinitionKey))
+                    builder.Validation.AddValidation("request.TagDefinitionKey", "Key is required");
+
+                if (!AllowedContentTypes.Contains(request.ContentType))
+                    builder.Validation.AddValidation("request.ContentType", "Must be 'Text' or 'Link'");
+
+                // Same rule the create path enforces: "choose from a list" with no list is a tag nobody
+                // can fill in. Enforced here too, or an edit could produce what create refuses.
+                if (!request.AllowCustomValue && (request.AllowedValues is null || request.AllowedValues.Count == 0))
+                    builder.Validation.AddValidation("request.AllowedValues",
+                        "Add at least one value to the list, or allow free text");
+
+                string? allowedValuesJson = null;
+                if (request.AllowedValues is { Count: > 0 })
+                {
+                    allowedValuesJson = JsonSerializer.Serialize(request.AllowedValues);
+                    if (allowedValuesJson.Length > MaxAllowedValuesLength)
+                        builder.Validation.AddValidation("request.AllowedValues", $"Must be {MaxAllowedValuesLength} characters or fewer when serialized");
+                }
+
+                if (!builder.IsOk)
+                    return builder.BuildResponse();
+
+                var dictionary = await _repo.GetAllTagDefinitionsAsync(cancellationToken);
+                var existing = dictionary.FirstOrDefault(d =>
+                    string.Equals(d.TagDefinitionKey, request.TagDefinitionKey, StringComparison.OrdinalIgnoreCase));
+
+                if (existing == null)
+                {
+                    builder.Errors.AddError(CallStatusCode.NotFound, "Tag definition not found.", null, "TagDefinitionKey");
+                    return builder.BuildResponse();
+                }
+
+                // Checked before the write as well as inside TagDefinition_Upsert: the procedure answers
+                // a bare 'skipped' for a system tag, which on its own is indistinguishable from a
+                // duplicate-key skip. Refusing here is what makes the reason sayable.
+                if (existing.IsSystemTag || existing.IsDomainTag)
+                {
+                    builder.Validation.AddValidation("request.TagDefinitionKey",
+                        "This tag is system-managed, so it cannot be edited here");
+                    return builder.BuildResponse();
+                }
+
+                var result = await _repo.UpdateTagDefinitionAsync(
+                    existing.TagDefinitionKey, request.ContentType, request.AllowCustomValue, request.IsMultiValued,
+                    allowedValuesJson, request.DisplayName, request.RequirementLevel, request.DisplayOrder,
+                    cancellationToken);
+
+                if (!string.Equals(result, "updated", StringComparison.Ordinal))
+                {
+                    builder.Errors.AddError(CallStatusCode.InternalError, "Could not save the tag.", result, "InternalError");
+                    return builder.BuildResponse();
+                }
+
+                var refreshed = await _repo.GetAllTagDefinitionsAsync(cancellationToken);
+                var saved = refreshed.FirstOrDefault(d => d.TagDefinitionId == existing.TagDefinitionId);
+                if (saved == null)
+                {
+                    builder.Errors.AddError(CallStatusCode.InternalError, "Tag definition could not be loaded after save.");
+                    return builder.BuildResponse();
+                }
+
+                builder.Data.Set(MapToTagDefinitionModel(saved));
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
+        public async Task<ApiServiceResponse<DeleteTagDefinitionResponse>> DeleteTagDefinitionAsync(int tagDefinitionId,
+            CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<DeleteTagDefinitionResponse>();
+            try
+            {
+                if (tagDefinitionId <= 0)
+                {
+                    builder.Validation.AddValidation("tagDefinitionId", "Is required");
+                    return builder.BuildResponse();
+                }
+
+                var (result, resourceCount, templateCount, primaryCount) =
+                    await _repo.DeleteTagDefinitionAsync(tagDefinitionId, cancellationToken);
+
+                switch (result)
+                {
+                    case "deleted":
+                        builder.Data.Set(new DeleteTagDefinitionResponse { Deleted = true });
+                        return builder.BuildResponse();
+
+                    case "system":
+                        builder.Data.Set(new DeleteTagDefinitionResponse
+                        {
+                            Deleted = false,
+                            IsSystemManaged = true,
+                            Message = "This tag is system-managed, so it cannot be deleted."
+                        });
+                        return builder.BuildResponse();
+
+                    case "inuse":
+                        // Every blocker, not just the first: one trip should tell the user everything they
+                        // have to clear, or they discover the next one only after fixing this one.
+                        var blockers = new List<string>();
+                        if (resourceCount > 0)
+                            blockers.Add($"{resourceCount} {(resourceCount == 1 ? "resource carries" : "resources carry")} it");
+                        if (templateCount > 0)
+                            blockers.Add($"{templateCount} resource {(templateCount == 1 ? "type lists" : "types list")} it in a tag template");
+                        if (primaryCount > 0)
+                            blockers.Add($"{primaryCount} {(primaryCount == 1 ? "resource uses" : "resources use")} it as the primary link");
+
+                        builder.Data.Set(new DeleteTagDefinitionResponse
+                        {
+                            Deleted = false,
+                            ResourceCount = resourceCount,
+                            TypeTemplateCount = templateCount,
+                            PrimaryForCount = primaryCount,
+                            Message = "Still in use — " + string.Join("; ", blockers) + "."
+                        });
+                        return builder.BuildResponse();
+
+                    case "notfound":
+                        builder.Errors.AddError(CallStatusCode.NotFound, "Tag definition not found.", null, "TagDefinitionId");
+                        return builder.BuildResponse();
+
+                    default:
+                        builder.Errors.AddError(CallStatusCode.InternalError, "Could not delete the tag.", result, "InternalError");
+                        return builder.BuildResponse();
+                }
             }
             catch (Exception ex)
             {

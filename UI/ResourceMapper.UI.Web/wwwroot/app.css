@@ -676,6 +676,16 @@ html, body {
     min-width: 0;
 }
 
+/* The consequence list in a "remove everywhere" confirmation. Bulleted on purpose: these are discrete
+   irreversible effects, and running them together as prose is how people skim past one. */
+.rm-cascade-effects {
+    margin: .25rem 0 .75rem;
+    padding-left: 1.25rem;
+    font-size: .78rem;
+    line-height: 1.5;
+    color: var(--mud-palette-text-primary);
+}
+
 /* The "already there" reference line in the add-a-choice dialogs: secondary to the input above it,
    and free to wrap, since a long vocabulary would otherwise widen the dialog.
    The top padding is not decoration — .rm-form-label carries padding-top:11px so it optically centres

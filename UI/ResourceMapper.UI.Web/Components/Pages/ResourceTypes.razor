@@ -4,7 +4,9 @@
 @using ResourceMapper.Common.Shared.Editor
 @using ResourceMapper.Common.Shared.ResourceTypes
 @using ResourceMapper.Common.Shared.ResourceTypes.Contracts
+@using ResourceMapper.Common.Shared.Cascade
 @using ResourceMapper.UI.Web.Components.ResourceTypes
+@using ResourceMapper.UI.Web.Components.Shared
 @inject IResourceService ResourceService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -85,6 +87,16 @@ else
                                    aria-label="Delete" Disabled="@(context.ResourceCount > 0 || _busy)"
                                    OnClick="@(() => ConfirmDelete(context))" />
                 </MudTooltip>
+                @* Offered only where the plain delete is refused, and only when there is another type to
+                   move the resources onto — Resource.ResourceTypeId is NOT NULL, so there is no empty state. *@
+                @if (context.ResourceCount > 0 && _types.Count > 1)
+                {
+                    <MudTooltip Text="@($"Remove everywhere — moves all {context.ResourceCount} resources onto another type, then deletes this one")">
+                        <MudIconButton Icon="@Icons.Material.Outlined.DeleteForever" Size="Size.Small" Color="Color.Error"
+                                       aria-label="Remove everywhere" Disabled="@_busy"
+                                       OnClick="@(() => ConfirmReassignAndDelete(context))" />
+                    </MudTooltip>
+                }
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
@@ -219,6 +231,80 @@ else
                     Severity.Error);
                 await LoadAsync();
             }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>
+    /// "Remove everywhere" for a resource type. A MOVE: Resource.ResourceTypeId is NOT NULL, so the
+    /// resources must land on another type — hence a mandatory replacement alongside the typed confirm.
+    /// The type's own entry-point template goes with it, as it already does on a plain delete.
+    /// </summary>
+    private async Task ConfirmReassignAndDelete(ResourceTypeModel type)
+    {
+        var replacements = _types
+            .Where(t => t.ResourceTypeId != type.ResourceTypeId)
+            .ToDictionary(
+                t => t.ResourceTypeId.ToString(),
+                t => t.ResourceCount > 0 ? $"{t.TypeName} ({t.ResourceCount})" : t.TypeName);
+
+        var effects = new List<string>
+        {
+            $"{type.ResourceCount} {(type.ResourceCount == 1 ? "resource moves" : "resources move")} onto the replacement type",
+            "Resource Type is part of a resource's identity, so their identity changes",
+            $"this type's tag template ({type.EntryPointTagCount} {(type.EntryPointTagCount == 1 ? "entry" : "entries")}) is deleted",
+            "tag values already recorded on those resources are left as they are",
+            "no resources are deleted"
+        };
+
+        var parameters = new DialogParameters
+        {
+            { nameof(ConfirmCascadeDialog.Prompt), $"Moves every resource of type '{type.TypeName}' onto another type, then removes '{type.TypeName}'." },
+            { nameof(ConfirmCascadeDialog.Effects), effects },
+            { nameof(ConfirmCascadeDialog.ConfirmWord), type.TypeName },
+            { nameof(ConfirmCascadeDialog.ActionText), "Reassign and delete" },
+            { nameof(ConfirmCascadeDialog.Replacements), replacements },
+            { nameof(ConfirmCascadeDialog.ReplacementLabel), "Move to type" },
+            { nameof(ConfirmCascadeDialog.ReplacementHelperText), "Resource counts shown in brackets." }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmCascadeDialog>($"Remove Resource Type {type.TypeName} Everywhere", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+        if (result.Data is not string replacementId || string.IsNullOrWhiteSpace(replacementId)) return;
+
+        _busy = true;
+        try
+        {
+            var request = new ReassignAndDeleteRequest
+            {
+                From = type.ResourceTypeId.ToString(),
+                To = replacementId
+            };
+            var response = await ResourceService.ReassignAndDeleteResourceTypeAsync(request, CancellationToken.None);
+
+            if (!response.IsSuccess() || response.ApiResponse.Data is null)
+            {
+                Snackbar.Add(FirstMessage(response.ApiResponse.Errors) ?? "Could not complete the change.", Severity.Error);
+                return;
+            }
+
+            var data = response.ApiResponse.Data;
+            var replacementName = _types.FirstOrDefault(t => t.ResourceTypeId.ToString() == replacementId)?.TypeName ?? "the new type";
+            await LoadAsync();
+
+            if (!data.Succeeded)
+            {
+                // Identity collision (same Subscription + Key already under the target type). Nothing moved.
+                Snackbar.Add(data.Message ?? "Could not complete the change.", Severity.Warning);
+                return;
+            }
+
+            var moved = data.AffectedResources == 1 ? "1 resource moved" : $"{data.AffectedResources} resources moved";
+            Snackbar.Add($"Removed '{type.TypeName}' — {moved} to '{replacementName}'.", Severity.Success);
         }
         finally
         {

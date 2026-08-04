@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using ResourceMapper.Common.Server.Resources.Models;
+using ResourceMapper.Common.Shared.Cascade;
 using ResourceMapper.Common.Shared.Domains;
 using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
@@ -111,6 +112,42 @@ namespace ResourceMapper.Common.Server.Resources.Interfaces
         Task<(string Result, int TagDefinitionId)> CreateTagDefinitionAsync(string tagKey, string tagDefinitionUid,
             string contentType, bool allowCustomValue, bool isMultiValued, string? allowedValuesJson,
             string? displayName, string requirementLevel, int displayOrder, CancellationToken cancellationToken);
+
+        // --- "Remove everywhere" cascades. Each is the deliberate override of a guard above. ---
+
+        // Deletes a tag AND every reference to it (recorded values, template rows, primary-link choices)
+        // in one transaction. Destroys metadata; never deletes resources.
+        // Result is 'deleted' | 'system' | 'notfound' | 'error'.
+        Task<(string Result, int ValuesRemoved, int TemplatesRemoved, int PrimaryLinksCleared)>
+            ForceDeleteTagDefinitionAsync(int tagDefinitionId, CancellationToken cancellationToken);
+
+        // Moves every resource off one domain value onto another, then drops the original. Refuses when the
+        // move would duplicate an identity (Domain + Type + Key), reporting the collision count.
+        // Result is 'reassigned' | 'notfound' | 'nonewvalue' | 'same' | 'conflict' | 'error'.
+        Task<(string Result, int AffectedResources, int Conflicts)> ReassignAndDeleteDomainValueAsync(
+            string oldValue, string newValue, CancellationToken cancellationToken);
+
+        // Moves every resource off one type onto another, drops the old type and its entry-point template.
+        // Refuses on identity collisions the same way.
+        // Result is 'reassigned' | 'notfound' | 'nonewtype' | 'same' | 'conflict' | 'error'.
+        Task<(string Result, int AffectedResources, int Conflicts)> ReassignAndDeleteResourceTypeAsync(
+            int resourceTypeId, int newResourceTypeId, CancellationToken cancellationToken);
+
+        // Every tag definition with the three counts that reference it (resources, type templates, and
+        // resources whose primary link it is) — the management screen's list and its delete guard.
+        Task<List<TagDefinitionUsage>> GetTagDefinitionsWithUsageAsync(CancellationToken cancellationToken);
+
+        // Edits an existing definition, keyed on TagDefinitionKey (which is NOT itself editable).
+        // Result is 'updated' | 'created' | 'skipped' (system-managed) | 'error'.
+        Task<string> UpdateTagDefinitionAsync(string tagKey, string contentType, bool allowCustomValue,
+            bool isMultiValued, string? allowedValuesJson, string? displayName, string requirementLevel,
+            int displayOrder, CancellationToken cancellationToken);
+
+        // Deletes a definition only when nothing references it and it is not system-managed. Reports all
+        // three counts so a refusal can name everything in the way.
+        // Result is 'deleted' | 'system' | 'inuse' | 'notfound' | 'error'.
+        Task<(string Result, int ResourceCount, int TypeTemplateCount, int PrimaryForCount)>
+            DeleteTagDefinitionAsync(int tagDefinitionId, CancellationToken cancellationToken);
 
         // Every domain value with its resource count, including values used by resources but missing
         // from the vocabulary (IsUnlisted) — import can create those.

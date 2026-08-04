@@ -4,6 +4,7 @@ using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces;
 using Microsoft.Data.SqlClient;
 using ResourceMapper.Common.Server.Resources.Interfaces;
 using ResourceMapper.Common.Server.Resources.Models;
+using ResourceMapper.Common.Shared.Cascade;
 using ResourceMapper.Common.Shared.Domains;
 using ResourceMapper.Common.Shared.Editor.Contracts;
 using ResourceMapper.Common.Shared.HomePage.Contracts;
@@ -401,6 +402,127 @@ namespace ResourceMapper.Common.Server.Resources
 
             await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
             return (cmd.ReadString("@Result") ?? "error", cmd.ReadInt("@TagDefinitionId"));
+        }
+
+        public async Task<(string Result, int ValuesRemoved, int TemplatesRemoved, int PrimaryLinksCleared)>
+            ForceDeleteTagDefinitionAsync(int tagDefinitionId, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].TagDefinition_ForceDelete")
+                .AddInteger("@TagDefinitionId", tagDefinitionId)
+                .AddInteger("@ValuesRemoved", 0, ParameterDirection.Output)
+                .AddInteger("@TemplatesRemoved", 0, ParameterDirection.Output)
+                .AddInteger("@PrimaryLinksCleared", 0, ParameterDirection.Output)
+                .AddVarchar("@Result", null, 10, ParameterDirection.Output);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+            return (cmd.ReadString("@Result") ?? "error",
+                    cmd.ReadInt("@ValuesRemoved"),
+                    cmd.ReadInt("@TemplatesRemoved"),
+                    cmd.ReadInt("@PrimaryLinksCleared"));
+        }
+
+        public async Task<(string Result, int AffectedResources, int Conflicts)> ReassignAndDeleteDomainValueAsync(
+            string oldValue, string newValue, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].DomainValue_ReassignAndDelete")
+                .AddNVarchar("@OldValue", oldValue)
+                .AddNVarchar("@NewValue", newValue)
+                .AddInteger("@AffectedResources", 0, ParameterDirection.Output)
+                .AddInteger("@Conflicts", 0, ParameterDirection.Output)
+                .AddVarchar("@Result", null, 12, ParameterDirection.Output);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+            return (cmd.ReadString("@Result") ?? "error",
+                    cmd.ReadInt("@AffectedResources"),
+                    cmd.ReadInt("@Conflicts"));
+        }
+
+        public async Task<(string Result, int AffectedResources, int Conflicts)> ReassignAndDeleteResourceTypeAsync(
+            int resourceTypeId, int newResourceTypeId, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].ResourceType_ReassignAndDelete")
+                .AddInteger("@ResourceTypeId", resourceTypeId)
+                .AddInteger("@NewResourceTypeId", newResourceTypeId)
+                .AddInteger("@AffectedResources", 0, ParameterDirection.Output)
+                .AddInteger("@Conflicts", 0, ParameterDirection.Output)
+                .AddVarchar("@Result", null, 12, ParameterDirection.Output);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+            return (cmd.ReadString("@Result") ?? "error",
+                    cmd.ReadInt("@AffectedResources"),
+                    cmd.ReadInt("@Conflicts"));
+        }
+
+        public async Task<List<TagDefinitionUsage>> GetTagDefinitionsWithUsageAsync(CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].TagDefinition_GetAllWithUsage");
+            return await _db.Execute.ExecuteQueryAsync(cmd, dr => new TagDefinitionUsage
+            {
+                Definition = new TagDefinition
+                {
+                    TagDefinitionId = dr.ReadInt("TagDefinitionId"),
+                    TagDefinitionUid = dr.ReadString("TagDefinitionUid"),
+                    TagDefinitionKey = dr.ReadString("TagDefinitionKey"),
+                    DisplayName = dr.ReadString("DisplayName"),
+                    TagContentTypeId = dr.ReadInt("TagContentTypeId"),
+                    ContentType = dr.ReadString("ContentType"),
+                    AllowCustomValue = dr.ReadBoolean("AllowCustomValue"),
+                    IsMultiValued = dr.ReadBoolean("IsMultiValued"),
+                    AllowedValues = dr.ReadString("AllowedValues"),
+                    RequirementLevel = dr.ReadString("RequirementLevel") ?? "Optional",
+                    IsDomainTag = dr.ReadBoolean("IsDomainTag"),
+                    IsSystemTag = dr.ReadBoolean("IsSystemTag"),
+                    DisplayOrder = dr.ReadInt("DisplayOrder"),
+                    CreatedOn = dr.ReadDateTime("CreatedOn"),
+                    UpdatedOn = dr.ReadNullableDateTime("UpdatedOn")
+                },
+                ResourceCount = dr.ReadInt("ResourceCount"),
+                TypeTemplateCount = dr.ReadInt("TypeTemplateCount"),
+                PrimaryForCount = dr.ReadInt("PrimaryForCount")
+            }, cancellationToken: cancellationToken);
+        }
+
+        public async Task<string> UpdateTagDefinitionAsync(string tagKey, string contentType, bool allowCustomValue,
+            bool isMultiValued, string? allowedValuesJson, string? displayName, string requirementLevel,
+            int displayOrder, CancellationToken cancellationToken)
+        {
+            // OnConflict = 'upsert', unlike CreateTagDefinitionAsync's 'skip': the row always exists here.
+            // The Domain/System flags are left NULL, which TagDefinition_Upsert reads as "no opinion" and
+            // therefore preserves (PL-49) — and the same procedure refuses system-managed rows outright,
+            // answering 'skipped', which is the behaviour the service turns into a reason.
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].TagDefinition_Upsert")
+                .AddNVarchar("@TagDefinitionKey", tagKey)
+                .AddVarchar("@TagDefinitionUid", tagKey)   // insert-only per the sproc; this path only updates
+                .AddVarchar("@ContentType", contentType)
+                .AddBit("@AllowCustomValue", allowCustomValue)
+                .AddBit("@IsMultiValued", isMultiValued)
+                .AddNVarchar("@AllowedValues", allowedValuesJson)
+                .AddNVarchar("@DisplayName", displayName)
+                .AddVarchar("@RequirementLevel", requirementLevel)
+                .AddInteger("@DisplayOrder", displayOrder)
+                .AddVarchar("@OnConflict", "upsert")
+                .AddInteger("@TagDefinitionId", 0, ParameterDirection.Output)
+                .AddVarchar("@Result", null, 10, ParameterDirection.Output);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+            return cmd.ReadString("@Result") ?? "error";
+        }
+
+        public async Task<(string Result, int ResourceCount, int TypeTemplateCount, int PrimaryForCount)>
+            DeleteTagDefinitionAsync(int tagDefinitionId, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].TagDefinition_Delete")
+                .AddInteger("@TagDefinitionId", tagDefinitionId)
+                .AddInteger("@ResourceCount", 0, ParameterDirection.Output)
+                .AddInteger("@TypeTemplateCount", 0, ParameterDirection.Output)
+                .AddInteger("@PrimaryForCount", 0, ParameterDirection.Output)
+                .AddVarchar("@Result", null, 10, ParameterDirection.Output);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+            return (cmd.ReadString("@Result") ?? "error",
+                    cmd.ReadInt("@ResourceCount"),
+                    cmd.ReadInt("@TypeTemplateCount"),
+                    cmd.ReadInt("@PrimaryForCount"));
         }
 
         public async Task<List<DomainValueModel>> GetDomainValuesAsync(CancellationToken cancellationToken)

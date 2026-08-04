@@ -1,0 +1,324 @@
+@page "/tags"
+@using HT.Api.Client.Contracts.Models
+@using ResourceMapper.Common.Server.Resources.Interfaces
+@using ResourceMapper.Common.Shared.Editor
+@using ResourceMapper.Common.Shared.Tags
+@using ResourceMapper.UI.Web.Components.Editor
+@using ResourceMapper.UI.Web.Components.Shared
+@inject IResourceService ResourceService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+@* The tag dictionary, shaped after /resource-types and /domains. Until now tags could only be created
+   inline from a resource or a type template, so the catalog's vocabulary had no screen of its own:
+   nothing listed what existed, what used it, or let it be corrected. *@
+
+<PageTitle>Tags — Hashtag Resource Mapper</PageTitle>
+
+<PageHeader Title="Tags"
+            Description="The metadata a resource can carry. A tag can only be deleted once nothing references it — no resource carrying a value, no type template listing it, and no resource using it as its primary link.">
+    <Actions>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.Add"
+                   Disabled="@_loading" OnClick="OpenCreate">
+            New Tag
+        </MudButton>
+    </Actions>
+</PageHeader>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+else if (_loadError is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-3">@_loadError</MudAlert>
+}
+else
+{
+    <MudTable T="TagDefinitionUsageModel" Items="_tags" Dense="true" Hover="true" Striped="false"
+              Elevation="0" Breakpoint="Breakpoint.Sm" AllowUnsorted="false">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel SortBy="@(new Func<TagDefinitionUsageModel, object?>(t => DisplayName(t)))" InitialDirection="SortDirection.Ascending">Name</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="@(new Func<TagDefinitionUsageModel, object?>(t => t.Definition.TagDefinitionKey))">Key</MudTableSortLabel></MudTh>
+            <MudTh>Holds</MudTh>
+            <MudTh>Values</MudTh>
+            <MudTh>Expected?</MudTh>
+            <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="@(new Func<TagDefinitionUsageModel, object?>(t => t.ResourceCount))">Resources</MudTableSortLabel></MudTh>
+            <MudTh Style="text-align:right;">Templates</MudTh>
+            <MudTh Style="text-align:right;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Name">
+                @DisplayName(context)
+                @if (context.IsSystemManaged)
+                {
+                    @* Named, not hidden: it is part of the vocabulary and shows up on resources, so an
+                       empty Actions column would otherwise read as a bug rather than a rule. *@
+                    <MudTooltip Text="System-managed — its shape is owned by deployment, so it cannot be edited or deleted here.">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="ml-1" Style="display:inline;">(system)</MudText>
+                    </MudTooltip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Key">
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@context.Definition.TagDefinitionKey</MudText>
+            </MudTd>
+            <MudTd DataLabel="Holds">@(context.Definition.ContentType == "Link" ? "A link" : "Text")</MudTd>
+            <MudTd DataLabel="Values">
+                @if (context.Definition.AllowCustomValue)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">anything</MudText>
+                }
+                else
+                {
+                    var values = context.Definition.AllowedValues ?? new List<string>();
+                    <MudTooltip Text="@string.Join(" · ", values)">
+                        <MudText Typo="Typo.body2">@values.Count in a list</MudText>
+                    </MudTooltip>
+                }
+                @if (context.Definition.IsMultiValued)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Style="display:inline;">· several</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Expected?">@RequirementLabel(context.Definition.RequirementLevel)</MudTd>
+            <MudTd DataLabel="Resources" Style="text-align:right;">@context.ResourceCount</MudTd>
+            <MudTd DataLabel="Templates" Style="text-align:right;">@context.TypeTemplateCount</MudTd>
+            <MudTd DataLabel="Actions" Style="text-align:right;">
+                @if (!context.IsSystemManaged)
+                {
+                    <MudTooltip Text="Edit this tag">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" aria-label="Edit"
+                                       Disabled="@_busy" OnClick="@(() => OpenEdit(context))" />
+                    </MudTooltip>
+                    <MudTooltip Text="@DeleteTooltip(context)">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error"
+                                       aria-label="Delete" Disabled="@(!context.IsUnused || _busy)"
+                                       OnClick="@(() => ConfirmDelete(context))" />
+                    </MudTooltip>
+                    @* Only offered where the plain delete is refused: with nothing referencing the tag the
+                       two would do the same thing, and showing an irreversible cascade next to a safe
+                       delete that already works invites picking the wrong one. *@
+                    @if (!context.IsUnused)
+                    {
+                        <MudTooltip Text="Remove everywhere — deletes this tag and every value, template entry and primary link that uses it">
+                            <MudIconButton Icon="@Icons.Material.Outlined.DeleteForever" Size="Size.Small" Color="Color.Error"
+                                           aria-label="Remove everywhere" Disabled="@_busy"
+                                           OnClick="@(() => ConfirmForceDelete(context))" />
+                        </MudTooltip>
+                    }
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-4">
+                No tags yet. Create one to start recording metadata against resources.
+            </MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private List<TagDefinitionUsageModel> _tags = new();
+
+    private bool _loading = true;
+    private bool _busy;
+    private string? _loadError;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadError = null;
+        try
+        {
+            var response = await ResourceService.GetTagDefinitionsWithUsageAsync(CancellationToken.None);
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+                _tags = response.ApiResponse.Data;
+            else
+                _loadError = FirstMessage(response.ApiResponse.Errors) ?? "Could not load tags.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>Falls back to the key: a definition with no DisplayName still has to be identifiable,
+    /// and the key is what the editor shows in that case too.</summary>
+    private static string DisplayName(TagDefinitionUsageModel tag) =>
+        string.IsNullOrWhiteSpace(tag.Definition.DisplayName)
+            ? tag.Definition.TagDefinitionKey
+            : tag.Definition.DisplayName!;
+
+    /// <summary>The same wording the dialog uses — "Error" is an internal severity, not something a
+    /// user would recognise (PL-23).</summary>
+    private static string RequirementLabel(string? level) => level switch
+    {
+        "Error" => "Required",
+        "Suggested" => "Recommended",
+        _ => "Optional"
+    };
+
+    private static string DeleteTooltip(TagDefinitionUsageModel tag)
+    {
+        if (tag.IsUnused) return "Delete this tag";
+
+        var blockers = new List<string>();
+        if (tag.ResourceCount > 0) blockers.Add($"{tag.ResourceCount} resource(s)");
+        if (tag.TypeTemplateCount > 0) blockers.Add($"{tag.TypeTemplateCount} template(s)");
+        if (tag.PrimaryForCount > 0) blockers.Add($"{tag.PrimaryForCount} primary link(s)");
+        return "In use by " + string.Join(", ", blockers) + " — clear those first";
+    }
+
+    /// <summary>Create reuses the editor's own dialog, so every entry point asks for the same things and
+    /// validates them the same way.</summary>
+    private async Task OpenCreate()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(TagDefinitionDialog.ExistingKeys), _tags.Select(t => t.Definition.TagDefinitionKey).ToList() }
+        };
+
+        var dialog = await DialogService.ShowAsync<TagDefinitionDialog>("Create Tag Definition", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        if (result.Data is TagDefinitionModel created)
+        {
+            await LoadAsync();
+            Snackbar.Add($"Saved '{DisplayNameOf(created)}'.", Severity.Success);
+        }
+    }
+
+    private async Task OpenEdit(TagDefinitionUsageModel tag)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(TagDefinitionDialog.Existing), tag.Definition },
+            { nameof(TagDefinitionDialog.ResourceCount), tag.ResourceCount },
+            {
+                nameof(TagDefinitionDialog.ExistingKeys),
+                _tags.Select(t => t.Definition.TagDefinitionKey).ToList()
+            }
+        };
+
+        var dialog = await DialogService.ShowAsync<TagDefinitionDialog>($"Edit Tag {DisplayName(tag)}", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        if (result.Data is TagDefinitionModel saved)
+        {
+            await LoadAsync();
+            Snackbar.Add($"Saved '{DisplayNameOf(saved)}'.", Severity.Success);
+        }
+    }
+
+    private static string DisplayNameOf(TagDefinitionModel definition) =>
+        string.IsNullOrWhiteSpace(definition.DisplayName) ? definition.TagDefinitionKey : definition.DisplayName!;
+
+    private async Task ConfirmDelete(TagDefinitionUsageModel tag)
+    {
+        // Plain-string message (not MarkupString): the name is user-supplied.
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Delete Tag",
+            $"Delete '{DisplayName(tag)}'? Nothing references it, so no resource loses data. " +
+            "This cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirmed != true) return;
+
+        _busy = true;
+        try
+        {
+            var response = await ResourceService.DeleteTagDefinitionAsync(tag.Definition.TagDefinitionId, CancellationToken.None);
+            if (!response.IsSuccess() || response.ApiResponse.Data is null)
+            {
+                Snackbar.Add(FirstMessage(response.ApiResponse.Errors) ?? "Could not delete.", Severity.Error);
+                return;
+            }
+
+            var data = response.ApiResponse.Data;
+            if (!data.Deleted)
+            {
+                // A refusal carries its reason — show that, and re-read, since a count that changed under
+                // us is exactly how a stale row's delete button came to be enabled.
+                Snackbar.Add(data.Message ?? "Could not delete.", Severity.Warning);
+                await LoadAsync();
+                return;
+            }
+
+            await LoadAsync();
+            Snackbar.Add($"Deleted '{DisplayName(tag)}'.", Severity.Success);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>
+    /// "Remove everywhere": the deliberate override of the in-use guard. The effects are spelled out with
+    /// the counts this row already carries, so the user sees exactly what is about to be destroyed rather
+    /// than a generic warning — and the dialog will not enable its button until the tag's name is typed.
+    /// </summary>
+    private async Task ConfirmForceDelete(TagDefinitionUsageModel tag)
+    {
+        var effects = new List<string>();
+        if (tag.ResourceCount > 0)
+            effects.Add($"{tag.ResourceCount} recorded {(tag.ResourceCount == 1 ? "value" : "values")} deleted from resources");
+        if (tag.TypeTemplateCount > 0)
+            effects.Add($"removed from {tag.TypeTemplateCount} resource {(tag.TypeTemplateCount == 1 ? "type's" : "types'")} tag template");
+        if (tag.PrimaryForCount > 0)
+            effects.Add($"{tag.PrimaryForCount} {(tag.PrimaryForCount == 1 ? "resource loses" : "resources lose")} their primary link");
+        effects.Add("no resources are deleted");
+
+        var parameters = new DialogParameters
+        {
+            { nameof(ConfirmCascadeDialog.Prompt), $"Removes the tag '{DisplayName(tag)}' and every reference to it." },
+            { nameof(ConfirmCascadeDialog.Effects), effects },
+            { nameof(ConfirmCascadeDialog.ConfirmWord), DisplayName(tag) },
+            { nameof(ConfirmCascadeDialog.ActionText), "Remove everywhere" }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmCascadeDialog>($"Remove Tag {DisplayName(tag)} Everywhere", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        _busy = true;
+        try
+        {
+            var response = await ResourceService.ForceDeleteTagDefinitionAsync(tag.Definition.TagDefinitionId, CancellationToken.None);
+            if (!response.IsSuccess() || response.ApiResponse.Data is null)
+            {
+                Snackbar.Add(FirstMessage(response.ApiResponse.Errors) ?? "Could not remove the tag.", Severity.Error);
+                return;
+            }
+
+            var data = response.ApiResponse.Data;
+            if (!data.Deleted)
+            {
+                Snackbar.Add(data.Message ?? "Could not remove the tag.", Severity.Warning);
+                await LoadAsync();
+                return;
+            }
+
+            await LoadAsync();
+            // Reports what was actually destroyed, not what was predicted — the counts can differ if
+            // something changed between opening the dialog and confirming it.
+            var parts = new List<string>();
+            if (data.ValuesRemoved > 0) parts.Add($"{data.ValuesRemoved} value(s)");
+            if (data.TemplatesRemoved > 0) parts.Add($"{data.TemplatesRemoved} template entry(ies)");
+            if (data.PrimaryLinksCleared > 0) parts.Add($"{data.PrimaryLinksCleared} primary link(s)");
+            var suffix = parts.Any() ? " — removed " + string.Join(", ", parts) : string.Empty;
+            Snackbar.Add($"Removed '{DisplayName(tag)}'{suffix}.", Severity.Success);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string? FirstMessage(List<Message>? messages) =>
+        messages?.FirstOrDefault()?.Details ?? messages?.FirstOrDefault()?.Title;
+}
