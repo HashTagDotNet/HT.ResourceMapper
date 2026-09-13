@@ -35,7 +35,11 @@ module.exports = defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {
-      ASPNETCORE_ENVIRONMENT: 'Development',
+      // Both names, deliberately: DOTNET_ENVIRONMENT wins over ASPNETCORE_ENVIRONMENT when both are
+      // set, so pinning only the latter left the suite at whatever the machine's ambient value was.
+      // 'localhost' is the convention here and the name appsettings.localhost.json is selected by.
+      DOTNET_ENVIRONMENT: 'localhost',
+      ASPNETCORE_ENVIRONMENT: 'localhost',
       ASPNETCORE_URLS: BASE_URL,
     },
   },
