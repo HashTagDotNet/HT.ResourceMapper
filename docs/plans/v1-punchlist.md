@@ -2,16 +2,20 @@
 
 > **This is the authoritative to-do list to v1.** It supersedes the "outstanding" sections of
 > `filter-plan/RESUME.md`, `explorer/00-implementation-plan-list.md`'s resume marker, and
-> `__ProjectNotes/SessionResumeContext.md`. Captured 2026-08-02.
+> `__ProjectNotes/SessionResumeContext.md`. Captured 2026-08-02, **re-triaged 2026-09-13** —
+> start at *Authoritative status*, not at the batch write-ups further down.
 
 ## Context
 
 All three feature builds are complete and pushed: home grid + filters, editor (slices 1–9),
-explorer (slices 1–10 + UI-polish passes 1 & 2). `home-page` is **134 commits ahead of `main`**
-and `main` holds nothing `home-page` lacks — so the app is not unfinished, it is **unmerged**,
-and carrying a punchlist of real-use defects.
+explorer (slices 1–10 + UI-polish passes 1 & 2), and since then the vocabulary-management surfaces
+(domains, tag dictionary, cascade deletes). `home-page` is **many commits ahead of `main`** and
+`main` holds nothing `home-page` lacks — so the app is not unfinished, it is **unmerged**, and
+carrying a punchlist of real-use defects. *(Check the gap with `git rev-list --left-right --count
+origin/main...home-page` rather than trusting a number written here.)*
 
 **Bar: v1 complete, not a POC.** Deployment/hosting is explicitly out of scope — v1 is the codebase.
+*(Re-confirmed by Steve, 2026-09-13.)*
 
 **Standing prioritisation rule (Steve):** *be aggressive on usability.* Usability items are v1
 requirements here, not polish. They are the first things cut under time pressure, so they are
@@ -23,37 +27,378 @@ fixes are proposals and placement/design details are TBD until the fix phase.
 
 ## Status of this list
 
-| Source | Count |
-|---|---:|
-| Steve's walkthrough (PL-07 → PL-44) | 30 |
-| Audit-sourced (PL-A1 → PL-A10) | 9 |
-| Pre-existing, verified (PL-01 → PL-06) | 6 |
-| **Fixed during capture** (PL-25a, PL-26) | 2 |
+> **RE-TRIAGED 2026-09-13 against the code.** The sections below the re-triage table — the original
+> `v1-BLOCKING`, `SECURITY` and `Batches` write-ups — are **historical**. They record what was found
+> on 2026-08-02 and why, which is still worth reading, but they are **not a to-do list any more**:
+> most of their items have since been fixed, and three later feature commits are absent from them.
+> **The re-triage table is the authoritative status.** Read it first.
 
-**Verified this session:** 416 unit tests — 2 fail (both pre-existing, PL-01), no new failures.
-Playwright regression suite — **8/8 pass**. `.sqlproj` cannot build under `dotnet` CLI (MSB4278,
-needs full MSBuild/VS) — documented, not a defect.
+### Why the list drifted
+
+The list was last reconciled **2026-08-03**. Three substantial feature commits landed **2026-08-04**
+and were never folded in — the domain-vocabulary CRUD stack, the tag-dictionary manager, and the
+"remove everywhere" cascade deletes for tags / subscriptions / types. Meanwhile the Azure UX pass and
+the sessions after it closed most of the batches without the headline sections being updated, so the
+document's own `v1-BLOCKING` section listed defects that were **already fixed in code**.
+
+The lesson worth keeping: **a punchlist that is appended to but never reconciled inverts — the top of
+the document becomes the least accurate part of it.** Re-triage is cheap; reading a stale list as if
+it were current is not.
+
+### Re-triage method
+
+Each item was checked against the source, not against memory. Two levers made this fast and should be
+preserved:
+
+1. **Fix sites carry their item id in a comment** (`// PL-A1: MudDataGrid repaints itself…`).
+   Grepping the ids across `Modules/ UI/ Database/` finds most fixes in one pass. **Caveat, learned
+   here:** a mention is *not* proof of a fix — two ids appear only in comments that *document the
+   defect as still present* and work around it. Every hit was read in context.
+2. Items with no annotation were verified by reading the named file, sproc or component.
+
+Items whose verdict genuinely needs a running app are marked **needs eyes** rather than guessed at.
+
+### Authoritative status
+
+**Closed since capture — verified in code:** PL-04, PL-06, PL-07, PL-08, PL-09, PL-10, PL-11, PL-12,
+PL-15, PL-16, PL-17, PL-20, PL-22, PL-23, PL-25a, PL-25b, PL-26, PL-27, PL-28, PL-29, PL-30,
+PL-31, PL-32, PL-33, PL-34, PL-35, PL-37, PL-38, PL-39, PL-41, PL-42, PL-43, PL-44, PL-45 *(superseded by PL-61)*, PL-46,
+PL-47, PL-48, PL-49, PL-52, PL-53, PL-54, PL-A1, PL-A8, PL-A9, and — settled in the browser pass
+below — **PL-18** (add affordances are consistent) and **PL-A7** (not a defect: the red mark on Key
+is the required-field asterisk, and Name genuinely is not required).
+
+**Still open.** Nothing here is a ship-stopper: both items the old header called v1-blocking, and the
+security item beside them, are fixed. Every item below has a verdict — **nothing is left unexamined.**
+The items marked ⚑ are decisions Steve has taken, not defects.
+
+_Widen the terminal if this renders as stacked Key: value records._
+
+| id | Item | Verdict |
+|---|---|---|
+| **PL-61** | **Replace simulated data with the real vNext Azure resource links** (wiki page 11783). Steve supplies the extraction — do not scrape it | **Decided — to do** ⚑ |
+| **PL-58** | **Dependency diagram dropped from v1** (Steve, 2026-09-13). Hide the entry points; keep the code re-enable-able | **Decided — to do** |
+| **PL-59** | Environment mismatch: app pinned `Development` while the machine runs `localhost` | **FIXED 2026-09-13** |
+| **PL-56** | Grid link tags rendered with no `rel` and no scheme guard; import validates no URLs | **Open** |
+| **PL-57** | Domains / Tags-manager / cascade-delete surfaces have no e2e coverage, no design record | **Open** |
+| **PL-13/14** | Rename dialog for resource identity was never built (`RenameDomainValueDialog` is the *vocabulary* one) | **Open** |
+| **PL-24** | The copy sweep; editor fields got helper text, other surfaces did not | **Open** |
+| **PL-A5** | `ResourceTag` still has no unique constraint on `(ResourceId, TagDefinitionId)`; two seed scripts work around its absence | **Open** |
+| **PL-A6** | Demo grid seed regenerates `ResourceUid` via `NEWID()` every run, invalidating permalinks | **Open** |
+| **PL-A10** | `_ = PersistViewAsync(_lastQuery)` still fire-and-forget (`Home.razor:366`) | **Open** |
+| **PL-A2** | "Azure ServcieFabric" typo — **confirmed rendering in the grid's Type column**, not just in seed files | **Open** |
+| **PL-A3** | **Root-caused:** first-load console 404 is `GET /favicon.ico`; the app ships no favicon. Browser caching is why it never reproduced | **Open, trivial** |
+| **PL-60** | `CLAUDE.md` documents UI projects that no longer exist and the wrong hosting model | **Open** |
+| **PL-55** | Save button placement, and not gated on validity. **Confirmed live:** enabled on an empty form; sits bottom-left with Cancel bottom-right | **Open** |
+| **PL-19** | Editor flow "fluidity" — everything it was gated on is resolved; **needs Steve's judgement**, not investigation | **Awaiting Steve** |
+| **PL-36** | Link tags render in the grid; the hardening ride-along is PL-56 | **Partly done** |
+| **PL-21** | Add-filter menu **verified clean**; vocabulary selects unchecked; explorer presets moot under PL-58 | **Mostly verified** |
+| **PL-40** | Explorer arrows — **deferred with the feature** (PL-58). Re-check only if the diagram is switched back on | **Parked** |
+| **PL-01** | The two `NotFound`→404 mapping tests still fail; still the only failures | **Open** |
+| **PL-05** | Merge to `main` | **Ready** — fast-forward, no conflicts |
 
 ---
 
-## v1-BLOCKING
+## Browser verification pass — 2026-09-13
+
+Drove the running app to settle every item the re-triage had marked **needs eyes**. Explorer items
+were deliberately **not** driven — the dependency diagram is dropped from v1 (PL-58).
+
+### Settled by this pass
+
+_Widen the terminal if this renders as stacked Key: value records._
+
+| id | Verdict |
+|---|---|
+| **PL-A3** | **Root-caused.** The first-load console 404 is `GET /favicon.ico` — the app ships no favicon. Browsers cache the 404, which is exactly why it "did not reproduce" on a second load. Not an app-logic defect; a missing static file. **Still open, trivial.** |
+| **PL-A7** | **Not a defect — closed.** An untouched Create form shows **no** error text at all. The red mark on Key is the **required-field asterisk**, the same marker Subscription and Resource Type carry; Name has none because Name genuinely is not required. The original report read a required-marker as a validation error. |
+| **PL-21** | **Add-filter menu verified clean.** It offers Name, Type, Description and the non-system tag keys only — no Subscription/Domain, so PL-04's filter holds in the live UI. Vocabulary selects remain unchecked; explorer presets are moot under PL-58. |
+| **PL-18** | **Resolved.** The add affordance is now in the same place on every surface — directly beneath its field, as a `+ CREATE …` / `+ ADD …` action (General: *Create Subscription…*, *Create new type…*; Tags: *Create new tag…*; Dependencies: *Create new…*). The 2026-08-04 commit closed this. |
+| **PL-19** | The three items it was gated on (PL-17, PL-18, PL-20) are all resolved, so the flow is ready to be judged. **Only Steve can close this one** — it is a subjective verdict on whether the flow now feels fluid. |
+| **PL-25b** | **Confirmed fixed in the browser.** The Dependencies tab reads "Choose a Subscription on the General tab first" while that field *is* enabled and reachable on the General tab. The app no longer instructs an action it forbids. |
+| **PL-A2** | **Confirmed user-visible.** "Azure ServcieFabric" renders in the grid's Type column. Not just seed-file cosmetics — customers would read it. |
+| **PL-55** | **Confirmed live.** Save is **enabled on a completely empty Create form**; its only possible outcome is the warning toast. Also observed and not previously recorded: **Save sits bottom-LEFT**, ahead of Previous/Next, while **Cancel sits bottom-right** — the position a primary action conventionally occupies. Worth folding into the placement decision. |
+
+### Checked and found healthy (no item — recorded so it is not re-investigated)
+
+**PL-53's fix is live.** A globally-required tag that no type template mentions still gets a row: with
+a type chosen, *Owning Team* appears with its required marker. The blank form shows no tag rows at
+all, which is correct — no type is chosen yet, and the form cannot be saved without one. This was
+checked specifically because the DB has a required, non-system tag and the blank form showed nothing;
+the fix holds.
+
+### Observation, not yet an item
+
+**Subscription is the most prominent tag on every grid row and is the one thing you cannot filter by.**
+That follows directly from PL-04/PL-21 (system and domain tags are excluded from the Add-filter
+picker), so the code is behaving as specified. Whether the *specification* is right is a question for
+Steve: the field the grid displays most is unfilterable. Raise it, don't fix it.
+
+---
+
+## New findings from the re-triage
+
+### PL-56 — grid link tags are rendered without a scheme guard or `rel`
+
+**This is PL-36's ride-along, which the original entry called for and which was never done.** The home
+grid renders a Link-typed tag as `<MudLink Href="@tag.TagValue" Target="_blank">` (`Home.razor:64`).
+Two problems, one line:
+
+- **No scheme guard.** `TagValue` is user-supplied. The repo already owns the guard —
+  `EditorValidation` restricts Link values to http/https (`:93-94`) — but that runs **at save time in
+  the editor only**. The **import path does no URL validation at all**, so a value the editor would
+  reject reaches the grid and is rendered as a clickable `href`.
+- **No `rel="noopener noreferrer"`** on a `target="_blank"` link. The original PL-36 entry called this
+  out explicitly (*"MudBlazor won't"*).
+
+**A sibling surface already does this correctly:** `explorer-canvas.js` guards with `isHttpUrl()`
+before opening and sets `rel`/`noopener` at three sites. **The recurring theme again** — a good
+pattern established once and applied inconsistently.
+
+**Severity depends on how far import is trusted.** Exposure needs a hostile value to arrive through
+import or the API rather than through the editor, so this is not the open door that the print XSS
+(PL-A8) was. Recorded as a finding to fix, not as a ship-stopper. Fixing it properly means **hoisting
+the scheme guard out of `EditorValidation` into something both the display path and import can call**,
+not patching the one `Href`.
+
+### PL-57 — three shipped surfaces have no e2e coverage and no design record
+
+The 2026-08-04 commits added a **Domains page**, a **Tags dictionary manager**, and **"remove
+everywhere" cascades** (`DomainValue_ReassignAndDelete`, `ResourceType_ReassignAndDelete`,
+`TagDefinition_ForceDelete`). Status:
+
+- **Service-layer unit coverage is real** — rename / reassign / delete paths including refusal cases.
+- **No e2e coverage.** The Playwright suite is still the same four specs (delete, dependencies,
+  dirty-guard, nested-create); none of the three new surfaces is driven.
+- **No design record.** None of the three appears in any doc under `docs/plans/`.
+
+**Why this matters more than the count suggests:** cascade delete is the most destructive code in the
+app — it rewrites or removes rows across every resource that uses a vocabulary item — and it is the
+only major surface with no end-to-end test. The unit tests mock the repository, so the sprocs' own
+`MERGE` and scoping guards are exercised **nowhere automatically**.
+
+### PL-58 — dependency diagram is **out of v1** (Steve's decision, 2026-09-13)
+
+**Decision, not a defect.** The dependency diagram / explorer is dropped from v1. **Constraint Steve
+attached: nothing done now may prevent enabling it later.**
+
+That makes this a **hide-the-entry-points change, not a deletion**:
+
+- **Keep** `explorer-canvas.js`, `ResourceExplorer.razor`, `ExplorerService`, `Resource_GetForExplorer`,
+  the `Diagram` table and the diagram sprocs. Deleting any of them turns re-enabling into a rebuild.
+- **Hide** the routes into it — the explorer entry point(s) from the grid row actions and the nav
+  menu. The `/explore/{uid}` and `/explore/shared/{id}` routes can stay registered but unlinked, or
+  sit behind a switch; leaving them reachable by typed URL is a decision to make, not an oversight.
+- **Keep the seed data and its scripts.** Re-enabling against an empty graph would look broken.
+- **Do not** revert the explorer fixes already made (PL-37 through PL-44, PL-A8, PL-A9). They are
+  done, they cost nothing to keep, and re-earning them later would be pure waste.
+
+**Items this parks (all already fixed — parked, not reopened):** PL-37, PL-38, PL-39, PL-41, PL-42,
+PL-43, PL-44. **PL-40** (are arrows actually visible) was the last explorer item still needing eyes —
+it is now **deferred with the feature** rather than verified, and must be checked if the diagram is
+ever switched back on.
+
+**Two things to check before hiding it**, because they reach outside the explorer:
+
+1. **PL-56's reference implementation lives in `explorer-canvas.js`** — `isHttpUrl()` plus
+   `rel="noopener noreferrer"`. Hiding the UI does not remove the code, so the reference survives; but
+   whoever fixes PL-56 should not assume the explorer is the place to put the shared guard.
+2. **Export/print (PNG, SVG, print) are explorer features.** Dropping the diagram drops them from v1
+   too. The **catalog JSON export (PL-09) is a separate feature and stays** — do not conflate them.
+
+### PL-59 — environment mismatch — **FIXED 2026-09-13**
+
+**Fixed by four changes**, all in `Program.cs` unless noted:
+1. `AddUserSecrets<Program>(optional: true)` — secrets no longer depend on the environment being *named* `Development`.
+2. Re-add `AddEnvironmentVariables()` + `AddCommandLine(args)` after it, so appending secrets does not outrank them.
+3. `builder.WebHost.UseStaticWebAssets()` — **the one that mattered most**, see the trap below.
+4. Treat `localhost` as local-development for the exception-handler/HSTS guard.
+Plus `appsettings.localhost.json` (committed, localdb strings — non-secret), both launch profiles moved to `localhost`, and `playwright.config.js` pinned to both environment variable names.
+
+**The trap, worth remembering:** Static Web Assets are wired up automatically **only when the environment is literally named `Development`**. Under any other name a non-published `dotnet run` returns **500 for `_framework/blazor.web.js`, `_content/MudBlazor/*` and the scoped-CSS bundle**. The page still server-renders, so it *looks* fine in a screenshot — but it is unstyled and the Blazor circuit never starts, so **nothing is clickable**. A 200 on `/` is not evidence the app works.
+
+That is also why the sibling MacroPoint repos adopt `localhost` painlessly: they are services, with no static web assets to lose.
+
+*Original write-up follows.*
+
+### PL-59 — the documented CLI run command fails; Visual Studio is unaffected
+
+**Scope, corrected 2026-09-13 after Steve ran it from Visual Studio:** **F5 from VS works fine** —
+the app serves the grid normally on the `https` profile (`https://localhost:7200`), because that
+profile sets `ASPNETCORE_ENVIRONMENT=Development` and the VS process does not carry the ambient
+`DOTNET_ENVIRONMENT=localhost` that a shell does. **This is a CLI/agent-shell problem, not a broken
+app** — the original heading here overstated it.
+
+**Found while trying to drive the app for the browser pass.** From a shell, every page returns
+**HTTP 500**:
+
+```
+KeyNotFoundException: Configuration value for key
+'ResourceMapper:ConnectionStrings:Database:RO' is required.
+```
+
+**Cause.** The shell environment carries `ASPNETCORE_ENVIRONMENT=localhost` **and**
+`DOTNET_ENVIRONMENT=localhost`. The app ships `appsettings.json` and `appsettings.Development.json` — **there is no
+`appsettings.localhost.json`** — and connection strings live in **user secrets**, which
+`WebApplication.CreateBuilder` loads **only when the environment is `Development`**. Under `localhost`
+the secrets are skipped and the required key is absent.
+
+**Why the documented run command does not save you — and the non-obvious bit:** it sets only
+`ASPNETCORE_ENVIRONMENT`, leaving `DOTNET_ENVIRONMENT=localhost` in place, and **`DOTNET_ENVIRONMENT`
+wins** — the app still resolved to `localhost`. Verified twice (`Hosting environment: localhost` with
+`ASPNETCORE_ENVIRONMENT=Development` set); setting **both** gives `Hosting environment: Development`
+and a 200. That precedence is the opposite of what most people assume, which is what makes this cost
+an hour rather than a minute. The both-variables form is a workaround, not a fix.
+
+**Why it still matters, given VS works:** it is the **agent/CLI path** that breaks, and that is the
+path every automated run uses — the Playwright suite's `webServer`, any script, any future pipeline.
+The failure mode is a bare 500 on every page with the reason only in the log. `GlobalConfig` already has `ValidateRequiredKeys` — failing fast at startup with a
+message naming the missing key and the resolved environment would turn a mystifying 500 into a
+one-line diagnosis. Deployment is out of v1 scope, but *starting the app* is not.
+
+**Steve's reframe, 2026-09-13 — this is the real finding:** *"the problem is that my F5-VS code is
+using `Development` as its environment."* **This project is the outlier, not the shell.** The machine
+convention is `localhost`: `macropoint.com` and `macropoint-lite.com` both ship
+`appsettings.localhost.json` across their services, and the ambient `DOTNET_ENVIRONMENT=localhost`
+exists to serve them. HT.ResourceMapper is the only repo that pins `Development` — in its launch
+profiles — and it parks its connection strings where **only** `Development` can reach them (user
+secrets, which `CreateBuilder` loads for that one environment name).
+
+So forcing `Development` anywhere — in a shell, in an agent's settings, in the docs — **entrenches the
+anomaly**. The fix is to make this repo behave like its neighbours.
+
+**Preferred fix (align with the machine convention):**
+
+1. `builder.Configuration.AddUserSecrets<Program>(optional: true)` — load secrets regardless of
+   environment name, so the app stops depending on being called `Development`.
+2. Add `appsettings.localhost.json` mirroring `appsettings.Development.json`'s Serilog override.
+3. Point both launch profiles at `localhost` so Visual Studio and the shell agree.
+
+Note the connection strings here are **not actually secret** — `(localdb)\MSSQLLocalDB` with
+Integrated Security, no password — so they could equally live in a committed
+`appsettings.localhost.json` and make a fresh clone work with no setup at all. Worth deciding
+deliberately rather than leaving them in user secrets by inertia.
+
+**Still worth doing regardless:** fail fast at startup naming the missing key *and the resolved
+environment*. `GlobalConfig.ValidateRequiredKeys` already exists. That turns this whole class of
+problem into one legible line instead of a bare 500.
+
+### PL-60 — `CLAUDE.md` documents a project layout that no longer exists
+
+`UI/ResourceMapper.UI.Client` and `UI/ResourceMapper.UI.Server` contain **nothing but stale `obj/`
+folders** — no `.csproj`. The solution references exactly one UI project, `UI/ResourceMapper.UI.Web`.
+Consequences in the checked-in guidance:
+
+- `dotnet build UI/ResourceMapper.UI.Server` and `dotnet run --project UI/ResourceMapper.UI.Server`
+  (both in `CLAUDE.md`'s **Development Commands**) target a project that cannot be built or run.
+- `CLAUDE.md` describes the app as **"Blazor WebAssembly hosted by ASP.NET Core"**. `Program.cs` is a
+  **Blazor Web App — static SSR with interactive-server islands**. Different hosting model, different
+  debugging assumptions.
+- The empty `obj/` husks are themselves worth deleting, or the next person will assume the projects
+  exist and were merely unloaded.
+
+**Small, but it is the file every new session reads first**, so a wrong instruction here costs more
+than its size suggests.
+
+### PL-61 — replace the simulated catalog with the real vNext Azure resource links ⚑
+
+**Steve, 2026-09-13.** The demo/simulated data goes; the catalog is populated from the team wiki page
+**vNext Azure Resource Links** (`MacroPoint.wiki`, page 11783).
+
+**Steve will provide the extraction.** The page is *not* reliably parseable by an automated agent, so
+**do not scrape it** — the input to this work arrives as instructions/content from Steve. Treat any
+agent-side parse of that page as untrusted and re-verify against what he supplies.
+
+**Why this is more than a data swap:** every demo script currently in the repo encodes assumptions the
+real data may not share — the domain (`prod` / `non-prod`) split, which tag definitions exist, which
+resource types exist and their `ShortCode`/`IconKey`, and the entry-point templates per type. The real
+links will have their own shape. Expect the *vocabulary* to change, not just the rows.
+
+**Sequencing — do this before the items it moots, not after:**
+
+- **Supersedes PL-45** (seed data does not exercise the headline feature). Real data either exercises
+  it or proves the feature wrong; either way the synthetic fix stops being the reference.
+- **Probably moots PL-A2** ("Azure ServcieFabric" typo) — that string lives in seeded *type* data which
+  real data replaces. Do not spend a separate pass fixing a typo in rows that are about to be deleted;
+  re-check afterwards that it is actually gone.
+- **Changes the shape of PL-A6** (demo seed regenerates `ResourceUid` via `NEWID()` each run). Real
+  catalog rows need **stable, re-runnable identity** far more than demo rows did, because permalinks to
+  them will be shared. PL-A6 stops being a demo-hygiene nit and becomes a requirement of the import.
+- **Interacts with PL-56.** Real Azure portal links arrive as URLs from an external document and land
+  in Link-typed tags rendered as clickable `href`s. That is exactly the unguarded display path PL-56
+  describes, and the **import path validates no URLs at all**. Fix PL-56 before or with this, not after.
+
+**Keep the demo scripts runnable.** They are the only fixture that makes the app demonstrable on an
+empty database, and the e2e suite has its own separate fixture that must not be disturbed. Replacing
+the *catalog contents* should not mean deleting the *ability to seed something*.
+
+**Open questions for Steve** (do not guess these):
+
+1. Is the wiki page a **one-time import** or a **recurring sync**? A recurring sync needs matching
+   rules — what counts as the same resource on re-import — and PL-A6's stable-identity requirement
+   becomes load-bearing.
+2. Do the wiki's groupings map onto the existing **Subscription** domain vocabulary, or do they need
+   new domain values?
+3. Does real data need **resource types** that do not exist yet, with their `ShortCode`/`IconKey`?
+
+### E2E suite — green again, and the cause was not what it looked like
+
+**All specs pass, verified on two consecutive full runs** with consistent per-test timings (no
+flakiness, and the known cold-start race did not surface).
+
+**Correction worth recording.** While the suite was red it was assumed — in this session's own
+reporting — to have been *"red since the August feature commits"*, on the reasoning that those commits
+shipped without it being run. **That was an inference, and it was wrong.** The suite passes against
+current code with every August change in place, so those commits never broke it.
+
+The real cause was environmental, the same root as PL-59: the ambient `DOTNET_ENVIRONMENT=localhost`
+overrode the `ASPNETCORE_ENVIRONMENT: 'Development'` that `playwright.config.js` pinned, so the app
+under test started with **no connection string at all**. Later, once that was fixed but before
+`UseStaticWebAssets()` was added, it failed a second way — the app served pages whose scripts all
+404'd, so every spec timed out clicking a control that could never respond.
+
+**Two lessons this cost real time to learn:**
+
+1. **A suite that fails on infrastructure looks exactly like a suite that fails on regressions.**
+   Every spec timed out on a `locator.click`, which reads as "the UI changed" — it was actually "the
+   UI was never alive". Check that the app under test is genuinely interactive before reading spec
+   failures as product defects.
+2. **Do not attribute redness to the most recent commits without running them.** The August commits
+   were the obvious suspect and were innocent.
+
+**The suite now pins both environment variable names** (`playwright.config.js`), so it no longer
+inherits whatever the machine happens to set.
+
+**Unchanged by this:** PL-57 still stands — the suite covers the editor only. Domains, the tag
+dictionary manager, and the cascade deletes have no end-to-end coverage, and cascade delete remains
+the most destructive code in the app with no automated check above the mocked unit tests.
+
+---
+
+## Historical sections
+
+Everything from here down is the 2026-08-02 capture and the session logs that followed, preserved for
+the reasoning they carry. **Status claims in them are superseded by the re-triage table above.**
+
+---
+
+## v1-BLOCKING *(historical — both items below are FIXED)*
 
 Ship-stoppers. Both are small.
 
 | id | Item | Where |
 |---|---|---|
-| **PL-22** | **Cancel leaves a permanently stuck loading bar over a blank page.** `_ = LoadAsync(...)` fire-and-forget from a *synchronous* `void Cancel()`; `finally` clears `_loading` but never calls `StateHasChanged()`, so nothing repaints. Dead end — user must reload. Fix: `async Task Cancel()` + `await`. | `ResourceEditor.razor:288-292, 297-315` |
-| **PL-42** | **Edges between two on-canvas neighbours are never drawn.** `Resource_GetForExplorer` returns only edges *incident to the center*. Confirmed: seed `DEMOEXP-checkout` shows Pricing Service and Inventory Service both on canvas with `Pricing Service -> Inventory Service` in the data and **no edge rendered**. For a dependency map this is a correctness defect — the picture asserts "unrelated" when they are related, with no signal of omission. | sproc + `ExplorerService` + `explorer-canvas.js` |
+| **PL-22** ✅ FIXED | **Cancel leaves a permanently stuck loading bar over a blank page.** `_ = LoadAsync(...)` fire-and-forget from a *synchronous* `void Cancel()`; `finally` clears `_loading` but never calls `StateHasChanged()`, so nothing repaints. Dead end — user must reload. Fix: `async Task Cancel()` + `await`. *(Now `private async Task Cancel()`, `ResourceEditor.razor:415`.)* | `ResourceEditor.razor:288-292, 297-315` |
+| **PL-42** ✅ FIXED | **Edges between two on-canvas neighbours are never drawn.** `Resource_GetForExplorer` returns only edges *incident to the center*. For a dependency map this is a correctness defect — the picture asserts "unrelated" when they are related, with no signal of omission. *(The sproc now returns every edge inside the on-canvas set, plus `@KnownResourceUids` backfill.)* | sproc + `ExplorerService` + `explorer-canvas.js` |
 
-## SECURITY
+## SECURITY *(historical — FIXED)*
 
 | id | Item | Where |
 |---|---|---|
-| **PL-A8** | **XSS via shared diagram name.** `printDiagram()` writes the user-supplied diagram name into `<title>` unescaped. Vector is not self-harm — slice 7b shares diagrams, so a name like `</title><img src=x onerror=…>` executes in the *recipient's* browser when they print. `escapeHtml` already exists in the same file (`:620`) and `svgWithHeader` uses it, so this is an oversight. One-line fix. | `explorer-canvas.js:590` |
+| **PL-A8** ✅ FIXED | **XSS via shared diagram name.** `printDiagram()` writes the user-supplied diagram name into `<title>` unescaped. Diagrams are shareable, so a name like `</title><img src=x onerror=…>` executes in the *recipient's* browser when they print. *(Now `escapeHtml(overlayTitle …)`, `explorer-canvas.js:744`.)* | `explorer-canvas.js:590` |
 
 ---
 
-## Batches
+## Batches *(historical — see the re-triage table for what is still open)*
 
 Grouped by **touched file/pattern, not by issue** — the single biggest speed lever. Ten tweaks to
 one file is one work item. Batches marked ⚑ are usability-critical per the standing rule.
@@ -577,6 +922,42 @@ persisted across records — a nested "Create new…" opened on **Dependencies**
 unseen. Now reset on record / nested-level change only, so View → Edit on the same record still keeps
 your place.
 
+## Session 2026-09-13 — walkthrough resumes
+
+### PL-55 — the editor's Save button: placement, and it invites a refusal ⚑ (new)
+
+**Steve, on returning to the app:** *"I don't think a 'Save' button should be at the bottom of the
+screen and if so, it should not be enabled if the record is not valid. I click on save and I get a
+yellow toast."*
+
+**Descriptive, not prescriptive** — recorded as three observations; the fix is TBD:
+
+1. **Placement.** Save sits in the sticky footer `.rm-shell-foot` beside the wizard's Previous/Next
+   (`ResourceEditor.razor:98`). That footer's own comment already records this as a knowingly
+   accepted trade from the Azure UX pass: *"Azure's bar belongs to a create wizard, while this editor
+   is mostly used to edit, where bottom-right Save is the stronger convention. Kept for consistency
+   with the reference."* So this **re-opens a decision that was made deliberately**, rather than
+   correcting an oversight — decide it on its merits, don't just move the button.
+2. **Save is never disabled for invalidity.** `Disabled="@_saving"` is the only gate. Validity is
+   computed nowhere the button can see — `EditorValidation.ValidateGeneral/ValidateTags` run *inside*
+   `SaveInternalAsync` (`:634-641`), at click time.
+3. **The yellow toast is that check failing.** `Snackbar.Add("Fix the highlighted fields before
+   saving.", Severity.Warning)`. An enabled control whose only outcome is a refusal — **the same
+   shape as PL-25b and PL-53:** the app offers an action it will not honour.
+
+**Note the tension between (1) and (2):** a disabled Save needs a live validity signal, and a Save
+placed where it must be scrolled to makes *"why is it disabled?"* harder to answer. Whichever
+placement wins, the "why can't I save" affordance is part of the same decision — a silent disabled
+button trades one dead end for a quieter one.
+
+**Also unresolved:** if validity gates the button, an untouched Create form is invalid from first
+paint, so Save would start disabled — which is the neighbourhood of **PL-A7** (Key shows red
+"Required" on an apparently untouched Create form while empty Name isn't). Confirm PL-A7 first; these
+may be one decision about when validation starts speaking.
+
+**Not yet triaged into a batch.** Touches `ResourceEditor.razor` chrome (B4's file) and the Azure
+footer from B11.
+
 ## Coverage gaps in this capture
 
 Findings here are only as good as what was exercised. Not covered:
@@ -590,7 +971,11 @@ Findings here are only as good as what was exercised. Not covered:
 
 A short second pass on `/import` before locking scope is worthwhile.
 
-## Effort and the cut list
+## Effort and the cut list *(historical — the cut was effectively taken)*
+
+> Most of what "Option B" scoped has since been built, and parts of Option C with it
+> (type CRUD, export, the Azure design). Kept for the estimation method and the
+> agent-compression analysis, which held up. The batch table below is **not** current status.
 
 **Unit: traditional human developer-hours** (S ≤30min · M ≤2h · L >2h), assuming a focused session
 with the app already running. See "Agent-driven re-cast" below — this project is built agentically,
@@ -671,19 +1056,29 @@ That lands **inside** the original 20–30h weekend budget rather than at double
 produce 30 findings — and that was Steve talking, with no code written. Design batches have the same
 shape. Adding agents does not move that floor.
 
-## Open decisions (block their batches, not the list)
+## Open decisions
 
-1. **PL-11** — how far to take Azure styling against "avoid customisation"?
-2. **PL-09** — HTTP controller (per the design doc) or in-process service (per current convention)?
-3. **PL-15** — wizard nav in Create mode only, or Edit too?
-4. **PL-18** — relabel/reposition, or an additional affordance?
-5. **PL-20** — was same-tag-twice-as-separate-rows ever intended? (contradicts the chips design)
+**Re-triaged 2026-09-13.** Most of the original five were settled by building the thing. What remains:
+
+1. **When should validation start speaking?** One decision covering the Save button (PL-55) and the
+   Key-shows-Required-on-a-fresh-form report (PL-A7). Gating Save on validity means an untouched
+   Create form starts disabled, so these cannot be decided separately.
+2. **Where does the scheme guard live?** (PL-56) Hoisting it out of `EditorValidation` so the display
+   path and import share it is the real fix; patching the one `Href` is not.
+3. **Is resource-identity rename still wanted?** (PL-13/14) It was specified, never built, and the app
+   has been used without it.
+
+*Settled since capture, kept for the record:* the Azure styling question (PL-11 — the design was built),
+the export transport question (PL-09 — in-process service shipped), wizard nav scope (PL-15 — both
+modes), and the add-affordance and multi-value questions (PL-18 / PL-20).
 
 ## Verification
 
-- `dotnet test` — expect **473** tests, 2 known failures (PL-01 `NotFound`→404), no new ones.
-  (Was 416 at capture; the count grew with the export / type-CRUD work.)
-- `cd tools/e2e && npm run test:e2e` — expect **8/8**. Was 0/8 from PL-45 until PL-52 closed it;
+- `dotnet test` — the **only** expected failures are the two `NotFound`→404 mapping tests (PL-01).
+  Any other red is a real signal. *(Deliberately not stating a total: the count grows with every
+  feature, so a fixed number here would go stale immediately and make a correct run look wrong.)*
+- `cd tools/e2e && npm run test:e2e` — all specs should pass. **Coverage gap (PL-57):** the suite
+  drives the editor only; the Domains, Tags-manager and cascade-delete surfaces are untested. Was 0/8 from PL-45 until PL-52 closed it;
   a red run is now a real signal again.
 - Drive the app: `ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS="http://localhost:5200" dotnet run --project UI/ResourceMapper.UI.Web --no-launch-profile`
 - **Stop the app before building** — it locks build output
