@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ResourceMapper.Common.Server.Config;
 using ResourceMapper.Common.Server.Explorer;
+using ResourceMapper.Common.Server.Identity;
 using ResourceMapper.Common.Server.Explorer.Interfaces;
 using ResourceMapper.Common.Server.Resources;
 using ResourceMapper.Common.Server.Resources.Interfaces;
@@ -34,6 +35,8 @@ namespace ResourceMapper.Common.Server.Utils
             services.TryAddScoped<IImportService,ImportService>();
             services.TryAddScoped<IExportRepository,ExportSqlRepository>();
             services.TryAddScoped<IExportService,ExportService>();
+            // Singleton: the owner is configuration and cannot vary per request while there is one.
+            services.TryAddSingleton<ICurrentIdentity, ConfiguredIdentity>();
             services.TryAddScoped<IClientSettingsRepository, ClientSettingsSqlRepository>();
             services.TryAddScoped<IClientSettingsService, ClientSettingsService>();
         }
