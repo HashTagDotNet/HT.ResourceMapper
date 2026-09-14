@@ -7,6 +7,8 @@ using ResourceMapper.Common.Server.Explorer;
 using ResourceMapper.Common.Server.Identity;
 using ResourceMapper.Common.Server.Explorer.Interfaces;
 using ResourceMapper.Common.Server.Resources;
+using ResourceMapper.Common.Server.SavedViews;
+using ResourceMapper.Common.Server.SavedViews.Interfaces;
 using ResourceMapper.Common.Server.Resources.Interfaces;
 using ResourceMapper.Common.Server.Settings;
 using ResourceMapper.Common.Server.Settings.Interfaces;
@@ -39,6 +41,8 @@ namespace ResourceMapper.Common.Server.Utils
             services.TryAddSingleton<ICurrentIdentity, ConfiguredIdentity>();
             services.TryAddScoped<IClientSettingsRepository, ClientSettingsSqlRepository>();
             services.TryAddScoped<IClientSettingsService, ClientSettingsService>();
+            services.TryAddScoped<ISavedViewRepository, SavedViewSqlRepository>();
+            services.TryAddScoped<ISavedViewService, SavedViewService>();
         }
     }
 }
