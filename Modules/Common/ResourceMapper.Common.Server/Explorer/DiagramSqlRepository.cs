@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,14 +18,14 @@ namespace ResourceMapper.Common.Server.Explorer
             _db = db;
         }
 
-        public async Task<DiagramUpsertResult> UpsertAsync(string diagramUid, string shareId, string clientId,
+        public async Task<DiagramUpsertResult> UpsertAsync(string diagramUid, string shareId, string ownerId,
             string name, string seedResourceUid, string displayPreset, string diagramJson,
             CancellationToken cancellationToken)
         {
             using var cmd = _db.RW.SprocCommand("[HTResourceMapper].Diagram_Upsert")
                 .AddVarchar("@DiagramUid", diagramUid)
                 .AddVarchar("@ShareId", shareId)
-                .AddVarchar("@ClientId", clientId)
+                .AddVarchar("@OwnerId", ownerId)
                 .AddNVarchar("@Name", name)
                 .AddVarchar("@SeedResourceUid", seedResourceUid)
                 .AddVarchar("@DisplayPreset", displayPreset)
@@ -50,7 +50,7 @@ namespace ResourceMapper.Common.Server.Explorer
             {
                 DiagramUid = dr.ReadString("DiagramUid"),
                 ShareId = dr.ReadString("ShareId"),
-                ClientId = dr.ReadString("ClientId"),
+                OwnerId = dr.ReadString("OwnerId"),
                 Name = dr.ReadString("Name"),
                 SeedResourceUid = dr.ReadString("SeedResourceUid"),
                 DisplayPreset = dr.ReadString("DisplayPreset"),
@@ -61,10 +61,10 @@ namespace ResourceMapper.Common.Server.Explorer
             return rows.FirstOrDefault();
         }
 
-        public async Task<List<DiagramListRow>> ListForClientAsync(string clientId, CancellationToken cancellationToken)
+        public async Task<List<DiagramListRow>> ListForClientAsync(string ownerId, CancellationToken cancellationToken)
         {
-            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].Diagram_ListForClient")
-                .AddVarchar("@ClientId", clientId);
+            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].Diagram_ListForOwner")
+                .AddVarchar("@OwnerId", ownerId);
 
             return await _db.Execute.ExecuteQueryAsync(cmd, dr => new DiagramListRow
             {
@@ -76,10 +76,10 @@ namespace ResourceMapper.Common.Server.Explorer
             }, cancellationToken: cancellationToken);
         }
 
-        public async Task<bool> DeleteAsync(string clientId, string diagramUid, CancellationToken cancellationToken)
+        public async Task<bool> DeleteAsync(string ownerId, string diagramUid, CancellationToken cancellationToken)
         {
             using var cmd = _db.RW.SprocCommand("[HTResourceMapper].Diagram_Delete")
-                .AddVarchar("@ClientId", clientId)
+                .AddVarchar("@OwnerId", ownerId)
                 .AddVarchar("@DiagramUid", diagramUid);
 
             var rows = await _db.Execute.ExecuteQueryAsync(cmd, dr => dr.ReadInt("Deleted"),

@@ -1,12 +1,12 @@
--- Create or update a diagram. Matches on (DiagramUid, ClientId) so a client can only update its
+﻿-- Create or update a diagram. Matches on (DiagramUid, OwnerId) so a client can only update its
 -- own rows; @ShareId is used only on insert. Returns the authoritative Result/DiagramUid/ShareId
 -- by selecting the row back (so updates return the real existing ShareId). If @DiagramUid already
--- exists under a DIFFERENT ClientId, the request is denied (Result='denied', empty ids) rather
+-- exists under a DIFFERENT OwnerId, the request is denied (Result='denied', empty ids) rather
 -- than attempting a blind INSERT that would violate UK_Diagram_DiagramUid.
 CREATE PROCEDURE [HTResourceMapper].[Diagram_Upsert]
     @DiagramUid VARCHAR(40),
     @ShareId VARCHAR(40),
-    @ClientId VARCHAR(64),
+    @OwnerId VARCHAR(64),
     @Name NVARCHAR(200),
     @SeedResourceUid VARCHAR(40),
     @DisplayPreset VARCHAR(20),
@@ -18,12 +18,12 @@ BEGIN
     DECLARE @Result VARCHAR(10);
 
     IF EXISTS (SELECT 1 FROM [HTResourceMapper].[Diagram]
-               WHERE DiagramUid = @DiagramUid AND ClientId = @ClientId)
+               WHERE DiagramUid = @DiagramUid AND OwnerId = @OwnerId)
     BEGIN
         UPDATE [HTResourceMapper].[Diagram]
         SET Name = @Name, SeedResourceUid = @SeedResourceUid, DisplayPreset = @DisplayPreset,
             DiagramJson = @DiagramJson, UpdatedOn = SYSUTCDATETIME()
-        WHERE DiagramUid = @DiagramUid AND ClientId = @ClientId;
+        WHERE DiagramUid = @DiagramUid AND OwnerId = @OwnerId;
         SET @Result = 'updated';
     END
     ELSE IF EXISTS (SELECT 1 FROM [HTResourceMapper].[Diagram] WHERE DiagramUid = @DiagramUid)
@@ -34,8 +34,8 @@ BEGIN
     ELSE
     BEGIN
         INSERT INTO [HTResourceMapper].[Diagram]
-            (DiagramUid, ShareId, ClientId, Name, SeedResourceUid, DisplayPreset, DiagramJson)
-        VALUES (@DiagramUid, @ShareId, @ClientId, @Name, @SeedResourceUid, @DisplayPreset, @DiagramJson);
+            (DiagramUid, ShareId, OwnerId, Name, SeedResourceUid, DisplayPreset, DiagramJson)
+        VALUES (@DiagramUid, @ShareId, @OwnerId, @Name, @SeedResourceUid, @DisplayPreset, @DiagramJson);
         SET @Result = 'created';
     END
 
@@ -44,5 +44,5 @@ BEGIN
     ELSE
         SELECT @Result AS Result, DiagramUid, ShareId
         FROM [HTResourceMapper].[Diagram]
-        WHERE DiagramUid = @DiagramUid AND ClientId = @ClientId;
+        WHERE DiagramUid = @DiagramUid AND OwnerId = @OwnerId;
 END

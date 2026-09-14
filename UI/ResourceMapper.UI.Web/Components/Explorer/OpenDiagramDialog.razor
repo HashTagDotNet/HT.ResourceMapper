@@ -1,4 +1,4 @@
-@namespace ResourceMapper.UI.Web.Components.Explorer
+﻿@namespace ResourceMapper.UI.Web.Components.Explorer
 @using ResourceMapper.Common.Server.Explorer.Interfaces
 @using ResourceMapper.Common.Shared.Explorer.Diagrams
 @inject IDiagramService DiagramService
@@ -38,7 +38,7 @@
 
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
-    [Parameter] public string ClientId { get; set; } = string.Empty;
+    [Parameter] public string OwnerId { get; set; } = string.Empty;
 
     private readonly List<DiagramListItem> _items = new();
     private bool _loading = true;
@@ -49,7 +49,7 @@
     {
         _loading = true;
         _items.Clear();
-        var resp = await DiagramService.ListForClientAsync(ClientId);
+        var resp = await DiagramService.ListForClientAsync(OwnerId);
         if (resp.IsSuccess() && resp.ApiResponse.Data is not null)
             _items.AddRange(resp.ApiResponse.Data);
         _loading = false;
@@ -59,7 +59,7 @@
 
     private async Task Delete(DiagramListItem d)
     {
-        await DiagramService.DeleteAsync(ClientId, d.DiagramUid);
+        await DiagramService.DeleteAsync(OwnerId, d.DiagramUid);
         await RefreshAsync();
     }
 

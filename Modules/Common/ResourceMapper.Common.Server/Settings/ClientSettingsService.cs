@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using HT.Api.Client.Contracts.Models;                 // CallStatusCode
@@ -18,14 +18,14 @@ namespace ResourceMapper.Common.Server.Settings
             _repo = repo;
         }
 
-        public async Task<ApiServiceResponse<ClientSettingModel>> GetAsync(string clientId, string settingKey, CancellationToken cancellationToken = default)
+        public async Task<ApiServiceResponse<ClientSettingModel>> GetAsync(string ownerId, string settingKey, CancellationToken cancellationToken = default)
         {
             var builder = new ServiceResponseBuilder<ClientSettingModel>();
             try
             {
-                if (string.IsNullOrWhiteSpace(clientId))
+                if (string.IsNullOrWhiteSpace(ownerId))
                 {
-                    builder.Validation.AddValidation("clientId", "Client id is required");
+                    builder.Validation.AddValidation("ownerId", "Owner is required");
                     return builder.BuildResponse();
                 }
                 if (string.IsNullOrWhiteSpace(settingKey))
@@ -34,7 +34,7 @@ namespace ResourceMapper.Common.Server.Settings
                     return builder.BuildResponse();
                 }
 
-                var value = await _repo.GetAsync(clientId, settingKey, cancellationToken);
+                var value = await _repo.GetAsync(ownerId, settingKey, cancellationToken);
                 builder.Data.Set(new ClientSettingModel { SettingKey = settingKey, Value = value });
                 return builder.BuildResponse();
             }
@@ -45,14 +45,14 @@ namespace ResourceMapper.Common.Server.Settings
             }
         }
 
-        public async Task<ApiServiceResponse<object>> SetAsync(string clientId, string settingKey, string? value, CancellationToken cancellationToken = default)
+        public async Task<ApiServiceResponse<object>> SetAsync(string ownerId, string settingKey, string? value, CancellationToken cancellationToken = default)
         {
             var builder = new ServiceResponseBuilder<object>();
             try
             {
-                if (string.IsNullOrWhiteSpace(clientId))
+                if (string.IsNullOrWhiteSpace(ownerId))
                 {
-                    builder.Validation.AddValidation("clientId", "Client id is required");
+                    builder.Validation.AddValidation("ownerId", "Owner is required");
                     return builder.BuildResponse();
                 }
                 if (string.IsNullOrWhiteSpace(settingKey))
@@ -61,7 +61,7 @@ namespace ResourceMapper.Common.Server.Settings
                     return builder.BuildResponse();
                 }
 
-                await _repo.UpsertAsync(clientId, settingKey, value ?? string.Empty, cancellationToken);
+                await _repo.UpsertAsync(ownerId, settingKey, value ?? string.Empty, cancellationToken);
                 builder.Data.Set(new object());
                 return builder.BuildResponse();
             }

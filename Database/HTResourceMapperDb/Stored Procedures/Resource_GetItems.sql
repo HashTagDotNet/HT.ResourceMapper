@@ -1,4 +1,4 @@
-CREATE PROCEDURE [HTResourceMapper].[Resource_GetItems]
+﻿CREATE PROCEDURE [HTResourceMapper].[Resource_GetItems]
     @SearchFor NVARCHAR(255) = NULL,
     @OrderBy NVARCHAR(50) = NULL,
     @OrderDirection NVARCHAR(4) = NULL,
@@ -70,6 +70,8 @@ BEGIN
             )
         )';
 
+        -- Per-VALUE match flag. Promoted to a per-TAG priority below with MIN() OVER, so a tag
+        -- whose any value matches the search sorts first as a whole rather than being split.
         SET @priorityLogic = '
             CASE
                 WHEN @SafeSearchForParam IS NOT NULL AND (
@@ -79,21 +81,13 @@ BEGIN
                 ELSE 1  -- Non-matching tags get priority 1
             END';
 
-        SET @orderByLogic = '
-                    CASE
-                        WHEN @SafeSearchForParam IS NOT NULL AND (
-                            rt.TagValue LIKE @SafeSearchForParam ESCAPE '']''
-                            OR td.TagDefinitionKey LIKE @SafeSearchForParam ESCAPE '']'')
-                        THEN 0
-                        ELSE 1
-                    END,
-                    td.TagDefinitionKey,
-                    rt.TagValue';
+        -- Values within one tag, once that tag has earned a place.
+        SET @orderByLogic = 'TagValue';
     END
     ELSE
     BEGIN
         SET @priorityLogic = '1'; -- All tags have same priority when no search
-        SET @orderByLogic = 'td.TagDefinitionKey, rt.TagValue';
+        SET @orderByLogic = 'TagValue';
     END
 
     -- Structured filter block (AND across filters; OR within an enumerable filter).
@@ -203,16 +197,25 @@ BEGIN
             COALESCE(td.DisplayName, td.TagDefinitionKey) as TagDisplayName,
             tct.TagCode as ContentType,
             rt.TagValue,
-            ' + @priorityLogic + ' as Priority,
-            ROW_NUMBER() OVER (
-                PARTITION BY pr.ResourceUid
-                ORDER BY
-                    ' + @orderByLogic + '
-            ) as TagRank
+            rt.TagDefinitionId,
+            -- A tag''s priority is the best priority of any of its values, so a multi-valued tag
+            -- is promoted or demoted as a unit and never straddles the cut.
+            MIN(' + @priorityLogic + ') OVER (PARTITION BY pr.ResourceUid, rt.TagDefinitionId) as Priority
         FROM PagedResources pr
         LEFT JOIN [HTResourceMapper].[ResourceTag] rt WITH(NOLOCK) ON pr.ResourceId = rt.ResourceId
         LEFT JOIN [HTResourceMapper].[TagDefinition] td WITH(NOLOCK) ON rt.TagDefinitionId = td.TagDefinitionId
         LEFT JOIN [HTResourceMapper].[TagContentType] tct WITH(NOLOCK) ON td.TagContentTypeId = tct.TagContentTypeId
+    ),
+    TagsRanked AS (
+        -- @TagLimit counts TAGS, not tag values. DENSE_RANK over the tag key means a four-value
+        -- tag occupies one slot instead of four, so one verbose tag can no longer push every
+        -- other tag off the row (which is exactly what a multi-valued catalog used to do).
+        SELECT *,
+               DENSE_RANK() OVER (
+                   PARTITION BY ResourceUid
+                   ORDER BY Priority, TagKey
+               ) as TagRank
+        FROM TagsWithPriority
     )
     SELECT
         ResourceUid,
@@ -227,9 +230,9 @@ BEGIN
         TagValue,
         Priority,
         TagRank
-    FROM TagsWithPriority
+    FROM TagsRanked
     WHERE TagRank <= @TagLimitParam
-    ORDER BY SortSeq, Priority, TagRank';
+    ORDER BY SortSeq, Priority, TagRank, ' + @orderByLogic + '';
 
     EXEC sp_executesql @sql, @pageParamDef,
         @SafeSearchForParam = @SafeSearchFor,

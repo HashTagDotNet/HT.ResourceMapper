@@ -1,18 +1,19 @@
-@page "/"
+﻿@page "/"
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Routing
 @using ResourceMapper.Common.Server.Resources.Interfaces
 @using ResourceMapper.Common.Server.Settings.Interfaces
+@using ResourceMapper.Common.Server.Identity
 @using ResourceMapper.Common.Shared.HomePage.Contracts
 @using ResourceMapper.Common.Shared.HomePage.Filtering
 @using ResourceMapper.UI.Web.Components.Home
-@using ResourceMapper.UI.Web.Explorer
 @implements IDisposable
 @inject IResourceService ResourceService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
 @inject IClientSettingsService ClientSettings
+@inject ICurrentIdentity Identity
 
 <PageTitle>Resources — Hashtag Resource Mapper</PageTitle>
 
@@ -54,22 +55,33 @@
                 }
                 else
                 {
+                    @* Grouped by tag, not by value: a multi-valued tag prints its label once and
+                       lists its values, instead of repeating "App Insights Filter:" four times.
+                       GroupBy preserves first-appearance order, so the sproc's tag ordering
+                       still decides the sequence. Link tags stay one chip per value - each is
+                       separately clickable and copyable. *@
                     <div class="d-flex flex-wrap rm-tags">
-                        @foreach (var tag in context.Item.Tags)
+                        @foreach (var tagGroup in context.Item.Tags.GroupBy(t => t.TagDisplayName))
                         {
-                            @if (string.Equals(tag.ContentType, "Link", StringComparison.OrdinalIgnoreCase))
+                            @if (string.Equals(tagGroup.First().ContentType, "Link", StringComparison.OrdinalIgnoreCase))
                             {
-                                <span class="rm-tag">
-                                    <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" Class="rm-tagicon" />
-                                    <MudLink Href="@tag.TagValue" Target="_blank" Typo="Typo.body2">@tag.TagDisplayName</MudLink>
-                                    <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
-                                                   Class="rm-copy" aria-label="Copy link"
-                                                   OnClick="@(() => CopyAsync(tag.TagValue))" />
-                                </span>
+                                @foreach (var tag in tagGroup)
+                                {
+                                    <span class="rm-tag">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" Class="rm-tagicon" />
+                                        <MudLink Href="@tag.TagValue" Target="_blank" Typo="Typo.body2">@tag.TagDisplayName</MudLink>
+                                        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
+                                                       Class="rm-copy" aria-label="Copy link"
+                                                       OnClick="@(() => CopyAsync(tag.TagValue))" />
+                                    </span>
+                                }
                             }
                             else
                             {
-                                <span class="rm-tagtext"><span class="rm-tagkey">@tag.TagDisplayName:</span> @tag.TagValue</span>
+                                <span class="rm-tagtext">
+                                    <span class="rm-tagkey">@tagGroup.Key:</span>
+                                    @string.Join(", ", tagGroup.Select(t => t.TagValue))
+                                </span>
                             }
                         }
                     </div>
@@ -107,15 +119,20 @@
                                  AriaLabel="External links" Dense="true">
                             @foreach (var link in links)
                             {
-                                <MudMenuItem>
+                                @* The whole row opens the link: a menu item that looks clickable but
+                                   only responds on a small leading icon reads as broken. The icon is
+                                   now decorative, and Copy stops propagation so it copies without
+                                   also navigating. *@
+                                <MudMenuItem OnClick="@(() => OpenExternal(link.TagValue))">
                                     <div class="d-flex align-center rm-linkitem">
-                                        <MudIconButton Icon="@Icons.Material.Outlined.OpenInNew" Size="Size.Small"
-                                                       aria-label="Open link" Class="mr-1"
-                                                       OnClick="@(() => OpenExternal(link.TagValue))" />
+                                        <MudIcon Icon="@Icons.Material.Outlined.OpenInNew" Size="Size.Small"
+                                                 Class="mr-1" />
                                         <span class="flex-grow-1">@link.TagDisplayName</span>
-                                        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
-                                                       aria-label="Copy link"
-                                                       OnClick="@(() => CopyAsync(link.TagValue))" />
+                                        <span @onclick:stopPropagation="true">
+                                            <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
+                                                           aria-label="@($"Copy {link.TagDisplayName} link")"
+                                                           OnClick="@(() => CopyAsync(link.TagValue))" />
+                                        </span>
                                     </div>
                                 </MudMenuItem>
                             }
@@ -171,7 +188,7 @@
     // Server-backed "resume where you left off" (per-client setting). Persistence is gated until the
     // first-render resume check has run, so the grid's default initial load can't clobber a saved view.
     private const string GridViewSettingKey = "home.gridView";
-    private string _clientId = string.Empty;
+    private string _ownerId = string.Empty;
     private bool _resumeChecked;
 
     protected override async Task OnInitializedAsync()
@@ -203,7 +220,7 @@
         // Resume: when the URL carries no state of its own, restore the last-saved view from the
         // server-side per-client setting. An explicit / deep-linked URL (any query string) always
         // wins over the saved setting.
-        _clientId = await ClientIdentity.GetOrCreateAsync(JS);
+        _ownerId = Identity.OwnerId;
 
         var restored = false;
         if (string.IsNullOrEmpty(new Uri(Navigation.Uri).Query))
@@ -211,7 +228,7 @@
             string? saved = null;
             try
             {
-                var settingResp = await ClientSettings.GetAsync(_clientId, GridViewSettingKey);
+                var settingResp = await ClientSettings.GetAsync(_ownerId, GridViewSettingKey);
                 saved = settingResp.IsSuccess() ? settingResp.ApiResponse.Data?.Value : null;
             }
             catch { /* settings unavailable — fall back to the default view */ }
@@ -368,8 +385,8 @@
 
     private async Task PersistViewAsync(string query)
     {
-        if (string.IsNullOrEmpty(_clientId)) return;
-        try { await ClientSettings.SetAsync(_clientId, GridViewSettingKey, query); }
+        if (string.IsNullOrEmpty(_ownerId)) return;
+        try { await ClientSettings.SetAsync(_ownerId, GridViewSettingKey, query); }
         catch { /* settings unavailable — best-effort persistence */ }
     }
 

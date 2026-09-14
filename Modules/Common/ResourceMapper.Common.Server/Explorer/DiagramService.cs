@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -21,14 +21,14 @@ namespace ResourceMapper.Common.Server.Explorer
             _repo = repo;
         }
 
-        public async Task<ApiServiceResponse<SaveDiagramResponse>> SaveAsync(string clientId, SaveDiagramRequest request, CancellationToken cancellationToken = default)
+        public async Task<ApiServiceResponse<SaveDiagramResponse>> SaveAsync(string ownerId, SaveDiagramRequest request, CancellationToken cancellationToken = default)
         {
             var builder = new ServiceResponseBuilder<SaveDiagramResponse>();
             try
             {
-                if (string.IsNullOrWhiteSpace(clientId))
+                if (string.IsNullOrWhiteSpace(ownerId))
                 {
-                    builder.Validation.AddValidation("clientId", "Client id is required");
+                    builder.Validation.AddValidation("ownerId", "Owner is required");
                     return builder.BuildResponse();
                 }
                 if (request is null)
@@ -54,7 +54,7 @@ namespace ResourceMapper.Common.Server.Explorer
                 var diagramUid = isNew ? NewId() : request.DiagramUid!;
                 var shareCandidate = NewId();   // used only if inserting; Upsert returns the real one
 
-                var result = await _repo.UpsertAsync(diagramUid, shareCandidate, clientId,
+                var result = await _repo.UpsertAsync(diagramUid, shareCandidate, ownerId,
                     request.Name, request.SeedResourceUid,
                     string.IsNullOrWhiteSpace(request.DisplayPreset) ? "nameType" : request.DisplayPreset,
                     request.DiagramJson ?? string.Empty, cancellationToken);
@@ -81,18 +81,18 @@ namespace ResourceMapper.Common.Server.Explorer
             }
         }
 
-        public async Task<ApiServiceResponse<List<DiagramListItem>>> ListForClientAsync(string clientId, CancellationToken cancellationToken = default)
+        public async Task<ApiServiceResponse<List<DiagramListItem>>> ListForClientAsync(string ownerId, CancellationToken cancellationToken = default)
         {
             var builder = new ServiceResponseBuilder<List<DiagramListItem>>();
             try
             {
-                if (string.IsNullOrWhiteSpace(clientId))
+                if (string.IsNullOrWhiteSpace(ownerId))
                 {
-                    builder.Validation.AddValidation("clientId", "Client id is required");
+                    builder.Validation.AddValidation("ownerId", "Owner is required");
                     return builder.BuildResponse();
                 }
 
-                var rows = await _repo.ListForClientAsync(clientId, cancellationToken);
+                var rows = await _repo.ListForClientAsync(ownerId, cancellationToken);
                 builder.Data.Set(rows.Select(r => new DiagramListItem
                 {
                     DiagramUid = r.DiagramUid,
@@ -110,7 +110,7 @@ namespace ResourceMapper.Common.Server.Explorer
             }
         }
 
-        public async Task<ApiServiceResponse<DiagramModel>> GetByShareIdAsync(string shareId, string? callerClientId, CancellationToken cancellationToken = default)
+        public async Task<ApiServiceResponse<DiagramModel>> GetByShareIdAsync(string shareId, string? callerOwnerId, CancellationToken cancellationToken = default)
         {
             var builder = new ServiceResponseBuilder<DiagramModel>();
             try
@@ -130,7 +130,7 @@ namespace ResourceMapper.Common.Server.Explorer
                 }
 
                 var model = ToModel(row);
-                model.IsOwner = !string.IsNullOrEmpty(callerClientId) && row.ClientId == callerClientId;
+                model.IsOwner = !string.IsNullOrEmpty(callerOwnerId) && row.OwnerId == callerOwnerId;
                 if (!model.IsOwner)
                 {
                     model.DiagramUid = string.Empty;   // don't leak the owner handle to a read-only recipient
@@ -146,14 +146,14 @@ namespace ResourceMapper.Common.Server.Explorer
             }
         }
 
-        public async Task<ApiServiceResponse<SaveDiagramResponse>> SaveCopyAsync(string clientId, string shareId, string? newName, CancellationToken cancellationToken = default)
+        public async Task<ApiServiceResponse<SaveDiagramResponse>> SaveCopyAsync(string ownerId, string shareId, string? newName, CancellationToken cancellationToken = default)
         {
             var builder = new ServiceResponseBuilder<SaveDiagramResponse>();
             try
             {
-                if (string.IsNullOrWhiteSpace(clientId))
+                if (string.IsNullOrWhiteSpace(ownerId))
                 {
-                    builder.Validation.AddValidation("clientId", "Client id is required");
+                    builder.Validation.AddValidation("ownerId", "Owner is required");
                     return builder.BuildResponse();
                 }
                 if (string.IsNullOrWhiteSpace(shareId))
@@ -171,7 +171,7 @@ namespace ResourceMapper.Common.Server.Explorer
                 }
 
                 var name = string.IsNullOrWhiteSpace(newName) ? src.Name + " (copy)" : newName!;
-                var result = await _repo.UpsertAsync(NewId(), NewId(), clientId,
+                var result = await _repo.UpsertAsync(NewId(), NewId(), ownerId,
                     name, src.SeedResourceUid, src.DisplayPreset, src.DiagramJson, cancellationToken);
 
                 builder.Data.Set(new SaveDiagramResponse
@@ -189,14 +189,14 @@ namespace ResourceMapper.Common.Server.Explorer
             }
         }
 
-        public async Task<ApiServiceResponse<object>> DeleteAsync(string clientId, string diagramUid, CancellationToken cancellationToken = default)
+        public async Task<ApiServiceResponse<object>> DeleteAsync(string ownerId, string diagramUid, CancellationToken cancellationToken = default)
         {
             var builder = new ServiceResponseBuilder<object>();
             try
             {
-                if (string.IsNullOrWhiteSpace(clientId))
+                if (string.IsNullOrWhiteSpace(ownerId))
                 {
-                    builder.Validation.AddValidation("clientId", "Client id is required");
+                    builder.Validation.AddValidation("ownerId", "Owner is required");
                     return builder.BuildResponse();
                 }
                 if (string.IsNullOrWhiteSpace(diagramUid))
@@ -205,7 +205,7 @@ namespace ResourceMapper.Common.Server.Explorer
                     return builder.BuildResponse();
                 }
 
-                var deleted = await _repo.DeleteAsync(clientId, diagramUid, cancellationToken);
+                var deleted = await _repo.DeleteAsync(ownerId, diagramUid, cancellationToken);
                 if (!deleted)
                 {
                     builder.Errors.AddError(CallStatusCode.NotFound, "Diagram Not Found",

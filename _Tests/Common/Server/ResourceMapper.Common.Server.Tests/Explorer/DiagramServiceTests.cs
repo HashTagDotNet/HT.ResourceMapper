@@ -1,4 +1,4 @@
-// ReSharper disable InconsistentNaming
+﻿// ReSharper disable InconsistentNaming
 
 using System.Collections.Generic;
 using System.Threading;
@@ -30,11 +30,11 @@ namespace ResourceMapper.Common.Server.Tests.Explorer
         #region SaveAsync
 
         [Fact]
-        public async Task SaveAsync_BlankClientId_ReturnsValidationAndDoesNotCallRepo()
+        public async Task SaveAsync_BlankOwnerId_ReturnsValidationAndDoesNotCallRepo()
         {
             var response = await _sut.SaveAsync("", Req("Diagram A", "seed1"), CancellationToken.None);
 
-            response.IsSuccess().Should().BeFalse("because a client id is required");
+            response.IsSuccess().Should().BeFalse("because a owner is required");
             _repo.Verify(r => r.UpsertAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
                 It.IsAny<CancellationToken>()), Times.Never, "because validation short-circuits");
@@ -117,7 +117,7 @@ namespace ResourceMapper.Common.Server.Tests.Explorer
         public async Task GetByShareIdAsync_CallerIsOwner_SetsIsOwnerTrueAndKeepsDiagramUid()
         {
             _repo.Setup(r => r.GetByShareIdAsync("s1", It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new DiagramRow { DiagramUid = "d1", ShareId = "s1", ClientId = "owner", Name = "N", SeedResourceUid = "seed", DisplayPreset = "nameType", DiagramJson = "{}" });
+                .ReturnsAsync(new DiagramRow { DiagramUid = "d1", ShareId = "s1", OwnerId = "owner", Name = "N", SeedResourceUid = "seed", DisplayPreset = "nameType", DiagramJson = "{}" });
 
             var response = await _sut.GetByShareIdAsync("s1", "owner", CancellationToken.None);
 
@@ -130,7 +130,7 @@ namespace ResourceMapper.Common.Server.Tests.Explorer
         public async Task GetByShareIdAsync_CallerNotOwner_SetsIsOwnerFalseAndBlanksDiagramUid()
         {
             _repo.Setup(r => r.GetByShareIdAsync("s1", It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new DiagramRow { DiagramUid = "d1", ShareId = "s1", ClientId = "owner", Name = "N", SeedResourceUid = "seed", DisplayPreset = "nameType", DiagramJson = "{}" });
+                .ReturnsAsync(new DiagramRow { DiagramUid = "d1", ShareId = "s1", OwnerId = "owner", Name = "N", SeedResourceUid = "seed", DisplayPreset = "nameType", DiagramJson = "{}" });
 
             var response = await _sut.GetByShareIdAsync("s1", "someone-else", CancellationToken.None);
 
@@ -143,7 +143,7 @@ namespace ResourceMapper.Common.Server.Tests.Explorer
         public async Task SaveCopyAsync_ClonesSourceUnderCallerWithNewIds()
         {
             _repo.Setup(r => r.GetByShareIdAsync("src-share", It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new DiagramRow { DiagramUid = "src-uid", ShareId = "src-share", ClientId = "owner", Name = "Orig", SeedResourceUid = "seed9", DisplayPreset = "detailed", DiagramJson = "{\"n\":1}" });
+                .ReturnsAsync(new DiagramRow { DiagramUid = "src-uid", ShareId = "src-share", OwnerId = "owner", Name = "Orig", SeedResourceUid = "seed9", DisplayPreset = "detailed", DiagramJson = "{\"n\":1}" });
             _repo.Setup(r => r.UpsertAsync(It.IsAny<string>(), It.IsAny<string>(), "me",
                     It.IsAny<string>(), "seed9", "detailed", "{\"n\":1}", It.IsAny<CancellationToken>()))
                 .ReturnsAsync((string uid, string share, string _, string __, string ___, string ____, string _____, CancellationToken ______) =>

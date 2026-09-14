@@ -1,4 +1,4 @@
-// ReSharper disable InconsistentNaming
+﻿// ReSharper disable InconsistentNaming
 
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,11 +27,11 @@ namespace ResourceMapper.Common.Server.Tests.Settings
         #region GetAsync
 
         [Fact]
-        public async Task GetAsync_BlankClientId_ReturnsValidationAndDoesNotCallRepo()
+        public async Task GetAsync_BlankOwnerId_ReturnsValidationAndDoesNotCallRepo()
         {
             var response = await _sut.GetAsync("", "home.gridView", CancellationToken.None);
 
-            response.IsSuccess().Should().BeFalse("because a client id is required");
+            response.IsSuccess().Should().BeFalse("because a owner is required");
             _repo.Verify(r => r.GetAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
                 Times.Never, "because validation short-circuits");
         }

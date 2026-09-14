@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -69,7 +69,7 @@
     <Build Include="Stored Procedures\ClientSetting_Upsert.sql" />
     <Build Include="Stored Procedures\Diagram_Delete.sql" />
     <Build Include="Stored Procedures\Diagram_GetByShareId.sql" />
-    <Build Include="Stored Procedures\Diagram_ListForClient.sql" />
+    <Build Include="Stored Procedures\Diagram_ListForOwner.sql" />
     <Build Include="Stored Procedures\Diagram_Upsert.sql" />
     <Build Include="Stored Procedures\DomainValue_Add.sql" />
     <Build Include="Stored Procedures\DomainValue_Delete.sql" />
@@ -132,6 +132,15 @@
     <None Include="Scripts\Demo_Purge_ExplorerGraph.sql" />
     <None Include="Scripts\Demo_Insert_TagVocabulary.sql" />
     <None Include="Scripts\Demo_Purge_TagVocabulary.sql" />
+    <None Include="Scripts\Live_Purge_Catalog.sql" />
+    <None Include="Scripts\Live_Seed_Vocabulary.sql" />
+    <None Include="Scripts\Live_Seed_PostImport.sql" />
+    <None Include="Scripts\Live_Seed_README.md" />
+    <None Include="Scripts\LiveCatalog.json" />
+    <None Include="Scripts\cross-domain-edges.json" />
+    <None Include="Scripts\build-live-catalog.py" />
+    <None Include="Scripts\wiki-vnext-azure-resource-links.md" />
+    <None Include="Scripts\wiki-queues-services.md" />
     <None Include="localhost.publish.xml" />
   </ItemGroup>
   <ItemGroup>

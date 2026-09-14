@@ -1,16 +1,17 @@
-@page "/explore/{ResourceUid}"
+﻿@page "/explore/{ResourceUid}"
 @page "/explore/shared/{ShareId}"
 @using Microsoft.JSInterop
 @using ResourceMapper.Common.Server.Explorer.Interfaces
 @using ResourceMapper.Common.Shared.Explorer
 @using ResourceMapper.Common.Shared.Explorer.Diagrams
 @using ResourceMapper.Common.Shared.Explorer.Diagrams.Contracts
-@using ResourceMapper.UI.Web.Explorer
 @using ResourceMapper.UI.Web.Components.Explorer
+@using ResourceMapper.Common.Server.Identity
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @inject IExplorerService ExplorerService
 @inject IDiagramService DiagramService
+@inject ICurrentIdentity Identity
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
@@ -68,16 +69,6 @@
         <MudText Typo="Typo.body2" Class="mr-3">
             @(string.IsNullOrWhiteSpace(_diagramName) ? "(unsaved)" : _diagramName)
         </MudText>
-        @if (!string.IsNullOrEmpty(_clientId))
-        {
-            <MudText Typo="Typo.caption" Class="mud-text-secondary mr-1">
-                Client: @(_clientId.Length >= 8 ? _clientId[..8] : _clientId)…
-            </MudText>
-            <MudTooltip Text="Copy your client id (carry it to another browser)">
-                <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
-                               aria-label="Copy client id" OnClick="CopyClientIdAsync" />
-            </MudTooltip>
-        }
     </div>
     @if (_isReadOnly)
     {
@@ -122,7 +113,7 @@
     private bool _initialized;
     private bool _isReadOnly;
     private string _preset = "nameType";
-    private string _clientId = string.Empty;
+    private string _ownerId = string.Empty;
     /// <summary>
     /// §7 page chrome. Prefers the saved diagram's name, then the seed resource's name — the same
     /// precedence the browser tab title already used, kept in one place so they cannot diverge.
@@ -168,7 +159,7 @@
         _selfRef = DotNetObjectReference.Create(this);
         await SafeInvokeAsync("init", _canvasEl, _selfRef);
 
-        _clientId = await ClientIdentity.GetOrCreateAsync(JS);
+        _ownerId = Identity.OwnerId;
         StateHasChanged();
 
         if (!string.IsNullOrEmpty(ShareId))
@@ -261,13 +252,6 @@
         _expanded.Clear();
     }
 
-    private async Task CopyClientIdAsync()
-    {
-        if (string.IsNullOrEmpty(_clientId)) return;
-        try { await JS.InvokeVoidAsync("navigator.clipboard.writeText", _clientId); }
-        catch { /* clipboard unavailable */ }
-    }
-
     private async Task FitAsync() => await SafeInvokeAsync("fit");
     private async Task ZoomAsync(double factor) => await SafeInvokeAsync("zoomBy", factor);
     private async Task PanAsync(double dx, double dy) => await SafeInvokeAsync("panByDir", dx, dy);
@@ -301,7 +285,7 @@
             DisplayPreset = _preset,
             DiagramJson = json
         };
-        var resp = await DiagramService.SaveAsync(_clientId, request);
+        var resp = await DiagramService.SaveAsync(_ownerId, request);
         if (resp.IsSuccess() && resp.ApiResponse.Data is not null)
         {
             _diagramUid = resp.ApiResponse.Data.DiagramUid;
@@ -321,14 +305,14 @@
     private async Task OpenAsync()
     {
         _error = null;
-        var parameters = new DialogParameters { ["ClientId"] = _clientId };
+        var parameters = new DialogParameters { ["ClientId"] = _ownerId };
         var dialog = await DialogService.ShowAsync<OpenDiagramDialog>("Open Diagram", parameters);
         var result = await dialog.Result;
         if (result is null || result.Canceled) return;
         var shareId = result.Data as string;
         if (string.IsNullOrWhiteSpace(shareId)) return;
 
-        var resp = await DiagramService.GetByShareIdAsync(shareId!, _clientId);
+        var resp = await DiagramService.GetByShareIdAsync(shareId!, _ownerId);
         if (!resp.IsSuccess() || resp.ApiResponse.Data is null)
         {
             Snackbar.Add("Could not open diagram.", Severity.Error);
@@ -361,7 +345,7 @@
     private async Task LoadSharedAsync(string shareId)
     {
         _error = null;
-        var resp = await DiagramService.GetByShareIdAsync(shareId, _clientId);
+        var resp = await DiagramService.GetByShareIdAsync(shareId, _ownerId);
         if (!resp.IsSuccess() || resp.ApiResponse.Data is null)
         {
             _error = "Shared diagram not found.";
@@ -393,7 +377,7 @@
     private async Task SaveCopyAsync()
     {
         if (string.IsNullOrEmpty(_shareId)) return;
-        var resp = await DiagramService.SaveCopyAsync(_clientId, _shareId, null);
+        var resp = await DiagramService.SaveCopyAsync(_ownerId, _shareId, null);
         if (resp.IsSuccess() && resp.ApiResponse.Data is not null)
         {
             _diagramUid = resp.ApiResponse.Data.DiagramUid;
@@ -460,7 +444,7 @@
             yesText: "Delete", cancelText: "Cancel");
         if (confirmed != true) return;
 
-        var resp = await DiagramService.DeleteAsync(_clientId, _diagramUid!);
+        var resp = await DiagramService.DeleteAsync(_ownerId, _diagramUid!);
         if (!resp.IsSuccess())
         {
             Snackbar.Add("Could not delete the diagram.", Severity.Error);
