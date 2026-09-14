@@ -101,6 +101,11 @@
     <Build Include="Stored Procedures\Resource_Save.sql" />
     <Build Include="Stored Procedures\Resource_SearchForPicker.sql" />
     <Build Include="Stored Procedures\Resource_Upsert.sql" />
+    <Build Include="Stored Procedures\SavedView_Upsert.sql" />
+    <Build Include="Stored Procedures\SavedView_ListForOwner.sql" />
+    <Build Include="Stored Procedures\SavedView_Delete.sql" />
+    <Build Include="Stored Procedures\SavedView_SetDefault.sql" />
+    <Build Include="Stored Procedures\SavedView_Reorder.sql" />
     <Build Include="Stored Procedures\ResourceTag_GetForResource.sql" />
     <Build Include="Stored Procedures\ResourceTypeTag_GetAll.sql" />
     <Build Include="Stored Procedures\TagDefinition_Delete.sql" />
@@ -116,8 +121,10 @@
     <Build Include="Tables\ResourceType.sql" />
     <Build Include="Tables\ResourceTypeTag.sql" />
     <Build Include="Tables\TagContentType.sql" />
+    <Build Include="Tables\SavedView.sql" />
     <Build Include="Tables\TagDefinition.sql" />
     <Build Include="User Defined Types\ResourceFilterList.sql" />
+    <Build Include="User Defined Types\SavedViewOrderList.sql" />
     <Build Include="User Defined Types\TagKeyValueList.sql" />
   </ItemGroup>
   <ItemGroup>
