@@ -1,0 +1,122 @@
+﻿@namespace ResourceMapper.UI.Web.Components.Layout
+@using ResourceMapper.Common.Server.Identity
+@using ResourceMapper.Common.Server.SavedViews
+@using ResourceMapper.Common.Server.SavedViews.Interfaces
+@using ResourceMapper.Common.Shared.SavedViews
+@using ResourceMapper.Common.Shared.SavedViews.Contracts
+@using ResourceMapper.UI.Web.Components.SavedViews
+@implements IDisposable
+@inject ISavedViewService SavedViews
+@inject ICurrentIdentity Identity
+@inject GridViewContext GridView
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+@* StartIcon, NOT Icon: with Icon, MudBlazor renders an icon-only activator and drops Label
+   entirely, so the entry appears as a bare glyph and looks like nesting failed. *@
+<MudMenu Label="Saved Views" StartIcon="@Icons.Material.Outlined.BookmarkBorder"
+         ActivationEvent="@MouseEvent.MouseOver" AnchorOrigin="Origin.TopRight" FullWidth="true">
+
+    <MudMenuItem Disabled="@(!GridView.GridIsActive || !GridView.CanSave)" OnClick="OnSave">Save</MudMenuItem>
+    <MudMenuItem Disabled="@(!GridView.GridIsActive)" OnClick="OnSaveAs">Save As…</MudMenuItem>
+
+    @if (_views.Count > 0)
+    {
+        <MudDivider />
+        @foreach (var view in _views)
+        {
+            <MudMenuItem OnClick="@(() => OnOpen(view))">
+                @(view.IsDefault ? "★ " : "")@view.Name
+            </MudMenuItem>
+        }
+    }
+
+    <MudDivider />
+    <MudMenuItem Href="/saved-views">Manage Saved Views…</MudMenuItem>
+</MudMenu>
+
+@code {
+    private List<SavedViewModel> _views = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        GridView.Changed += OnContextChanged;
+        await ReloadAsync();
+    }
+
+    /// <summary>Re-read the list; both the menu and the manage page render from it.</summary>
+    private async Task ReloadAsync()
+    {
+        try
+        {
+            var response = await SavedViews.ListAsync(Identity.OwnerId, CancellationToken.None);
+            _views = response.IsSuccess()
+                ? response.ApiResponse.Data ?? new List<SavedViewModel>()
+                : new List<SavedViewModel>();
+        }
+        catch
+        {
+            // A failure to list saved views must not take the whole layout - and therefore every
+            // page - down. An empty menu is the graceful degradation.
+            _views = new List<SavedViewModel>();
+        }
+    }
+
+    private void OnContextChanged() => InvokeAsync(StateHasChanged);
+
+    private Task OnOpen(SavedViewModel view) => GridView.RequestOpenAsync(view);
+
+    private Task OnSave() => SaveViewAsync(GridView.OpenViewUid, GridView.OpenViewName);
+
+    private async Task OnSaveAs()
+    {
+        // The dialog is given the existing names so it can warn about a collision and switch its
+        // button to Replace before anything is written.
+        var parameters = new DialogParameters<SaveViewDialog>
+        {
+            { x => x.ExistingNames, _views.Select(v => v.Name).ToList() }
+        };
+
+        var dialog = await DialogService.ShowAsync<SaveViewDialog>("Save View As", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        var name = (result.Data as string ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        // Resolve the uid here: SavedView_Upsert keys on UID, and the server's duplicate-name
+        // validation carries none, so the UI could not turn that error into an overwrite. The
+        // procedure still detects the collision, which is what makes concurrent saves safe.
+        var existing = _views.FirstOrDefault(v =>
+            string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase));
+
+        await SaveViewAsync(existing?.SavedViewUid ?? string.Empty, name);
+    }
+
+    /// <summary>The single place that writes a view and refreshes what the menu shows.</summary>
+    private async Task SaveViewAsync(string savedViewUid, string name)
+    {
+        var request = new SaveViewRequest
+        {
+            SavedViewUid = savedViewUid,          // empty => create, populated => update
+            Name = name,
+            QueryString = GridView.CurrentQuery
+        };
+
+        var response = await SavedViews.SaveAsync(Identity.OwnerId, request, CancellationToken.None);
+        if (!response.IsSuccess())
+        {
+            Snackbar.Add("That view could not be saved.", Severity.Warning);
+            return;
+        }
+
+        var saved = response.ApiResponse.Data;
+        // Saved and current now agree, so Save goes quiet until the query moves again.
+        GridView.SetOpenView(saved?.SavedViewUid ?? string.Empty, name, GridView.CurrentQuery);
+        await ReloadAsync();
+        Snackbar.Add($"Saved “{name}”.", Severity.Success);
+    }
+
+    public void Dispose() => GridView.Changed -= OnContextChanged;
+}

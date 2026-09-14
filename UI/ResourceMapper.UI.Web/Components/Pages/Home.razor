@@ -4,6 +4,8 @@
 @using ResourceMapper.Common.Server.Resources.Interfaces
 @using ResourceMapper.Common.Server.Settings.Interfaces
 @using ResourceMapper.Common.Server.Identity
+@using ResourceMapper.Common.Server.SavedViews
+@using ResourceMapper.Common.Shared.SavedViews
 @using ResourceMapper.Common.Shared.HomePage.Contracts
 @using ResourceMapper.Common.Shared.HomePage.Filtering
 @using ResourceMapper.UI.Web.Components.Home
@@ -14,6 +16,7 @@
 @inject ISnackbar Snackbar
 @inject IClientSettingsService ClientSettings
 @inject ICurrentIdentity Identity
+@inject GridViewContext GridView
 
 <PageTitle>Resources — Hashtag Resource Mapper</PageTitle>
 
@@ -200,6 +203,12 @@
         _lastQuery = _state.ToQueryString();
         Navigation.LocationChanged += OnLocationChanged;
 
+        // The Saved Views menu lives in the layout and cannot reach this page directly; it raises
+        // this instead. Publish the starting query at the same time so Save As has something to
+        // write even before the first filter change.
+        GridView.OpenRequested += ApplySavedViewAsync;
+        GridView.SetCurrentQuery(_lastQuery);
+
         try
         {
             var keys = await ResourceService.GetTagFilterKeys(CancellationToken.None);
@@ -376,6 +385,10 @@
         var path = new Uri(Navigation.Uri).AbsolutePath;
         Navigation.NavigateTo(path + _lastQuery, forceLoad: false, replace: !push);
 
+        // Tell the Saved Views menu what Save would write. It lives in the layout's hamburger and
+        // cannot see this page's state any other way.
+        GridView.SetCurrentQuery(_lastQuery);
+
         // Persist the current view so a later visit with a bare URL resumes here. Gated on
         // _resumeChecked so the grid's default initial load can't overwrite a saved view before
         // we've had the chance to restore it.
@@ -410,7 +423,36 @@
         _ => "ResourceName"
     };
 
-    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+    /// <summary>
+    /// Loads a saved view's query. Mirrors what the resume path does: assign _lastQuery BEFORE
+    /// navigating so OnLocationChanged treats it as self-inflicted, and replace rather than push so
+    /// Back does not bounce between the previous query and this one.
+    /// </summary>
+    private async Task ApplySavedViewAsync(SavedViewModel view)
+    {
+        var state = ResourceFilterState.FromQueryString(view.QueryString);
+        _state = state;
+        _urlOrderBy = state.OrderBy;
+        _urlOrderDirection = state.OrderDirection;
+        _lastQuery = state.ToQueryString();
+
+        Navigation.NavigateTo(new Uri(Navigation.Uri).AbsolutePath + _lastQuery,
+                              forceLoad: false, replace: true);
+        GridView.SetCurrentQuery(_lastQuery);
+        // Record it as open using the NORMALISED query: comparing against the raw stored string
+        // would make Save look enabled the moment the view was opened.
+        GridView.SetOpenView(view.SavedViewUid, view.Name, _lastQuery);
+
+        await HandleReload(pushHistory: false);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        GridView.OpenRequested -= ApplySavedViewAsync;
+        GridView.GridDetached();
+    }
 
     private const string DetailRoute = "/resources";
 

@@ -43,6 +43,8 @@ namespace ResourceMapper.Common.Server.Utils
             services.TryAddScoped<IClientSettingsService, ClientSettingsService>();
             services.TryAddScoped<ISavedViewRepository, SavedViewSqlRepository>();
             services.TryAddScoped<ISavedViewService, SavedViewService>();
+            // Per-circuit seam between the grid page and the layout's Saved Views menu.
+            services.TryAddScoped<GridViewContext>();
         }
     }
 }

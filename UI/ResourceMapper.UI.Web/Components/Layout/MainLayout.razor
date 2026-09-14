@@ -1,4 +1,4 @@
-@inherits LayoutComponentBase
+﻿@inherits LayoutComponentBase
 @using ResourceMapper.Common.Server.Resources.Interfaces
 @inject IResourceService ResourceService
 
@@ -21,6 +21,8 @@
             <MudMenuItem Href="/domains" Icon="@Icons.Material.Outlined.Workspaces">@_domainsLabel</MudMenuItem>
             <MudMenuItem Href="/tags" Icon="@Icons.Material.Outlined.Sell">Tags</MudMenuItem>
             <MudMenuItem Href="/import" Icon="@Icons.Material.Outlined.UploadFile">Import…</MudMenuItem>
+            <MudDivider />
+            <SavedViewsMenu />
         </MudMenu>
         <MudLink Href="/" Typo="Typo.subtitle1" Color="Color.Inherit" Underline="Underline.Hover"
                  Class="ml-2" Style="font-weight:600;letter-spacing:.2px;"

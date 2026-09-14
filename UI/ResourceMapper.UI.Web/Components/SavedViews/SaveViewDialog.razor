@@ -1,0 +1,63 @@
+@namespace ResourceMapper.UI.Web.Components.SavedViews
+
+@* The overwrite confirmation lives here rather than in a second modal: the moment the typed name
+   matches an existing view, the dialog says so and the button changes to Replace. One decision,
+   one place, and the user finds out before committing rather than after. *@
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="Name" Label="View Name" Immediate="true"
+                      MaxLength="@MaxNameLength" Error="@IsTooLong"
+                      ErrorText="@($"Must be {MaxNameLength} characters or fewer")"
+                      HelperText="@Helper" />
+
+        @if (Collides)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+                A view named “@Name.Trim()” already exists. Saving replaces it.
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="@(Collides ? Color.Warning : Color.Primary)" Variant="Variant.Filled"
+                   OnClick="Submit" Disabled="@(!CanSubmit)">
+            @(Collides ? "Replace" : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    /// <summary>Mirrors SavedViewValidation.MaxNameLength; NVARCHAR(200) in the database.</summary>
+    private const int MaxNameLength = 200;
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string Name { get; set; } = string.Empty;
+
+    /// <summary>Existing names for this owner, so a collision is visible before saving.</summary>
+    [Parameter] public IReadOnlyList<string> ExistingNames { get; set; } = new List<string>();
+
+    private string Trimmed => (Name ?? string.Empty).Trim();
+
+    private bool IsTooLong => Trimmed.Length > MaxNameLength;
+
+    /// <summary>Control characters would corrupt the menu this name is rendered into.</summary>
+    private bool HasControlCharacters => Trimmed.Any(char.IsControl);
+
+    private bool Collides => !string.IsNullOrWhiteSpace(Trimmed) &&
+        ExistingNames.Any(n => string.Equals(n, Trimmed, StringComparison.OrdinalIgnoreCase));
+
+    private bool CanSubmit => !string.IsNullOrWhiteSpace(Trimmed) && !IsTooLong && !HasControlCharacters;
+
+    private string Helper => HasControlCharacters
+        ? "Must not contain line breaks or control characters"
+        : "Names are unique, so saving over one replaces it.";
+
+    private void Submit()
+    {
+        if (!CanSubmit) return;
+        MudDialog.Close(DialogResult.Ok(Trimmed));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

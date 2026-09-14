@@ -12,6 +12,18 @@ BEGIN
 
     DECLARE @Result VARCHAR(10);
 
+    -- Name collision with a DIFFERENT view of the same owner. Detected here rather than by a
+    -- check-then-write in the service, so two concurrent saves cannot both pass the check and then
+    -- have the second one fail on UK_SavedView_Owner_Name as an unhandled 500.
+    IF EXISTS (SELECT 1 FROM [HTResourceMapper].[SavedView]
+               WHERE OwnerId = @OwnerId
+                 AND Name = @Name
+                 AND SavedViewUid <> @SavedViewUid)
+    BEGIN
+        SELECT 'duplicate' AS Result, CAST('' AS VARCHAR(40)) AS SavedViewUid;
+        RETURN;
+    END
+
     IF EXISTS (SELECT 1 FROM [HTResourceMapper].[SavedView]
                WHERE SavedViewUid = @SavedViewUid AND OwnerId = @OwnerId)
     BEGIN
