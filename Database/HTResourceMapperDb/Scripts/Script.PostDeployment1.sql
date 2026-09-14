@@ -13,16 +13,17 @@ WHEN NOT MATCHED BY TARGET THEN
     INSERT ([TagContentTypeId], [TagCode]) VALUES (source.[TagContentTypeId], source.[TagCode]);
 
 -- Domain (boundary) tag. System-managed, required, single-valued, restricted vocabulary.
--- Displayed as "Subscription" in this deployment; values are the prod/non-prod tiers.
+-- Displayed as "Tier" in this deployment. 'shared' is carried by logical resources
+-- (System, Application) that exist in both tiers and are deployed to neither.
 MERGE [HTResourceMapper].[TagDefinition] AS target
 USING (SELECT
         [TagDefinitionUid] = 'b1d0c0de-0000-4000-8000-000000000001'
        ,[TagDefinitionKey] = 'Domain'
-       ,[DisplayName]      = 'Subscription'
+       ,[DisplayName]      = 'Tier'
        ,[TagContentTypeId] = 1               -- Text
        ,[AllowCustomValue] = CAST(0 AS BIT)
        ,[IsMultiValued]    = CAST(0 AS BIT)
-       ,[AllowedValues]    = '["prod","non-prod"]'
+       ,[AllowedValues]    = '["prod","non-prod","shared"]'
        ,[RequirementLevel] = 'Error'
        ,[IsDomainTag]      = CAST(1 AS BIT)
        ,[IsSystemTag]      = CAST(1 AS BIT)

@@ -9,6 +9,11 @@
 const { chromium } = require('playwright-core');
 const { expect } = require('@playwright/test');
 
+// The domain tag's user-facing DisplayName, as seeded by Live_Seed_Vocabulary.sql. The app
+// renders this label from the database rather than hardcoding it, so a rename there has to be
+// mirrored here - it read 'Subscription' before the live catalog landed.
+const DOMAIN_LABEL = 'Tier';
+
 /**
  * Launches system Chrome (no bundled Chromium download needed) and returns { browser, page }.
  * Pass { headless: false } to watch it run.
@@ -30,7 +35,7 @@ async function launch(options = {}) {
 }
 
 /**
- * Clicks a MudSelect identified by its label text (e.g. "Resource Type", "Subscription").
+ * Clicks a MudSelect identified by its label text (e.g. "Resource Type", DOMAIN_LABEL).
  *
  * Why not a plain `getByLabel(...).click()`: MudSelect renders its trigger in one of two shapes
  * depending on whether a value is currently set —
@@ -91,7 +96,7 @@ async function pickOption(page, optionText, exact = true) {
 }
 
 /**
- * Selects the editor's Resource Type + Subscription (Domain), then waits for BOTH choices to be
+ * Selects the editor's Resource Type + domain tag, then waits for BOTH choices to be
  * reflected in the read-only Identity preview before returning.
  *
  * Why this matters: selecting Type triggers OnResourceTypeChanged (re-seeds the Tags tab's rows
@@ -107,7 +112,7 @@ async function pickOption(page, optionText, exact = true) {
 async function selectTypeAndDomain(page, typeName, domainName) {
   await clickSelect(page, 'Resource Type');
   await pickOption(page, typeName);
-  await clickSelect(page, 'Subscription');
+  await clickSelect(page, DOMAIN_LABEL);
   await pickOption(page, domainName);
   // The identity preview moved from its own card (.rm-identity-preview) into a form row
   // (.rm-identity-inline) when the General tab became a single column — azure-ux-design-v1 §6.
@@ -184,4 +189,4 @@ async function waitForServer(url, timeoutMs = 60000) {
   throw new Error(`Server at ${url} did not respond within ${timeoutMs}ms`);
 }
 
-module.exports = { launch, clickSelect, clickSelectInScope, pickOption, selectTypeAndDomain, fillNameAndWaitForSlug, fillRequiredTags, waitForServer };
+module.exports = { DOMAIN_LABEL, launch, clickSelect, clickSelectInScope, pickOption, selectTypeAndDomain, fillNameAndWaitForSlug, fillRequiredTags, waitForServer };

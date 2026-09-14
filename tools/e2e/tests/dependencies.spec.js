@@ -3,7 +3,7 @@
 //   - ResourceType 'E2eDepType'
 //   - Picker candidates: e2e-candidate-1, e2e-candidate-2 (non-prod), e2e-candidate-prod (prod)
 const { test, expect } = require('@playwright/test');
-const { clickSelect, pickOption, fillRequiredTags } = require('../mud-helpers');
+const { DOMAIN_LABEL, clickSelect, pickOption, fillRequiredTags } = require('../mud-helpers');
 
 // Pre-existing, non-blocking artifact already noted in slice #6/#7 execution notes.
 const IGNORED_CONSOLE_PATTERNS = [/404 \(Not Found\)/];
@@ -28,7 +28,7 @@ test.describe('Dependencies / Dependent On tabs (slice #8)', () => {
     await page.goto('/resources');
     await clickSelect(page, 'Resource Type');
     await pickOption(page, 'E2eDepType');
-    await clickSelect(page, 'Subscription');
+    await clickSelect(page, DOMAIN_LABEL);
     await pickOption(page, 'non-prod');
     await page.getByLabel('Name', { exact: true }).fill('E2E Subject');
     await page.keyboard.press('Tab');

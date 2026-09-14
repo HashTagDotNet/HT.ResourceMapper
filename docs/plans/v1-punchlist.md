@@ -75,6 +75,9 @@ _Widen the terminal if this renders as stacked Key: value records._
 
 | id | Item | Verdict |
 |---|---|---|
+| **PL-64** | **Select lists need compact rows and must stop running off the screen** — the Add Filter menu now lists 19 tags, overflows the viewport, and shows internal tag keys rather than display names | **Open** ⚑ |
+| **PL-63** | **Swap the single-owner identity for a real provider** — the `ICurrentIdentity` seam lands with Saved Views returning one configured owner (`anonymous`); a real IdP replaces that one implementation | **Roadmap** |
+| **PL-62** | **Saved views need an on-screen "you are here" indicator** — Edge's filled star. Parked deliberately while building saved views | **Parked idea** |
 | **PL-61** | **Replace simulated data with the real vNext Azure resource links** (wiki page 11783). Steve supplies the extraction — do not scrape it | **Decided — to do** ⚑ |
 | **PL-58** | **Dependency diagram dropped from v1** (Steve, 2026-09-13). Hide the entry points; keep the code re-enable-able | **Decided — to do** |
 | **PL-59** | Environment mismatch: app pinned `Development` while the machine runs `localhost` | **FIXED 2026-09-13** |
@@ -1086,3 +1089,87 @@ modes), and the add-affordance and multi-value questions (PL-18 / PL-20).
   argument gets rewritten into a Windows path
 - DB checks: `sqlcmd -S '(localdb)\MSSQLLocalDB' -d ResourceMapper` with `SET QUOTED_IDENTIFIER ON;`
   — **not** the SQL MCP
+
+## Session 2026-09-13 (later) — live catalog landed, saved views designed
+
+### PL-62 — saved views have no on-screen "you are here" indicator (parked idea)
+
+**Steve:** *"pin this idea for later: Edge solves the equivalent with a filled star in the address bar."*
+
+**Context.** Saved Views (see `SavedViewsDesign.md`) puts Save / Save As / the view list / Manage
+entirely in the hamburger menu — no grid toolbar, by decision. The consequence, raised and
+accepted at design time: nothing on the page says which saved view you are in, or that you have
+changed it since opening. `Save`'s target is therefore implicit.
+
+Steve's call was that this matches how Edge behaves, and it does — Edge's favourites menu does not
+annotate the page either. But Edge *does* have one signal the grid will not: **a filled star in
+the address bar**, telling you the current page is already a favourite without opening anything.
+
+**Parked, not rejected.** Deliberately out of scope for the first build, so the menu-only shape
+gets used as designed before more chrome is added. If it proves confusing in practice, the
+smallest remedy is a name chip on the filter bar showing the open view and a changed marker —
+the equivalent of the filled star. Decide it from use, not in advance.
+
+**Related:** the fire-and-forget `PersistViewAsync` call (PL-A10) sits in the same `Home.razor`
+startup path that Saved Views changes, and is worth folding in when that code is touched.
+
+### PL-63 — swap the single-owner identity for a real provider
+
+**Steve:** *"pin this, adding identity is on the roadmap."* Then, on being told saved views would
+otherwise be browser-scoped: *"or if you can, you can use the current identity (which is always
+mine until we add an identity provider)"* — and on what that identity should be, *"or it may be
+anonymous or something."*
+
+**What changed because of that.** The first version of this entry recorded a constraint to live
+with: everything personal keys on `ClientIdentity`'s random per-browser GUID, so nothing follows a
+person. Steve's steer turned it into a seam built now rather than a gap deferred —
+`ICurrentIdentity` returns a single `OwnerId` read from `ResourceMapper:Identity:OwnerId`,
+defaulting to the literal `anonymous`. Saved views, Explorer diagrams and the grid resume setting
+all move onto it (see `SavedViewsDesign.md`).
+
+**What is left for the roadmap.** Only the provider. Because the rows already carry a stable
+owner, arriving at real identity is one implementation of `ICurrentIdentity` plus a decision about
+what happens to rows owned by `anonymous` — adopt them for the first real user, or leave them.
+That decision is much easier taken while the tables are small.
+
+**What this explicitly is not.** Not authentication, not authorisation, not multi-tenancy. Anyone
+reaching the deployment is the owner, and every procedure's `@OwnerId` filter is a no-op today.
+The point is that ownership has the right *shape* now, so the later change is an implementation
+rather than a schema migration across three tables.
+
+**Carries a cost worth knowing.** `ClientSetting.ClientId` and `Diagram.ClientId` should be renamed
+to `OwnerId` in the same pass, touching the `Diagram_*` and `ClientSetting_*` procedures and their
+repositories. Diagrams already saved under a browser GUID become invisible — a non-event in a dev
+database, a one-line `UPDATE` if one ever matters.
+
+### PL-64 — select lists: compact rows, and a way to stop them running off the screen ⚑ (new)
+
+**Steve:** *"select lists should display items in compact form and we need a mechanism so items do
+not scroll off the screen."* Observed on the **Add Filter** menu with the live catalog loaded.
+
+**Why it appeared now.** The demo data had a handful of tag definitions. The live catalog has
+**19**, so the menu went from comfortably short to taller than the viewport. Nothing about the
+menu changed — the data did. Expect the same wherever a list is generated from the vocabulary.
+
+**Three separate problems in one control** (`AddFilterMenu.razor`):
+
+1. **Rows are not compact.** The `MudMenu` sets no `Dense`, so each entry takes full-height
+   padding. Roughly a third more entries would fit on the same screen for free.
+2. **No overflow mechanism.** There is no `MaxHeight`, no internal scroll and no type-to-filter, so
+   entries past the viewport are simply unreachable — the page itself does not scroll while a
+   popover is open. This is the part that makes it a defect rather than a nicety.
+3. **It shows internal tag keys, not display names** — `AppInsightsFilter`, `ConfigPrefix`,
+   `DbAppName`, `PortalUrl` — where the grid beside it shows "App Insights Filter", "Config Key
+   Prefix", "Database Application Name", "Portal". That is **PL-48's exact defect**, which was
+   fixed for the grid and never applied here: `ResourceService.GetTagFilterKeys` returns
+   `GetAllTagKeysAsync`, a list of raw keys, with no `COALESCE(DisplayName, TagDefinitionKey)`
+   anywhere in the path. Found while confirming the first two; Steve did not report it.
+
+**Descriptive, not prescriptive.** The fix is not decided. Worth noting that item 3 changes a
+contract (the filter menu would need key *and* label, since the key is what the filter and the
+permalink token are built from — see the comment in `Resource_GetItems`), so it is not simply a
+matter of swapping the string.
+
+**Scope beyond this one menu.** Any select fed from the vocabulary has the same exposure: the
+resource type picker, the tag pickers in the editor, and the domain-value lists. Worth fixing as a
+pattern rather than one control at a time.

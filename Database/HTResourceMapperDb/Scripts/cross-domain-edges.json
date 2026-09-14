@@ -1,0 +1,28 @@
+{
+  "crossDomainEdges": [
+    [
+      "vnext",
+      "usspi-aps-dt-mplt-dev-visibility-macropoint-com"
+    ],
+    [
+      "vnext",
+      "usspi-aps-pp-mplt-preprod-visibility-macropoint-com"
+    ],
+    [
+      "vnext",
+      "usspi-aps-pd-mplt-visibility-macropoint-com"
+    ],
+    [
+      "vnext-proxy",
+      "usspi-aps-dt-mplt-dev-vnextproxy-macropoint-com"
+    ],
+    [
+      "vnext-proxy",
+      "usspi-aps-pp-mplt-preprod-vnextproxy-macropoint-com"
+    ],
+    [
+      "vnext-proxy",
+      "usspi-aps-pd-mplt-vnextproxy-macropoint-com"
+    ]
+  ]
+}

@@ -7,7 +7,7 @@
 // (confirmed by driving this exact flow manually). Specs must re-click "Dependencies" after a
 // pop-back before asserting on its rows, rather than assume the tab stayed active.
 const { test, expect } = require('@playwright/test');
-const { clickSelect, pickOption, selectTypeAndDomain, fillNameAndWaitForSlug, fillRequiredTags } = require('../mud-helpers');
+const { DOMAIN_LABEL, clickSelect, pickOption, selectTypeAndDomain, fillNameAndWaitForSlug, fillRequiredTags } = require('../mud-helpers');
 
 const IGNORED_CONSOLE_PATTERNS = [/404 \(Not Found\)/];
 
@@ -34,7 +34,7 @@ async function openDependenciesAndCreateNew(page) {
   // timeout — this hint text only appears once the nested LoadAsync (including the domain-lock
   // write) has completed. Interacting too early (observed under heavier full-suite load) can hit
   // a field mid-re-render and silently lose the input.
-  await expect(page.getByText("Locked to the parent resource's Subscription")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText(`Locked to the parent resource's ${DOMAIN_LABEL}`)).toBeVisible({ timeout: 10000 });
 }
 
 async function fillNestedChild(page, name) {
@@ -66,10 +66,10 @@ test.describe('Nested "Create new…" dependency target (slice #9)', () => {
     await openDependenciesAndCreateNew(page);
     expect(page.url()).toContain('?n=1', 'a nested create must carry the ?n nested-level marker');
 
-    // Domain lock (RD7): the Subscription select shows the parent's domain and is disabled.
+    // Domain lock (RD7): the domain select shows the parent's domain and is disabled.
     // `.mud-input.mud-select-input` (both classes together) uniquely identifies the trigger div —
     // `.mud-select-input` alone also matches the hidden input and an inner text/adornment div.
-    const domainControl = page.locator('.mud-input-control', { hasText: 'Subscription' }).first();
+    const domainControl = page.locator('.mud-input-control', { hasText: DOMAIN_LABEL }).first();
     const domainInput = domainControl.locator('.mud-input.mud-select-input');
     await expect(domainInput).toContainText('non-prod');
     await expect(domainInput).toHaveClass(/mud-disabled/);
