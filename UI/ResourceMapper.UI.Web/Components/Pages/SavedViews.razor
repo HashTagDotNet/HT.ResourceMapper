@@ -1,0 +1,388 @@
+﻿@page "/saved-views"
+@using ResourceMapper.Common.Server.Identity
+@using ResourceMapper.Common.Server.SavedViews
+@using ResourceMapper.Common.Server.SavedViews.Interfaces
+@using ResourceMapper.Common.Shared.SavedViews
+@using ResourceMapper.Common.Shared.SavedViews.Contracts
+@inject ISavedViewService ViewService
+@inject ICurrentIdentity Identity
+@inject GridViewContext GridView
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Saved Views — Hashtag Resource Mapper</PageTitle>
+
+<PageHeader Title="Saved Views"
+            Description="Named grid queries. The starred view opens when you visit the resource list without a link of its own; otherwise the list resumes wherever you left it." />
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+else if (_loadError is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-3">@_loadError</MudAlert>
+}
+else if (_views.Count == 0)
+{
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+        No saved views yet. Filter the resource list how you like, then choose
+        <strong>Saved Views → Save As…</strong> from the application menu.
+    </MudAlert>
+}
+else
+{
+    @* Client-side filter: the whole list is already loaded for the menu, so searching it is not
+       another round trip. *@
+    <MudTextField @bind-Value="_search" Immediate="true" Clearable="true" Class="mb-3"
+                  Placeholder="Filter saved views…" Variant="Variant.Outlined" Margin="Margin.Dense"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.FilterList"
+                  aria-label="Filter saved views" />
+
+    <MudTable T="SavedViewModel" Items="Filtered" Dense="true" Hover="true" Elevation="0"
+              Breakpoint="Breakpoint.Sm" AllowUnsorted="true"
+              Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
+        <HeaderContent>
+            <MudTh Style="width:1%;">Order</MudTh>
+            <MudTh Style="width:1%;">Default</MudTh>
+            <MudTh>Name</MudTh>
+            <MudTh>Query</MudTh>
+            <MudTh Style="text-align:right;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Order">
+                @* Move up/down rather than drag: it is keyboard-reachable, needs no drag library,
+                   and the whole new order is committed in one call either way. *@
+                <div class="d-flex">
+                    <MudIconButton Icon="@Icons.Material.Outlined.ArrowUpward" Size="Size.Small"
+                                   aria-label="@($"Move {context.Name} up")"
+                                   Disabled="@(IsFirst(context) || _busy)"
+                                   OnClick="@(() => MoveAsync(context, -1))" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward" Size="Size.Small"
+                                   aria-label="@($"Move {context.Name} down")"
+                                   Disabled="@(IsLast(context) || _busy)"
+                                   OnClick="@(() => MoveAsync(context, 1))" />
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Default">
+                <MudTooltip Text="@(context.IsDefault ? "Stop opening this by default" : "Open this by default")">
+                    <MudIconButton Size="Size.Small" Disabled="@_busy"
+                                   Icon="@(context.IsDefault ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)"
+                                   Color="@(context.IsDefault ? Color.Warning : Color.Default)"
+                                   aria-label="@($"{(context.IsDefault ? "Clear" : "Set")} {context.Name} as the default view")"
+                                   OnClick="@(() => ToggleDefaultAsync(context))" />
+                </MudTooltip>
+            </MudTd>
+            <MudTd DataLabel="Name">
+                @if (_renamingUid == context.SavedViewUid)
+                {
+                    <MudTextField @bind-Value="_renameText" Immediate="true" Margin="Margin.Dense"
+                                  MaxLength="200" Variant="Variant.Outlined" aria-label="New name"
+                                  OnKeyDown="@(e => OnRenameKey(e, context))" AutoFocus="true"
+                                  Error="@RenameHasError" />
+                    @* Rendered explicitly rather than via ErrorText: a disabled Save button with no
+                       stated reason is the same "enabled control that only refuses" problem in
+                       reverse - the user can see they are blocked but not why. *@
+                    @if (RenameHasError)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Error" Class="d-block mt-1" role="alert">
+                            @RenameError
+                        </MudText>
+                    }
+                    <div class="d-flex mt-1">
+                        <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
+                                   Disabled="@(RenameHasError || _busy)"
+                                   OnClick="@(() => CommitRenameAsync(context))">Save</MudButton>
+                        <MudButton Size="Size.Small" Class="ml-2" OnClick="CancelRename">Cancel</MudButton>
+                    </div>
+                }
+                else
+                {
+                    <span>@context.Name</span>
+                }
+            </MudTd>
+            <MudTd DataLabel="Query">
+                <MudLink Href="@("/" + context.QueryString)" Typo="Typo.body2">
+                    <span class="rm-desc" title="@context.QueryString">@Summarise(context.QueryString)</span>
+                </MudLink>
+            </MudTd>
+            <MudTd DataLabel="Actions" Style="text-align:right;">
+                <MudTooltip Text="Open this view">
+                    <MudIconButton Icon="@Icons.Material.Outlined.OpenInNew" Size="Size.Small"
+                                   aria-label="@($"Open {context.Name}")" Disabled="@_busy"
+                                   OnClick="@(() => Open(context))" />
+                </MudTooltip>
+                <MudTooltip Text="Rename">
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
+                                   aria-label="@($"Rename {context.Name}")" Disabled="@_busy"
+                                   OnClick="@(() => BeginRename(context))" />
+                </MudTooltip>
+                <MudTooltip Text="Delete">
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small"
+                                   aria-label="@($"Delete {context.Name}")" Disabled="@_busy"
+                                   OnClick="@(() => ConfirmDelete(context))" />
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@* Delete confirmation. Deleting the starred view simply leaves no default, which the resource
+   list handles by resuming wherever you left it - so the warning says so rather than blocking. *@
+<MudDialog @bind-Visible="_confirmingDelete" Options="_dialogOptions">
+    <TitleContent>Delete Saved View</TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2">
+            Delete “<strong>@(_pendingDelete?.Name)</strong>”? This cannot be undone.
+        </MudText>
+        @if (_pendingDelete?.IsDefault == true)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+                This is your default view. Without one, the resource list resumes wherever you left it.
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _confirmingDelete = false)">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" Disabled="@_busy"
+                   OnClick="DeleteConfirmedAsync">Delete</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private const int MaxNameLength = 200;
+
+    private List<SavedViewModel> _views = new();
+    private bool _loading = true;
+    private bool _busy;
+    private string? _loadError;
+    private string _search = string.Empty;
+
+    private string _renamingUid = string.Empty;
+    private string _renameText = string.Empty;
+
+    private bool _confirmingDelete;
+    private SavedViewModel? _pendingDelete;
+    private readonly DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+
+    private IEnumerable<SavedViewModel> Filtered =>
+        string.IsNullOrWhiteSpace(_search)
+            ? _views
+            : _views.Where(v => v.Name.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var response = await ViewService.ListAsync(Identity.OwnerId, CancellationToken.None);
+            if (response.IsSuccess())
+            {
+                _views = response.ApiResponse.Data ?? new List<SavedViewModel>();
+                _loadError = null;
+            }
+            else
+            {
+                _loadError = "Saved views could not be loaded.";
+            }
+        }
+        catch
+        {
+            _loadError = "Saved views could not be loaded.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // ---- ordering ----
+
+    private bool IsFirst(SavedViewModel v) => _views.FindIndex(x => x.SavedViewUid == v.SavedViewUid) == 0;
+    private bool IsLast(SavedViewModel v) => _views.FindIndex(x => x.SavedViewUid == v.SavedViewUid) == _views.Count - 1;
+
+    /// <summary>Moves one row and commits the whole resulting order in a single call.</summary>
+    private async Task MoveAsync(SavedViewModel view, int delta)
+    {
+        var index = _views.FindIndex(x => x.SavedViewUid == view.SavedViewUid);
+        var target = index + delta;
+        if (index < 0 || target < 0 || target >= _views.Count) return;
+
+        (_views[index], _views[target]) = (_views[target], _views[index]);
+
+        _busy = true;
+        try
+        {
+            var order = _views.Select(v => v.SavedViewUid).ToList();
+            var response = await ViewService.ReorderAsync(Identity.OwnerId, order, CancellationToken.None);
+            if (!response.IsSuccess())
+            {
+                Snackbar.Add("That order could not be saved.", Severity.Warning);
+                await ReloadAsync();   // put the list back the way the database has it
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // ---- default ----
+
+    private async Task ToggleDefaultAsync(SavedViewModel view)
+    {
+        _busy = true;
+        try
+        {
+            // Un-starring the current default clears it entirely rather than picking another.
+            var uid = view.IsDefault ? null : view.SavedViewUid;
+            var response = await ViewService.SetDefaultAsync(Identity.OwnerId, uid, CancellationToken.None);
+            if (!response.IsSuccess())
+                Snackbar.Add("The default could not be changed.", Severity.Warning);
+
+            await ReloadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // ---- rename ----
+
+    private void BeginRename(SavedViewModel view)
+    {
+        _renamingUid = view.SavedViewUid;
+        _renameText = view.Name;
+    }
+
+    private void CancelRename()
+    {
+        _renamingUid = string.Empty;
+        _renameText = string.Empty;
+    }
+
+    private string RenameTrimmed => (_renameText ?? string.Empty).Trim();
+
+    private bool RenameHasError => !string.IsNullOrEmpty(RenameError);
+
+    /// <summary>Mirrors SavedViewValidation so the problem is named before a round trip.</summary>
+    private string? RenameError
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(RenameTrimmed)) return "Is required";
+            if (RenameTrimmed.Length > MaxNameLength) return $"Must be {MaxNameLength} characters or fewer";
+            if (RenameTrimmed.Any(char.IsControl)) return "Must not contain line breaks or control characters";
+            if (_views.Any(v => v.SavedViewUid != _renamingUid &&
+                                string.Equals(v.Name, RenameTrimmed, StringComparison.OrdinalIgnoreCase)))
+                return "Another saved view already has that name";
+            return null;
+        }
+    }
+
+    private async Task OnRenameKey(KeyboardEventArgs e, SavedViewModel view)
+    {
+        if (e.Key == "Escape") { CancelRename(); return; }
+        if (e.Key == "Enter" && !RenameHasError) await CommitRenameAsync(view);
+    }
+
+    private async Task CommitRenameAsync(SavedViewModel view)
+    {
+        if (RenameHasError) return;
+
+        _busy = true;
+        try
+        {
+            // The request carries all three fields, so the existing query must be sent back or it
+            // would be blanked.
+            var request = new SaveViewRequest
+            {
+                SavedViewUid = view.SavedViewUid,
+                Name = RenameTrimmed,
+                QueryString = view.QueryString
+            };
+
+            var response = await ViewService.SaveAsync(Identity.OwnerId, request, CancellationToken.None);
+            if (!response.IsSuccess())
+            {
+                Snackbar.Add("That view could not be renamed.", Severity.Warning);
+                return;
+            }
+
+            CancelRename();
+            await ReloadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // ---- delete ----
+
+    private void ConfirmDelete(SavedViewModel view)
+    {
+        _pendingDelete = view;
+        _confirmingDelete = true;
+    }
+
+    private async Task DeleteConfirmedAsync()
+    {
+        if (_pendingDelete is null) return;
+
+        _busy = true;
+        try
+        {
+            var response = await ViewService.DeleteAsync(
+                Identity.OwnerId, _pendingDelete.SavedViewUid, CancellationToken.None);
+
+            if (!response.IsSuccess())
+                Snackbar.Add("That view could not be deleted.", Severity.Warning);
+            else
+                Snackbar.Add($"Deleted “{_pendingDelete.Name}”.", Severity.Success);
+
+            _confirmingDelete = false;
+            _pendingDelete = null;
+            await ReloadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // ---- open ----
+
+    private void Open(SavedViewModel view)
+    {
+        // Tell the grid which view it is opening before navigating, so Save targets it.
+        GridView.SetOpenView(view.SavedViewUid, view.Name, view.QueryString);
+        Navigation.NavigateTo("/" + view.QueryString);
+    }
+
+    /// <summary>A readable gist of a query string, since the raw form is long and encoded.</summary>
+    private static string Summarise(string queryString)
+    {
+        if (string.IsNullOrWhiteSpace(queryString)) return "—";
+
+        var parts = queryString.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries);
+        var bits = new List<string>();
+
+        foreach (var part in parts)
+        {
+            if (part.StartsWith("q=", StringComparison.Ordinal))
+                bits.Add("search “" + Uri.UnescapeDataString(part[2..]) + "”");
+            else if (part.StartsWith("f=", StringComparison.Ordinal))
+            {
+                var segments = Uri.UnescapeDataString(part[2..]).Split('~');
+                if (segments.Length >= 3)
+                    bits.Add(segments[0].Replace("tag:", string.Empty) + " = " + segments[2].Replace(",", ", "));
+            }
+        }
+
+        return bits.Count == 0 ? "all resources" : string.Join("  ·  ", bits);
+    }
+}
