@@ -32,7 +32,7 @@ payload (`DiagramJson`) is treated as an **opaque string** here — slice 7 deci
 
 ---
 
-## 1. SQL — table (`Database\HTResourceMapperDb\Tables\`)
+## 1. SQL — table (`Database\MacroPoint.Azure.ResourceExplorer.Db\Tables\`)
 
 **File:** `Diagram.sql`
 
@@ -41,7 +41,7 @@ payload (`DiagramJson`) is treated as an **opaque string** here — slice 7 deci
 -- share token (ShareId). DiagramJson is an opaque client-defined payload (nodes + positions +
 -- expansion state); the server never inspects it. SeedResourceUid is a loose reference (no FK) —
 -- the store is a decoupled client artifact. See docs/plans/explorer/resource-explorer-design-v1.md §7.
-CREATE TABLE [HTResourceMapper].[Diagram]
+CREATE TABLE [ResourceExplorer].[Diagram]
 (
     [DiagramId] INT NOT NULL IDENTITY(1,1)
         CONSTRAINT [PK_Diagram_DiagramId] PRIMARY KEY (DiagramId)
@@ -62,10 +62,10 @@ CREATE TABLE [HTResourceMapper].[Diagram]
 GO
 -- Open-Recent lists a client's diagrams most-recent-first.
 CREATE NONCLUSTERED INDEX [IX_Diagram_ClientId]
-    ON [HTResourceMapper].[Diagram] ([ClientId]);
+    ON [ResourceExplorer].[Diagram] ([ClientId]);
 ```
 
-## 2. SQL — sprocs (`Database\HTResourceMapperDb\Stored Procedures\`)
+## 2. SQL — sprocs (`Database\MacroPoint.Azure.ResourceExplorer.Db\Stored Procedures\`)
 
 **File:** `Diagram_Upsert.sql`
 
@@ -73,7 +73,7 @@ CREATE NONCLUSTERED INDEX [IX_Diagram_ClientId]
 -- Create or update a diagram. Matches on (DiagramUid, ClientId) so a client can only update its
 -- own rows; @ShareId is used only on insert. Returns the authoritative Result/DiagramUid/ShareId
 -- by selecting the row back (so updates return the real existing ShareId).
-CREATE PROCEDURE [HTResourceMapper].[Diagram_Upsert]
+CREATE PROCEDURE [ResourceExplorer].[Diagram_Upsert]
     @DiagramUid VARCHAR(40),
     @ShareId VARCHAR(40),
     @ClientId VARCHAR(64),
@@ -87,10 +87,10 @@ BEGIN
 
     DECLARE @Result VARCHAR(10);
 
-    IF EXISTS (SELECT 1 FROM [HTResourceMapper].[Diagram]
+    IF EXISTS (SELECT 1 FROM [ResourceExplorer].[Diagram]
                WHERE DiagramUid = @DiagramUid AND ClientId = @ClientId)
     BEGIN
-        UPDATE [HTResourceMapper].[Diagram]
+        UPDATE [ResourceExplorer].[Diagram]
         SET Name = @Name, SeedResourceUid = @SeedResourceUid, DisplayPreset = @DisplayPreset,
             DiagramJson = @DiagramJson, UpdatedOn = SYSUTCDATETIME()
         WHERE DiagramUid = @DiagramUid AND ClientId = @ClientId;
@@ -98,14 +98,14 @@ BEGIN
     END
     ELSE
     BEGIN
-        INSERT INTO [HTResourceMapper].[Diagram]
+        INSERT INTO [ResourceExplorer].[Diagram]
             (DiagramUid, ShareId, ClientId, Name, SeedResourceUid, DisplayPreset, DiagramJson)
         VALUES (@DiagramUid, @ShareId, @ClientId, @Name, @SeedResourceUid, @DisplayPreset, @DiagramJson);
         SET @Result = 'created';
     END
 
     SELECT @Result AS Result, DiagramUid, ShareId
-    FROM [HTResourceMapper].[Diagram]
+    FROM [ResourceExplorer].[Diagram]
     WHERE DiagramUid = @DiagramUid AND ClientId = @ClientId;
 END
 ```
@@ -115,7 +115,7 @@ END
 ```sql
 -- Resolve a diagram by its public share token (read-only share; also used by the owner to open
 -- a recent diagram, since the list returns each row's ShareId).
-CREATE PROCEDURE [HTResourceMapper].[Diagram_GetByShareId]
+CREATE PROCEDURE [ResourceExplorer].[Diagram_GetByShareId]
     @ShareId VARCHAR(40)
 AS
 BEGIN
@@ -124,7 +124,7 @@ BEGIN
     SELECT
         DiagramUid, ShareId, ClientId, Name, SeedResourceUid, DisplayPreset, DiagramJson,
         CONVERT(VARCHAR(33), COALESCE(UpdatedOn, CreatedOn), 126) AS UpdatedOnUtc
-    FROM [HTResourceMapper].[Diagram]
+    FROM [ResourceExplorer].[Diagram]
     WHERE ShareId = @ShareId;
 END
 ```
@@ -134,7 +134,7 @@ END
 ```sql
 -- A client's diagrams for Open-Recent (metadata only; no DiagramJson). Includes ShareId so the
 -- caller can open a chosen diagram via Diagram_GetByShareId.
-CREATE PROCEDURE [HTResourceMapper].[Diagram_ListForClient]
+CREATE PROCEDURE [ResourceExplorer].[Diagram_ListForClient]
     @ClientId VARCHAR(64)
 AS
 BEGIN
@@ -143,7 +143,7 @@ BEGIN
     SELECT
         DiagramUid, ShareId, Name, SeedResourceUid,
         CONVERT(VARCHAR(33), COALESCE(UpdatedOn, CreatedOn), 126) AS UpdatedOnUtc
-    FROM [HTResourceMapper].[Diagram]
+    FROM [ResourceExplorer].[Diagram]
     WHERE ClientId = @ClientId
     ORDER BY COALESCE(UpdatedOn, CreatedOn) DESC;
 END
@@ -153,14 +153,14 @@ END
 
 ```sql
 -- Delete a client's own diagram. Returns 1 if a row was deleted, else 0.
-CREATE PROCEDURE [HTResourceMapper].[Diagram_Delete]
+CREATE PROCEDURE [ResourceExplorer].[Diagram_Delete]
     @ClientId VARCHAR(64),
     @DiagramUid VARCHAR(40)
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    DELETE FROM [HTResourceMapper].[Diagram]
+    DELETE FROM [ResourceExplorer].[Diagram]
     WHERE ClientId = @ClientId AND DiagramUid = @DiagramUid;
 
     SELECT CAST(CASE WHEN @@ROWCOUNT > 0 THEN 1 ELSE 0 END AS INT) AS Deleted;
@@ -168,7 +168,7 @@ END
 ```
 
 **Register all five files** — add these lines (alphabetically) to the `<Build>` `<ItemGroup>` in
-`HTResourceMapperDb.sqlproj`:
+`MacroPoint.Azure.ResourceExplorer.Db.sqlproj`:
 
 ```xml
 <Build Include="Tables\Diagram.sql" />
@@ -179,18 +179,18 @@ END
 ```
 
 - [ ] **Step 1:** Create the table + 4 sproc files and add the 5 `<Build Include>` lines.
-- [ ] **Step 2:** Apply all 5 to `(localdb)\MSSQLLocalDB\ResourceMapper` via `sqlcmd` — the table with a plain `CREATE TABLE` (guard with `IF OBJECT_ID(...) IS NULL`), the sprocs as `CREATE OR ALTER PROCEDURE`. (`sqlcmd`, not the SQL MCP.)
+- [ ] **Step 2:** Apply all 5 to `(localdb)\MSSQLLocalDB\ResourceExplorer` via `sqlcmd` — the table with a plain `CREATE TABLE` (guard with `IF OBJECT_ID(...) IS NULL`), the sprocs as `CREATE OR ALTER PROCEDURE`. (`sqlcmd`, not the SQL MCP.)
 
 ---
 
-## 3. Server models (`Modules\Common\ResourceMapper.Common.Server\Explorer\Models\`)
+## 3. Server models (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\Explorer\Models\`)
 
-New `Explorer\Models\` folder; namespace `ResourceMapper.Common.Server.Explorer.Models`.
+New `Explorer\Models\` folder; namespace `MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Models`.
 
 **File:** `DiagramRow.cs`
 
 ```csharp
-namespace ResourceMapper.Common.Server.Explorer.Models
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Models
 {
     /// <summary>Full diagram row (Diagram_GetByShareId).</summary>
     public class DiagramRow
@@ -210,7 +210,7 @@ namespace ResourceMapper.Common.Server.Explorer.Models
 **File:** `DiagramListRow.cs`
 
 ```csharp
-namespace ResourceMapper.Common.Server.Explorer.Models
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Models
 {
     /// <summary>Metadata row for Open-Recent (Diagram_ListForClient); no DiagramJson.</summary>
     public class DiagramListRow
@@ -227,7 +227,7 @@ namespace ResourceMapper.Common.Server.Explorer.Models
 **File:** `DiagramUpsertResult.cs`
 
 ```csharp
-namespace ResourceMapper.Common.Server.Explorer.Models
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Models
 {
     /// <summary>Result row from Diagram_Upsert.</summary>
     public class DiagramUpsertResult
@@ -243,14 +243,14 @@ namespace ResourceMapper.Common.Server.Explorer.Models
 
 ---
 
-## 4. Shared DTOs (`Modules\Common\ResourceMapper.Common.Shared\Explorer\Diagrams\`)
+## 4. Shared DTOs (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Shared\Explorer\Diagrams\`)
 
-New `Explorer\Diagrams\` folder; namespace `ResourceMapper.Common.Shared.Explorer.Diagrams`.
+New `Explorer\Diagrams\` folder; namespace `MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer.Diagrams`.
 
 **File:** `DiagramModel.cs`
 
 ```csharp
-namespace ResourceMapper.Common.Shared.Explorer.Diagrams
+namespace MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer.Diagrams
 {
     /// <summary>A full saved diagram returned to the client (by share token).</summary>
     public class DiagramModel
@@ -269,7 +269,7 @@ namespace ResourceMapper.Common.Shared.Explorer.Diagrams
 **File:** `DiagramListItem.cs`
 
 ```csharp
-namespace ResourceMapper.Common.Shared.Explorer.Diagrams
+namespace MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer.Diagrams
 {
     /// <summary>Open-Recent entry (metadata only).</summary>
     public class DiagramListItem
@@ -286,7 +286,7 @@ namespace ResourceMapper.Common.Shared.Explorer.Diagrams
 **File:** `Contracts\SaveDiagramRequest.cs`
 
 ```csharp
-namespace ResourceMapper.Common.Shared.Explorer.Diagrams.Contracts
+namespace MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer.Diagrams.Contracts
 {
     /// <summary>Save (create when DiagramUid is null/empty, else update) a diagram.</summary>
     public class SaveDiagramRequest
@@ -303,7 +303,7 @@ namespace ResourceMapper.Common.Shared.Explorer.Diagrams.Contracts
 **File:** `Contracts\SaveDiagramResponse.cs`
 
 ```csharp
-namespace ResourceMapper.Common.Shared.Explorer.Diagrams.Contracts
+namespace MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer.Diagrams.Contracts
 {
     public class SaveDiagramResponse
     {
@@ -318,7 +318,7 @@ namespace ResourceMapper.Common.Shared.Explorer.Diagrams.Contracts
 
 ---
 
-## 5. Repository (`Modules\Common\ResourceMapper.Common.Server\Explorer\`)
+## 5. Repository (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\Explorer\`)
 
 **File:** `Interfaces\IDiagramRepository.cs`
 
@@ -326,9 +326,9 @@ namespace ResourceMapper.Common.Shared.Explorer.Diagrams.Contracts
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using ResourceMapper.Common.Server.Explorer.Models;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Models;
 
-namespace ResourceMapper.Common.Server.Explorer.Interfaces
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces
 {
     public interface IDiagramRepository
     {
@@ -352,12 +352,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using HT.Microsoft.SqlClient.Extensions;
-using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces;
-using ResourceMapper.Common.Server.Explorer.Interfaces;
-using ResourceMapper.Common.Server.Explorer.Models;
+using MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions;
+using MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions.Abstractions.Interfaces;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Models;
 
-namespace ResourceMapper.Common.Server.Explorer
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer
 {
     public class DiagramSqlRepository : IDiagramRepository
     {
@@ -372,7 +372,7 @@ namespace ResourceMapper.Common.Server.Explorer
             string name, string seedResourceUid, string displayPreset, string diagramJson,
             CancellationToken cancellationToken)
         {
-            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].Diagram_Upsert")
+            using var cmd = _db.RW.SprocCommand("[ResourceExplorer].Diagram_Upsert")
                 .AddVarchar("@DiagramUid", diagramUid)
                 .AddVarchar("@ShareId", shareId)
                 .AddVarchar("@ClientId", clientId)
@@ -393,7 +393,7 @@ namespace ResourceMapper.Common.Server.Explorer
 
         public async Task<DiagramRow?> GetByShareIdAsync(string shareId, CancellationToken cancellationToken)
         {
-            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].Diagram_GetByShareId")
+            using var cmd = _db.RO.SprocCommand("[ResourceExplorer].Diagram_GetByShareId")
                 .AddVarchar("@ShareId", shareId);
 
             var rows = await _db.Execute.ExecuteQueryAsync(cmd, dr => new DiagramRow
@@ -413,7 +413,7 @@ namespace ResourceMapper.Common.Server.Explorer
 
         public async Task<List<DiagramListRow>> ListForClientAsync(string clientId, CancellationToken cancellationToken)
         {
-            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].Diagram_ListForClient")
+            using var cmd = _db.RO.SprocCommand("[ResourceExplorer].Diagram_ListForClient")
                 .AddVarchar("@ClientId", clientId);
 
             return await _db.Execute.ExecuteQueryAsync(cmd, dr => new DiagramListRow
@@ -428,7 +428,7 @@ namespace ResourceMapper.Common.Server.Explorer
 
         public async Task<bool> DeleteAsync(string clientId, string diagramUid, CancellationToken cancellationToken)
         {
-            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].Diagram_Delete")
+            using var cmd = _db.RW.SprocCommand("[ResourceExplorer].Diagram_Delete")
                 .AddVarchar("@ClientId", clientId)
                 .AddVarchar("@DiagramUid", diagramUid);
 
@@ -445,7 +445,7 @@ namespace ResourceMapper.Common.Server.Explorer
 
 ---
 
-## 6. Service (`Modules\Common\ResourceMapper.Common.Server\Explorer\`)
+## 6. Service (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\Explorer\`)
 
 **File:** `Interfaces\IDiagramService.cs`
 
@@ -453,11 +453,11 @@ namespace ResourceMapper.Common.Server.Explorer
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using HT.Api.Service.Contracts;
-using ResourceMapper.Common.Shared.Explorer.Diagrams;
-using ResourceMapper.Common.Shared.Explorer.Diagrams.Contracts;
+using MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer.Diagrams;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer.Diagrams.Contracts;
 
-namespace ResourceMapper.Common.Server.Explorer.Interfaces
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces
 {
     public interface IDiagramService
     {
@@ -478,14 +478,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using HT.Api.Client.Contracts.Models;                 // CallStatusCode
-using HT.Api.Service.Contracts;                       // ApiServiceResponse<T>
-using HT.Api.Service.Contracts.BuildersOfT;           // ServiceResponseBuilder<T>
-using ResourceMapper.Common.Server.Explorer.Interfaces;
-using ResourceMapper.Common.Shared.Explorer.Diagrams;
-using ResourceMapper.Common.Shared.Explorer.Diagrams.Contracts;
+using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Models;                 // CallStatusCode
+using MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts;                       // ApiServiceResponse<T>
+using MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.BuildersOfT;           // ServiceResponseBuilder<T>
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer.Diagrams;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer.Diagrams.Contracts;
 
-namespace ResourceMapper.Common.Server.Explorer
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer
 {
     public class DiagramService : IDiagramService
     {
@@ -716,16 +716,16 @@ services.TryAddScoped<IDiagramRepository, DiagramSqlRepository>();
 services.TryAddScoped<IDiagramService, DiagramService>();
 ```
 
-(The `ResourceMapper.Common.Server.Explorer` / `.Explorer.Interfaces` usings are already present from
+(The `MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer` / `.Explorer.Interfaces` usings are already present from
 slice 1.)
 
 - [ ] **Step 7:** Register the repo + service.
 
 ---
 
-## 8. Tests (`_Tests\Common\Server\ResourceMapper.Common.Server.Tests\Explorer\`)
+## 8. Tests (`_Tests\Common\Server\MacroPoint.Azure.ResourceExplorer.Common.Server.Tests\Explorer\`)
 
-Add `DiagramServiceTests.cs` (namespace `ResourceMapper.Common.Server.Tests.Explorer`), service vs.
+Add `DiagramServiceTests.cs` (namespace `MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Explorer`), service vs.
 mocked `IDiagramRepository`.
 
 ```csharp
@@ -734,19 +734,19 @@ mocked `IDiagramRepository`.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using ResourceMapper.Common.Server.Explorer;
-using ResourceMapper.Common.Server.Explorer.Interfaces;
-using ResourceMapper.Common.Server.Explorer.Models;
-using ResourceMapper.Common.Shared.Explorer.Diagrams.Contracts;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Models;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer.Diagrams.Contracts;
 
-namespace ResourceMapper.Common.Server.Tests.Explorer
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Explorer
 {
     [Trait("Category", "Unit")]
-    [Trait("Category", "ResourceMapper")]
-    [Trait("Category", "ResourceMapper/Common")]
-    [Trait("Category", "ResourceMapper/Common/Server")]
-    [Trait("Category", "ResourceMapper/Common/Server/Explorer")]
-    [Trait("Category", "ResourceMapper/Common/Server/Explorer/DiagramService")]
+    [Trait("Category", "ResourceExplorer")]
+    [Trait("Category", "ResourceExplorer/Common")]
+    [Trait("Category", "ResourceExplorer/Common/Server")]
+    [Trait("Category", "ResourceExplorer/Common/Server/Explorer")]
+    [Trait("Category", "ResourceExplorer/Common/Server/Explorer/DiagramService")]
     public class DiagramServiceTests
     {
         private readonly Mock<IDiagramRepository> _repo;
@@ -901,20 +901,20 @@ namespace ResourceMapper.Common.Server.Tests.Explorer
 > open `ResourceServiceTests.cs` / `ResourceService.cs` and match exactly — do not invent members.
 
 - [ ] **Step 8:** Write `DiagramServiceTests.cs`.
-- [ ] **Step 9:** Run `dotnet test --filter "FullyQualifiedName~ResourceMapper.Common.Server.Tests.Explorer.DiagramServiceTests"` → all pass; then `dotnet build` + full `dotnet test` (no regressions).
+- [ ] **Step 9:** Run `dotnet test --filter "FullyQualifiedName~MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Explorer.DiagramServiceTests"` → all pass; then `dotnet build` + full `dotnet test` (no regressions).
 
 ---
 
 ## Verification
 
-1. **DB:** apply the table + 4 sprocs to `(localdb)\MSSQLLocalDB\ResourceMapper` via `sqlcmd`.
+1. **DB:** apply the table + 4 sprocs to `(localdb)\MSSQLLocalDB\ResourceExplorer` via `sqlcmd`.
 2. **Sproc exercise via `sqlcmd`:**
    - `Diagram_Upsert` with a fresh `@DiagramUid` → returns `Result='created'` + the ids; run it again with the **same** uid/clientId and changed `@Name` → `Result='updated'`, **same ShareId** returned, row updated.
    - `Diagram_ListForClient` for that client → the row (metadata, most-recent first).
    - `Diagram_GetByShareId` with the returned ShareId → the full row incl. `DiagramJson`.
    - `Diagram_Delete` with a wrong clientId → `Deleted=0`; with the right one → `Deleted=1`.
    - Clean up any rows you insert (report what you added).
-3. **Build + unit tests:** `dotnet build`, then `dotnet test` → all green (the 2 pre-existing `HT.Api.Service.Contracts.Tests` failures remain, unrelated).
+3. **Build + unit tests:** `dotnet build`, then `dotnet test` → all green (the 2 pre-existing `MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.Tests` failures remain, unrelated).
 
 ---
 
@@ -937,11 +937,11 @@ namespace ResourceMapper.Common.Server.Tests.Explorer
   pattern: `DeleteAsync` returns `ApiServiceResponse<object>`, with `builder.Data.Set(new object())`
   on success. No test changes were needed (the delete tests only assert `IsSuccess()`).
 - **Build:** `dotnet build` clean across all C# projects; only the expected `MSB4278` on
-  `HTResourceMapperDb.sqlproj` (old-style SSDT, not built via `dotnet build`).
+  `MacroPoint.Azure.ResourceExplorer.Db.sqlproj` (old-style SSDT, not built via `dotnet build`).
 - **Tests:** targeted filter → 9/9 new `DiagramServiceTests` pass. Full `dotnet test` → no
   regressions; the only failures are the 2 pre-existing, out-of-scope
-  `HT.Api.Service.Contracts.Tests.BuildersOfTTests` failures.
-- **DB apply + sqlcmd exercise** against `(localdb)\MSSQLLocalDB\ResourceMapper`:
+  `MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.Tests.BuildersOfTTests` failures.
+- **DB apply + sqlcmd exercise** against `(localdb)\MSSQLLocalDB\ResourceExplorer`:
   - Table applied via guarded `IF OBJECT_ID(...) IS NULL` `CREATE TABLE` + index; sprocs applied as
     `CREATE OR ALTER PROCEDURE`. All 5 objects confirmed present in `sys.objects`.
   - `Diagram_Upsert` create (`DiagramUid='test-diag-uid-001'`) → `Result='created'` +

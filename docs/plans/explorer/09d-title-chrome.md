@@ -6,7 +6,7 @@ Final sub-slice of [UI-polish pass 2](./09-ui-polish.md). Adds the **floating ti
 overlay** (top-left over the canvas) and — the key requirement — **composites it into PNG/SVG/print
 exports** so the exported picture is self-documenting. `wwwroot`/Razor only. Depends on 9c.
 
-> **Build note:** stop any running `ResourceMapper.UI.Web` (it locks build output) before `dotnet build`/`run`.
+> **Build note:** stop any running `MacroPoint.Azure.ResourceExplorer.UI.Web` (it locks build output) before `dotnet build`/`run`.
 
 **Key decisions:**
 - **On-screen overlay** is a small div the JS module creates in the canvas host (top-left), showing
@@ -312,9 +312,9 @@ the title live, `pointer-events: none` confirmed via computed style (never block
 interaction), and all four export paths (Save SVG / Save PNG / Copy image / Print) — see the
 export-contains-title evidence above for each.
 
-**Build/test:** `dotnet build` clean aside from the expected `HTResourceMapperDb.sqlproj` MSB4278
+**Build/test:** `dotnet build` clean aside from the expected `MacroPoint.Azure.ResourceExplorer.Db.sqlproj` MSB4278
 (pre-existing, ignored per CLAUDE.md). `dotnet test`: 2 pre-existing, unrelated failures in
-`HT.Api.Service.Contracts.Tests` (NotFound → HTTP status mapping); all other tests (414) passed —
+`MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.Tests` (NotFound → HTTP status mapping); all other tests (414) passed —
 no regressions (this slice is `wwwroot`/Razor only, no server-side test coverage to affect).
 
 **Commit:** `e783d0e` on `home-page`. This completes pass 2.

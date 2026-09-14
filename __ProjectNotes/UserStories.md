@@ -240,13 +240,13 @@ POST /api/resources
 ### US-011: Configurable Resource-Name Click Behavior
 **As a** user of the resource catalog
 **I want to** choose what happens when I click a resource's name in the grid
-**So that** the click takes me straight to the tool I use most — either the resource's primary external reference or the ResourceMapper details page
+**So that** the click takes me straight to the tool I use most — either the resource's primary external reference or the ResourceExplorer details page
 
 **Acceptance Criteria:**
-- [ ] A **User Preferences** page exposes a setting: *"When I click a resource name, open…"* with two choices — **Primary external link** (default) or **ResourceMapper details page**
+- [ ] A **User Preferences** page exposes a setting: *"When I click a resource name, open…"* with two choices — **Primary external link** (default) or **ResourceExplorer details page**
 - [ ] The preference is persisted client-side in `localStorage` (same mechanism as the home-page "resume last view" state — see `ViewStorageKey` in `Home.razor`), under a distinct key
 - [ ] **Default behavior** (no preference set, or set to "Primary external link"): clicking the resource name opens that resource's *primary* external reference link
-- [ ] When the preference is "ResourceMapper details page": clicking the name opens the details page instead
+- [ ] When the preference is "ResourceExplorer details page": clicking the name opens the details page instead
 - [ ] **Missing primary link fallback:** if a resource has no primary reference link defined, the name is not a dead link. Show a tooltip (or equivalent affordance) offering **"Open details to define primary resource link"**, which navigates to the details page where the user can set one
 - [ ] Behavior is consistent across the home grid and any other place resource names are rendered as clickable
 

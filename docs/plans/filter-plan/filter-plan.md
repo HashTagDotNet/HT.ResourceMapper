@@ -54,7 +54,7 @@ Flow: `Home.razor` (owns `ResourceFilterState` + search + sort + displayCount)
 
 ## 1. Data contract changes
 
-File: `Modules/Common/ResourceMapper.Common.Shared/HomePage/Contracts/ResourceGridContract.cs`
+File: `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Shared/HomePage/Contracts/ResourceGridContract.cs`
 
 **Replace** the unused single-value `ResourceGridFilterDefinition`. New shape (string-serialized
 enums for readable URLs / future saved JSON):
@@ -97,11 +97,11 @@ public class ResourceGridFacetValue { public string? Value { get; set; } public 
 
 ---
 
-## 2. Database layer  (canonical project only: `Database/HTResourceMapperDb/`)
+## 2. Database layer  (canonical project only: `Database/MacroPoint.Azure.ResourceExplorer.Db/`)
 
 ### 2a. New TVP — `User Defined Types/ResourceFilterList.sql`
 ```sql
-CREATE TYPE [HTResourceMapper].[ResourceFilterList] AS TABLE (
+CREATE TYPE [ResourceExplorer].[ResourceFilterList] AS TABLE (
     [FilterIndex]  TINYINT        NOT NULL,   -- groups multi-value rows of one filter
     [FilterColumn] NVARCHAR(50)   NOT NULL,   -- 'ResourceType' | 'ResourceName' | 'Description' | 'Tag'
     [TagKey]       NVARCHAR(50)   NULL,       -- set iff FilterColumn = 'Tag'
@@ -114,7 +114,7 @@ One row per selected value; one row per text filter. **Empty/all selection ⇒ n
 column (enforced in C#, §3). Mirrors the existing `TagKeyValueList` TVP + `.AddTvp` pattern.
 
 ### 2b. Extend `Stored Procedures/Resource_GetItems.sql`
-- Add param `@Filters [HTResourceMapper].[ResourceFilterList] READONLY`.
+- Add param `@Filters [ResourceExplorer].[ResourceFilterList] READONLY`.
 - Init `@whereClause = N'WHERE 1=1'`; change the search block from `WHERE (...)` to `AND (...)`.
   Search/tag-priority/order/`@OrderBy`-whitelist behaviour unchanged **except** `@OrderBy` gains
   `LastUpdatedOn`/relative-time ordering already present; no new identifier concatenation.
@@ -134,8 +134,8 @@ column (enforced in C#, §3). Mirrors the existing `TagKeyValueList` TVP + `.Add
     AND NOT EXISTS (                                   -- no required tag-key group is unsatisfied
       SELECT 1 FROM (SELECT DISTINCT TagKey FROM @Filters WHERE FilterColumn='Tag' AND Operator='Equals') g
       WHERE NOT EXISTS (
-        SELECT 1 FROM [HTResourceMapper].[ResourceTag] rtf
-        JOIN [HTResourceMapper].[TagDefinition] tdf ON rtf.TagDefinitionId = tdf.TagDefinitionId
+        SELECT 1 FROM [ResourceExplorer].[ResourceTag] rtf
+        JOIN [ResourceExplorer].[TagDefinition] tdf ON rtf.TagDefinitionId = tdf.TagDefinitionId
         JOIN @Filters f ON f.FilterColumn='Tag' AND f.Operator='Equals' AND f.TagKey = g.TagKey
                         AND ( f.FilterValue = rtf.TagValue OR (f.IsBlank=1 AND rtf.TagValue IS NULL) )
         WHERE rtf.ResourceId = r.ResourceId AND tdf.TagDefinitionKey = g.TagKey ))
@@ -147,7 +147,7 @@ column (enforced in C#, §3). Mirrors the existing `TagKeyValueList` TVP + `.Add
     escape expression.
 - **Pass `@Filters` through `sp_executesql`** — TVPs require an explicit `READONLY` entry in the
   paramdef string, e.g. `N'@SafeSearchForParam NVARCHAR(255), @SkipParam INT, @TakeParam INT,
-  @TagLimitParam INT, @FiltersParam [HTResourceMapper].[ResourceFilterList] READONLY,
+  @TagLimitParam INT, @FiltersParam [ResourceExplorer].[ResourceFilterList] READONLY,
   @TotalRecordsParam INT OUTPUT'` (count query) and the same minus the OUTPUT (page query).
   **Consolidate** the search-present/absent branches into a single paramdef each (pass a possibly-NULL
   `@SafeSearchFor`) so the **count and page paramdefs are byte-identical** — the two queries must
@@ -155,11 +155,11 @@ column (enforced in C#, §3). Mirrors the existing `TagKeyValueList` TVP + `.Add
 
 ### 2c. New facet sproc — `Stored Procedures/Resource_GetFilterValues.sql`
 ```sql
-CREATE PROCEDURE [HTResourceMapper].[Resource_GetFilterValues]
+CREATE PROCEDURE [ResourceExplorer].[Resource_GetFilterValues]
     @FacetColumn NVARCHAR(50),                               -- 'ResourceType' | 'Tag'
     @FacetTagKey NVARCHAR(50) = NULL,                        -- required when @FacetColumn = 'Tag'
     @SearchFor   NVARCHAR(255) = NULL,                       -- APPLIED to counts (reversed decision)
-    @Filters     [HTResourceMapper].[ResourceFilterList] READONLY
+    @Filters     [ResourceExplorer].[ResourceFilterList] READONLY
 ```
 - Build `@SafeSearchFor` exactly as `Resource_GetItems`; **apply it** so counts match the searched grid.
 - Copy `@Filters` minus the facet's own dimension (`FilterColumn <> @FacetColumn`, and for tags
@@ -195,7 +195,7 @@ CREATE PROCEDURE [HTResourceMapper].[Resource_GetFilterValues]
 - **`ResourceSqlRepository.cs`** — `BuildFilterTable(filters)` → `DataTable`
   (`FilterIndex,FilterColumn,TagKey,Operator,FilterValue,IsBlank`), one row per value / tag value /
   text (mirror `ImportSqlRepository.SetResourceTagsAsync`, incl. `DBNull` where needed);
-  `.AddTvp("@Filters","[HTResourceMapper].[ResourceFilterList]", …)` on both calls; **drop the C#
+  `.AddTvp("@Filters","[ResourceExplorer].[ResourceFilterList]", …)` on both calls; **drop the C#
   tag-trim loop** (now `@TagLimit` in SQL). Implement `GetFilterValuesAsync`.
 - **New model** `Resources/Models/ResourceGridFacetItem.cs` `{ string? Value; bool IsBlank; int ItemCount; }`.
 - Empty TVP: **verified** `.AddTvp` with a zero-row `DataTable` sends an empty table (not NULL) —
@@ -221,7 +221,7 @@ All-checkbox tri-state resolver, `IsConstraining(filter)`, and the URL parse/for
 serialization is deterministic** — filters ordered by column then TagKey, value lists sorted — so the
 prerender snapshot key (§5.2) is stable across passes.
 
-### 4b. Components — new folder `UI/ResourceMapper.UI.Web/Components/Home/` (register in `_Imports.razor`)
+### 4b. Components — new folder `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Home/` (register in `_Imports.razor`)
 | Component | Role | MudBlazor |
 |---|---|---|
 | `ResourceFilterBar` | search box + chip set + add button + result-count/display-count header | `MudTextField`, layout, `MudSelect` (display count) |
@@ -339,12 +339,12 @@ whitelist. `Contains` reuses `ESCAPE ']'` so wildcard metacharacters match liter
 
 **Change:** `…/HomePage/Contracts/ResourceGridContract.cs`; `Resources/Interfaces/IResourceService.cs`;
 `Resources/ResourceService.cs`; `Resources/Interfaces/IResourceRepository.cs`;
-`Resources/ResourceSqlRepository.cs`; `Database/HTResourceMapperDb/Stored Procedures/Resource_GetItems.sql`;
-**`Database/HTResourceMapperDb/HTResourceMapperDb.sqlproj`** (add `<Build Include>` entries — see below);
+`Resources/ResourceSqlRepository.cs`; `Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/Resource_GetItems.sql`;
+**`Database/MacroPoint.Azure.ResourceExplorer.Db/MacroPoint.Azure.ResourceExplorer.Db.sqlproj`** (add `<Build Include>` entries — see below);
 `UI/…/Components/Pages/Home.razor`; `UI/…/Components/_Imports.razor`.
 
-**Add:** `Database/HTResourceMapperDb/User Defined Types/ResourceFilterList.sql`;
-`Database/HTResourceMapperDb/Stored Procedures/Resource_GetFilterValues.sql`;
+**Add:** `Database/MacroPoint.Azure.ResourceExplorer.Db/User Defined Types/ResourceFilterList.sql`;
+`Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/Resource_GetFilterValues.sql`;
 `…/HomePage/Filtering/ResourceFilterModels.cs`; `Resources/Models/ResourceGridFacetItem.cs`;
 `UI/…/Components/Home/{ResourceFilterBar,FilterChip,EnumerableFilterEditor,TextFilterEditor,AddFilterMenu}.razor`.
 
@@ -374,7 +374,7 @@ resolution. 3. **Server** (§3) + validation; unit tests. 4. **Client state + UR
   >4 clamped, `n` clamped, bad sort dropped, garbage→empty).
 
 **SQL via SQL MCP** (`mp-execute-procedure`/`mp-run-query`/`mp-explain-query`), seed
-`Database/HTResourceMapperDb/Scripts/Demo_Insert_ResourceItemsForGrid.sql` (add rows with **NULL
+`Database/MacroPoint.Azure.ResourceExplorer.Db/Scripts/Demo_Insert_ResourceItemsForGrid.sql` (add rows with **NULL
 ResourceTypeId and NULL TagValue**):
 - `Resource_GetItems` with a hand-built `ResourceFilterList`: single/multi Type Equals (OR-within);
   Type NotEquals incl. **untyped survives**; **two tag-key filters AND** (`Environment=prod` +

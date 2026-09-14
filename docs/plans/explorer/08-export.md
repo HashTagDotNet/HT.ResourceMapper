@@ -26,7 +26,7 @@ This slice adds **export**: an **Export** toolbar menu with **Copy image (PNG �
 
 ---
 
-## 1. Load the SVG extension (`UI\ResourceMapper.UI.Web\Components\App.razor`)
+## 1. Load the SVG extension (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\Components\App.razor`)
 
 Add the `<script>` **after** `cytoscape-cxtmenu.js` and **before** `blazor.web.js`:
 
@@ -174,7 +174,7 @@ In the `ShareAsync` method (from 7b), replace the clipboard line:
 
 ## UI verification hook (visible slice)
 
-- [ ] **Step 4: Build + run.** `dotnet build` clean; `dotnet run --project UI/ResourceMapper.UI.Web`.
+- [ ] **Step 4: Build + run.** `dotnet build` clean; `dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web`.
 - [ ] **Step 5: Drive it** at `/explore/DEMOEXP-checkout` (expand a few nodes first):
   1. **Export → Copy image** → paste into an image-accepting target (e.g. an image editor, or Teams
      message) → the diagram appears as a PNG; a "copied" snackbar shows.

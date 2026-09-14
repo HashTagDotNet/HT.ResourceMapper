@@ -23,14 +23,14 @@ rewire.
 
 ---
 
-## 1. SQL (`Database\HTResourceMapperDb\`)
+## 1. SQL (`Database\MacroPoint.Azure.ResourceExplorer.Db\`)
 
 **Table** `Tables\ClientSetting.sql`:
 
 ```sql
 -- Generic per-client settings, keyed by the anonymous clientId (see design §7.1). First consumer:
 -- the home grid's saved view ('home.gridView'). SettingJson is an opaque client string.
-CREATE TABLE [HTResourceMapper].[ClientSetting]
+CREATE TABLE [ResourceExplorer].[ClientSetting]
 (
     [ClientSettingId] INT NOT NULL IDENTITY(1,1)
         CONSTRAINT [PK_ClientSetting_ClientSettingId] PRIMARY KEY (ClientSettingId)
@@ -47,14 +47,14 @@ CREATE TABLE [HTResourceMapper].[ClientSetting]
 **Sproc** `Stored Procedures\ClientSetting_Get.sql`:
 
 ```sql
-CREATE PROCEDURE [HTResourceMapper].[ClientSetting_Get]
+CREATE PROCEDURE [ResourceExplorer].[ClientSetting_Get]
     @ClientId VARCHAR(64),
     @SettingKey VARCHAR(100)
 AS
 BEGIN
     SET NOCOUNT ON;
     SELECT SettingJson AS Value
-    FROM [HTResourceMapper].[ClientSetting]
+    FROM [ResourceExplorer].[ClientSetting]
     WHERE ClientId = @ClientId AND SettingKey = @SettingKey;
 END
 ```
@@ -62,24 +62,24 @@ END
 **Sproc** `Stored Procedures\ClientSetting_Upsert.sql`:
 
 ```sql
-CREATE PROCEDURE [HTResourceMapper].[ClientSetting_Upsert]
+CREATE PROCEDURE [ResourceExplorer].[ClientSetting_Upsert]
     @ClientId VARCHAR(64),
     @SettingKey VARCHAR(100),
     @SettingJson NVARCHAR(MAX)
 AS
 BEGIN
     SET NOCOUNT ON;
-    IF EXISTS (SELECT 1 FROM [HTResourceMapper].[ClientSetting] WHERE ClientId = @ClientId AND SettingKey = @SettingKey)
-        UPDATE [HTResourceMapper].[ClientSetting]
+    IF EXISTS (SELECT 1 FROM [ResourceExplorer].[ClientSetting] WHERE ClientId = @ClientId AND SettingKey = @SettingKey)
+        UPDATE [ResourceExplorer].[ClientSetting]
         SET SettingJson = @SettingJson, UpdatedOn = SYSUTCDATETIME()
         WHERE ClientId = @ClientId AND SettingKey = @SettingKey;
     ELSE
-        INSERT INTO [HTResourceMapper].[ClientSetting] (ClientId, SettingKey, SettingJson)
+        INSERT INTO [ResourceExplorer].[ClientSetting] (ClientId, SettingKey, SettingJson)
         VALUES (@ClientId, @SettingKey, @SettingJson);
 END
 ```
 
-Add three `<Build Include>` lines to `HTResourceMapperDb.sqlproj`:
+Add three `<Build Include>` lines to `MacroPoint.Azure.ResourceExplorer.Db.sqlproj`:
 
 ```xml
 <Build Include="Tables\ClientSetting.sql" />
@@ -87,18 +87,18 @@ Add three `<Build Include>` lines to `HTResourceMapperDb.sqlproj`:
 <Build Include="Stored Procedures\ClientSetting_Upsert.sql" />
 ```
 
-- [ ] **Step 1:** Create the 3 files + `<Build Include>` lines, and apply to `(localdb)\MSSQLLocalDB\ResourceMapper` via `sqlcmd` (table `IF OBJECT_ID(...) IS NULL`; sprocs `CREATE OR ALTER`).
+- [ ] **Step 1:** Create the 3 files + `<Build Include>` lines, and apply to `(localdb)\MSSQLLocalDB\ResourceExplorer` via `sqlcmd` (table `IF OBJECT_ID(...) IS NULL`; sprocs `CREATE OR ALTER`).
 
 ---
 
-## 2. Shared DTO (`Modules\Common\ResourceMapper.Common.Shared\Settings\`)
+## 2. Shared DTO (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Shared\Settings\`)
 
-New `Settings\` folder; namespace `ResourceMapper.Common.Shared.Settings`.
+New `Settings\` folder; namespace `MacroPoint.Azure.ResourceExplorer.Common.Shared.Settings`.
 
 **File:** `ClientSettingModel.cs`
 
 ```csharp
-namespace ResourceMapper.Common.Shared.Settings
+namespace MacroPoint.Azure.ResourceExplorer.Common.Shared.Settings
 {
     public class ClientSettingModel
     {
@@ -112,14 +112,14 @@ namespace ResourceMapper.Common.Shared.Settings
 
 ---
 
-## 3. Server: model, repo, service (`Modules\Common\ResourceMapper.Common.Server\Settings\`)
+## 3. Server: model, repo, service (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\Settings\`)
 
-New `Settings\` folder; namespace `ResourceMapper.Common.Server.Settings` (+ `Interfaces`, `Models`).
+New `Settings\` folder; namespace `MacroPoint.Azure.ResourceExplorer.Common.Server.Settings` (+ `Interfaces`, `Models`).
 
 **File:** `Models\ClientSettingRow.cs`
 
 ```csharp
-namespace ResourceMapper.Common.Server.Settings.Models
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Settings.Models
 {
     public class ClientSettingRow
     {
@@ -134,7 +134,7 @@ namespace ResourceMapper.Common.Server.Settings.Models
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ResourceMapper.Common.Server.Settings.Interfaces
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Settings.Interfaces
 {
     public interface IClientSettingsRepository
     {
@@ -151,12 +151,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using HT.Microsoft.SqlClient.Extensions;
-using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces;
-using ResourceMapper.Common.Server.Settings.Interfaces;
-using ResourceMapper.Common.Server.Settings.Models;
+using MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions;
+using MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions.Abstractions.Interfaces;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Settings.Interfaces;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Settings.Models;
 
-namespace ResourceMapper.Common.Server.Settings
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Settings
 {
     public class ClientSettingsSqlRepository : IClientSettingsRepository
     {
@@ -169,7 +169,7 @@ namespace ResourceMapper.Common.Server.Settings
 
         public async Task<string?> GetAsync(string clientId, string settingKey, CancellationToken cancellationToken)
         {
-            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].ClientSetting_Get")
+            using var cmd = _db.RO.SprocCommand("[ResourceExplorer].ClientSetting_Get")
                 .AddVarchar("@ClientId", clientId)
                 .AddVarchar("@SettingKey", settingKey);
 
@@ -183,7 +183,7 @@ namespace ResourceMapper.Common.Server.Settings
 
         public async Task UpsertAsync(string clientId, string settingKey, string settingJson, CancellationToken cancellationToken)
         {
-            using var cmd = _db.RW.SprocCommand("[HTResourceMapper].ClientSetting_Upsert")
+            using var cmd = _db.RW.SprocCommand("[ResourceExplorer].ClientSetting_Upsert")
                 .AddVarchar("@ClientId", clientId)
                 .AddVarchar("@SettingKey", settingKey)
                 .AddNVarchar("@SettingJson", settingJson);
@@ -199,10 +199,10 @@ namespace ResourceMapper.Common.Server.Settings
 ```csharp
 using System.Threading;
 using System.Threading.Tasks;
-using HT.Api.Service.Contracts;
-using ResourceMapper.Common.Shared.Settings;
+using MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.Settings;
 
-namespace ResourceMapper.Common.Server.Settings.Interfaces
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Settings.Interfaces
 {
     public interface IClientSettingsService
     {
@@ -218,13 +218,13 @@ namespace ResourceMapper.Common.Server.Settings.Interfaces
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using HT.Api.Client.Contracts.Models;                 // CallStatusCode
-using HT.Api.Service.Contracts;                       // ApiServiceResponse<T>
-using HT.Api.Service.Contracts.BuildersOfT;           // ServiceResponseBuilder<T>
-using ResourceMapper.Common.Server.Settings.Interfaces;
-using ResourceMapper.Common.Shared.Settings;
+using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Models;                 // CallStatusCode
+using MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts;                       // ApiServiceResponse<T>
+using MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.BuildersOfT;           // ServiceResponseBuilder<T>
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Settings.Interfaces;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.Settings;
 
-namespace ResourceMapper.Common.Server.Settings
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Settings
 {
     public class ClientSettingsService : IClientSettingsService
     {
@@ -299,7 +299,7 @@ namespace ResourceMapper.Common.Server.Settings
 ## 4. Dependency registration
 
 Add to `RegisterCommonDependencies` in `DependencyRegistration.cs` (with the matching `using`s
-`ResourceMapper.Common.Server.Settings` / `...Settings.Interfaces`):
+`MacroPoint.Azure.ResourceExplorer.Common.Server.Settings` / `...Settings.Interfaces`):
 
 ```csharp
 services.TryAddScoped<IClientSettingsRepository, ClientSettingsSqlRepository>();
@@ -310,9 +310,9 @@ services.TryAddScoped<IClientSettingsService, ClientSettingsService>();
 
 ---
 
-## 5. Tests (`_Tests\Common\Server\ResourceMapper.Common.Server.Tests\Settings\`)
+## 5. Tests (`_Tests\Common\Server\MacroPoint.Azure.ResourceExplorer.Common.Server.Tests\Settings\`)
 
-New folder; namespace `ResourceMapper.Common.Server.Tests.Settings`.
+New folder; namespace `MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Settings`.
 
 **File:** `ClientSettingsServiceTests.cs`
 
@@ -321,17 +321,17 @@ New folder; namespace `ResourceMapper.Common.Server.Tests.Settings`.
 
 using System.Threading;
 using System.Threading.Tasks;
-using ResourceMapper.Common.Server.Settings;
-using ResourceMapper.Common.Server.Settings.Interfaces;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Settings;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Settings.Interfaces;
 
-namespace ResourceMapper.Common.Server.Tests.Settings
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Settings
 {
     [Trait("Category", "Unit")]
-    [Trait("Category", "ResourceMapper")]
-    [Trait("Category", "ResourceMapper/Common")]
-    [Trait("Category", "ResourceMapper/Common/Server")]
-    [Trait("Category", "ResourceMapper/Common/Server/Settings")]
-    [Trait("Category", "ResourceMapper/Common/Server/Settings/ClientSettingsService")]
+    [Trait("Category", "ResourceExplorer")]
+    [Trait("Category", "ResourceExplorer/Common")]
+    [Trait("Category", "ResourceExplorer/Common/Server")]
+    [Trait("Category", "ResourceExplorer/Common/Server/Settings")]
+    [Trait("Category", "ResourceExplorer/Common/Server/Settings/ClientSettingsService")]
     public class ClientSettingsServiceTests
     {
         private readonly Mock<IClientSettingsRepository> _repo;
@@ -422,7 +422,7 @@ namespace ResourceMapper.Common.Server.Tests.Settings
 
 ---
 
-## 6. Rewire `Home.razor` (`UI\ResourceMapper.UI.Web\Components\Pages\Home.razor`)
+## 6. Rewire `Home.razor` (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\Components\Pages\Home.razor`)
 
 **Read the file first.** Replace the two `localStorage` uses of the grid-view with the service +
 `clientId`. Concretely:
@@ -432,8 +432,8 @@ namespace ResourceMapper.Common.Server.Tests.Settings
 Add usings and an inject:
 
 ```razor
-@using ResourceMapper.Common.Server.Settings.Interfaces
-@using ResourceMapper.UI.Web.Explorer
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.Settings.Interfaces
+@using MacroPoint.Azure.ResourceExplorer.UI.Web.Explorer
 @inject IClientSettingsService ClientSettings
 ```
 
@@ -489,11 +489,11 @@ grid interop.)
 
 ## UI verification hook (visible slice)
 
-- [ ] **Step 7: Build + run.** `dotnet build` clean; `dotnet run --project UI/ResourceMapper.UI.Web`.
+- [ ] **Step 7: Build + run.** `dotnet build` clean; `dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web`.
 - [ ] **Step 8: Drive the home grid** (`/`):
   1. Apply a filter / search / sort, then navigate away and back (or reload with a bare `/` URL) →
      the view **resumes** (same as before — but now from the server).
-  2. Confirm via `sqlcmd` that a `[HTResourceMapper].[ClientSetting]` row exists for your `clientId`
+  2. Confirm via `sqlcmd` that a `[ResourceExplorer].[ClientSetting]` row exists for your `clientId`
      with `SettingKey = 'home.gridView'` and the query string as `SettingJson`.
   3. Clear `localStorage` (dev-tools) but keep the same `clientId` cookie/entry → the saved view still
      resumes (it's server-side now). (Note: clearing the `rm_client_id` localStorage entry yields a new

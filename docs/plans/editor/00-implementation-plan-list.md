@@ -30,5 +30,5 @@ commented out). See the design doc's *Deferred / next phases*.
 
 - **Verify each slice end-to-end** before starting the next (build, tests, and — for UI — drive
   the actual app).
-- The DB project is `Database/HTResourceMapperDb`; app DB is `(localdb)\MSSQLLocalDB\ResourceMapper`.
+- The DB project is `Database/MacroPoint.Azure.ResourceExplorer.Db`; app DB is `(localdb)\MSSQLLocalDB\ResourceExplorer`.
 - Per-slice plan docs will be added here as `NN-<slug>.md` and linked from the table.

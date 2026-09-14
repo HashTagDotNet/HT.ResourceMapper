@@ -1,0 +1,464 @@
+@using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Models
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Interfaces
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.Editor
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.ResourceTypes
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.ResourceTypes.Contracts
+@using MacroPoint.Azure.ResourceExplorer.UI.Web.Components.Editor
+@inject IResourceService ResourceService
+@inject IDialogService DialogService
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            Short code and icon are what the dependency explorer draws: the code is printed inside
+            each node and the icon picks the glyph and colour. Leaving them blank gives every
+            resource of this type a generic blue dot.
+        </MudText>
+
+        <MudTextField T="string" @bind-Value="_typeName" Label="Type Name" Required="true"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="250"
+                      Immediate="true" Error="@_typeNameError" ErrorText="@_typeNameErrorText"
+                      HelperText="@DuplicateHint" />
+
+        <div class="rt-dialog-row mt-2">
+            <MudTextField T="string" @bind-Value="_shortCode" Label="Short Code" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" MaxLength="10" Immediate="true"
+                          HelperText="Up to 10 characters, e.g. APP, SBQ" />
+
+            <MudSelect T="string" @bind-Value="_iconKey" Label="Icon" Variant="Variant.Outlined"
+                       Margin="Margin.Dense" Clearable="true"
+                       HelperText="Determines the node glyph and colour">
+                @foreach (var key in ResourceTypeIcons.KnownKeys)
+                {
+                    <MudSelectItem Value="@key">@key</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+
+        @* Wrapped in its own div: MudCheckBox renders a MudInputControl whose input container is a
+           flex ROW, and everything after it was being laid out inside that container. The tag
+           template below is a grid, so as a flex item it collapsed to content width — its TAG column
+           resolved to 110px inside a 912px dialog, which is what clipped the "Expected?" selects. *@
+    <div>
+        <MudCheckBox T="bool" @bind-Value="_allowCustomTags" Class="mt-2"
+                     Label="Allow custom tags on resources of this type" />
+    </div>
+
+        @* The tag template. The list screen has always REPORTED a "Tag Template" count per type
+           while offering no way to change it — the only editor was a seed script, since no write
+           path existed below this point either (only ResourceTypeTag_GetAll). This is that gap.
+
+           Why it matters beyond completeness: these rows decide which tags a new resource of this
+           type is prompted for, and IsDefaultPrimary decides which Link tag becomes its
+           click-through link. Both were configurable only by re-running SQL. *@
+        <div class="rm-section-heading mt-4">Tag template</div>
+        <div class="rm-section-desc">
+            Tags a new resource of this type starts with. One Link tag can be marked the default
+            primary — that becomes the resource's click-through link.
+        </div>
+
+        @if (_template.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                No tags — a new resource of this type starts with none.
+            </MudText>
+        }
+        else
+        {
+            <MudRadioGroup T="int?" Value="_defaultPrimaryTagId" ValueChanged="OnDefaultPrimaryChanged">
+                <div class="rt-template-table">
+                    <div class="rt-template-head">
+                        <span>Tag</span>
+                        <span>Expected?</span>
+                        <span title="The Link tag opened from the grid and the explorer">Default primary</span>
+                        <span></span>
+                    </div>
+                    @foreach (var row in _template)
+                    {
+                        var def = DefinitionFor(row.TagDefinitionId);
+                        <div class="rt-template-row">
+                            <span class="rt-template-name">
+                                @(def?.DisplayName ?? def?.TagDefinitionKey ?? $"#{row.TagDefinitionId}")
+                                @if (def is not null && !IsLink(def))
+                                {
+                                    <span class="rt-template-kind">text</span>
+                                }
+                            </span>
+
+                            @* Null = inherit the definition's own level, which is the common case;
+                               an override is offered because the column exists and a type genuinely
+                               may need a tag that is required here but optional elsewhere. *@
+                            <MudSelect T="string" Value="@(row.RequirementLevel ?? string.Empty)"
+                                       ValueChanged="@(v => OnRequirementChanged(row, v))"
+                                       aria-label="@($"Expected level for {def?.DisplayName ?? def?.TagDefinitionKey}")"
+                                       Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                                <MudSelectItem Value="@("")">Inherit (@InheritedLevelText(def))</MudSelectItem>
+                                <MudSelectItem Value="@("Error")">Required</MudSelectItem>
+                                <MudSelectItem Value="@("Suggested")">Recommended</MudSelectItem>
+                                <MudSelectItem Value="@("Optional")">Optional</MudSelectItem>
+                            </MudSelect>
+
+                            <span class="rt-template-primary">
+                                @* Only a Link tag can be a click-through link, so only Link rows get
+                                   the radio — offering it on a text tag would be a choice the
+                                   explorer cannot honour. *@
+                                @if (def is not null && IsLink(def))
+                                {
+                                    <MudRadio T="int?" Value="@((int?)row.TagDefinitionId)" Color="Color.Primary" Dense="true" />
+                                }
+                                else
+                                {
+                                    <span class="rt-template-dash" title="Only a link tag can be the primary">—</span>
+                                }
+                            </span>
+
+                            <MudTooltip Text="Remove from this type's template">
+                                <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small"
+                                               aria-label="@($"Remove {def?.DisplayName ?? def?.TagDefinitionKey}")"
+                                               OnClick="@(() => RemoveRow(row))" />
+                            </MudTooltip>
+                        </div>
+                    }
+                </div>
+            </MudRadioGroup>
+        }
+
+        @* Two affordances, exactly as the editor's Tags tab has: attach an EXISTING definition, or
+           create a brand-new one. Only the first shipped initially, so a type could not be given a
+           tag that did not already exist — and when every existing tag was already in the template
+           the section became a dead end with nothing to do. "Create new tag…" always shows, because
+           a brand-new definition is always addable (same reasoning as TagsTab). *@
+        <div class="d-flex align-center mt-2 rt-template-actions">
+            @if (AddableDefinitions().Any())
+            {
+                <MudAutocomplete T="TagDefinitionModel" @key="_addKey" Value="null" ValueChanged="OnAddTag"
+                                 SearchFunc="SearchAddable"
+                                 ToStringFunc="@(t => t?.DisplayName ?? t?.TagDefinitionKey ?? string.Empty)"
+                                 Placeholder="Add a tag to this template…" Variant="Variant.Outlined"
+                                 Margin="Margin.Dense" Clearable="true" ResetValueOnEmptyText="true"
+                                 CoerceValue="false" Class="rt-template-add" />
+            }
+            <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
+                       OnClick="OpenCreateTagDialog"
+                       Class="@(AddableDefinitions().Any() ? "ml-2" : string.Empty)">
+                Create new tag…
+            </MudButton>
+        </div>
+
+        @* Scoped CSS only reaches elements this component renders itself, so the framing here is
+           an inline style on the MudPaper and the classes below sit on plain divs. *@
+        <MudPaper Elevation="0" Class="pa-3 mt-3" Style="border:1px solid var(--mud-palette-divider);">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Explorer node preview</MudText>
+            <div class="rt-preview-body mt-2">
+                <div class="rt-preview-node" style="@($"background:{ResourceTypeIcons.ColorFor(_iconKey)};")">
+                    @PreviewCode
+                </div>
+                <MudText Typo="Typo.body2">
+                    @(string.IsNullOrWhiteSpace(_typeName) ? "Untitled type" : _typeName)
+                </MudText>
+            </div>
+            @if (string.IsNullOrWhiteSpace(_shortCode))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    No short code — the explorer falls back to the first three letters of the name.
+                </MudText>
+            }
+        </MudPaper>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mt-3">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_saving">
+            @(_saving ? "Saving…" : IsEdit ? "Save" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>The row being edited, or null to create a new type.</summary>
+    [Parameter] public ResourceTypeModel? Existing { get; set; }
+
+    /// <summary>Every other type's name, so a collision is flagged before the round trip.
+    /// The server still enforces it (UK_ResourceType_TypeName) — this is only a hint.</summary>
+    [Parameter] public List<string> ExistingNames { get; set; } = new();
+
+    /// <summary>
+    /// Every tag definition, for the template picker. Supplied by the caller so the dialog does not
+    /// re-fetch it per open; empty means the caller does not offer template editing (the editor's
+    /// inline create-type), in which case EntryPointTags is left null on save and the template is
+    /// untouched.
+    /// </summary>
+    [Parameter] public List<TagDefinitionModel> TagDictionary { get; set; } = new();
+
+    /// <summary>This type's existing template rows. Empty for a new type.</summary>
+    [Parameter] public List<EntryPointTagTemplateModel> EntryPointTags { get; set; } = new();
+
+    private readonly List<EntryPointTagTemplateModel> _template = new();
+    private List<TagDefinitionModel> _tagDictionary = new();
+    private int? _defaultPrimaryTagId;
+    private int _addKey;
+
+    private string _typeName = string.Empty;
+    private string? _shortCode;
+    private string? _iconKey;
+    private bool _allowCustomTags = true;
+    private bool _saving;
+    private bool _typeNameError;
+    private string? _typeNameErrorText;
+    private string? _error;
+
+    private bool IsEdit => Existing is not null && Existing.ResourceTypeId != 0;
+
+    protected override void OnInitialized()
+    {
+        // Domain and system tags are excluded for the same reason the editor's add-tag picker
+        // excludes them (PL-04/PL-21): Domain is set on the General tab, and a system tag is
+        // plumbing. A template row for either would be unfillable or meaningless.
+        _tagDictionary = TagDictionary
+            .Where(d => !d.IsDomainTag && !d.IsSystemTag)
+            .OrderBy(d => d.DisplayOrder)
+            .ThenBy(d => d.DisplayName ?? d.TagDefinitionKey, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        // Copy rather than bind: Cancel must leave the caller's list untouched.
+        _template.AddRange(EntryPointTags.Select(t => new EntryPointTagTemplateModel
+        {
+            TagDefinitionId = t.TagDefinitionId,
+            IsDefaultPrimary = t.IsDefaultPrimary,
+            RequirementLevel = t.RequirementLevel
+        }));
+        SortTemplate();
+        _defaultPrimaryTagId = _template.FirstOrDefault(t => t.IsDefaultPrimary)?.TagDefinitionId;
+
+        if (Existing is null) return;
+
+        _typeName = Existing.TypeName;
+        _shortCode = Existing.ShortCode;
+        _iconKey = Existing.IconKey;
+        _allowCustomTags = Existing.AllowCustomTags;
+    }
+
+    // --- Tag template editing -------------------------------------------------------------------
+
+    private TagDefinitionModel? DefinitionFor(int tagDefinitionId) =>
+        _tagDictionary.FirstOrDefault(d => d.TagDefinitionId == tagDefinitionId);
+
+    private static bool IsLink(TagDefinitionModel d) =>
+        string.Equals(d.ContentType, "Link", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Names the level a row inherits, so "Inherit" is not a blank cheque.</summary>
+    private static string InheritedLevelText(TagDefinitionModel? d) => d?.RequirementLevel switch
+    {
+        "Error" => "required",
+        "Suggested" => "recommended",
+        _ => "optional"
+    };
+
+    /// <summary>Template order follows the definitions' DisplayOrder, matching the Tags tab.</summary>
+    private void SortTemplate()
+    {
+        var order = _tagDictionary
+            .Select((d, i) => (d.TagDefinitionId, i))
+            .ToDictionary(x => x.TagDefinitionId, x => x.i);
+
+        _template.Sort((a, b) =>
+            order.GetValueOrDefault(a.TagDefinitionId, int.MaxValue)
+                 .CompareTo(order.GetValueOrDefault(b.TagDefinitionId, int.MaxValue)));
+    }
+
+    private IEnumerable<TagDefinitionModel> AddableDefinitions()
+    {
+        var present = _template.Select(t => t.TagDefinitionId).ToHashSet();
+        return _tagDictionary.Where(d => !present.Contains(d.TagDefinitionId));
+    }
+
+    private Task<IEnumerable<TagDefinitionModel>> SearchAddable(string search, CancellationToken cancellationToken)
+    {
+        var candidates = AddableDefinitions();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            candidates = candidates.Where(d =>
+                (d.DisplayName ?? d.TagDefinitionKey).Contains(search, StringComparison.OrdinalIgnoreCase)
+                || d.TagDefinitionKey.Contains(search, StringComparison.OrdinalIgnoreCase));
+        }
+        return Task.FromResult(candidates);
+    }
+
+    private void OnAddTag(TagDefinitionModel? definition)
+    {
+        if (definition is null) return;
+        if (_template.Any(t => t.TagDefinitionId == definition.TagDefinitionId)) return;
+
+        _template.Add(new EntryPointTagTemplateModel { TagDefinitionId = definition.TagDefinitionId });
+        SortTemplate();
+        _addKey++;   // PL-16: remount so the autocomplete resets to its placeholder
+    }
+
+    private void RemoveRow(EntryPointTagTemplateModel row)
+    {
+        _template.Remove(row);
+        if (_defaultPrimaryTagId == row.TagDefinitionId)
+        {
+            // Removing the primary must clear the pointer, not leave it aimed at a row that is gone.
+            _defaultPrimaryTagId = null;
+            foreach (var t in _template) t.IsDefaultPrimary = false;
+        }
+    }
+
+    private void OnDefaultPrimaryChanged(int? tagDefinitionId)
+    {
+        _defaultPrimaryTagId = tagDefinitionId;
+        foreach (var t in _template)
+            t.IsDefaultPrimary = t.TagDefinitionId == tagDefinitionId;
+    }
+
+    private void OnRequirementChanged(EntryPointTagTemplateModel row, string? value) =>
+        row.RequirementLevel = string.IsNullOrEmpty(value) ? null : value;
+
+    /// <summary>
+    /// Creates a tag definition and drops it straight into this template — the same shape as
+    /// TagsTab.OpenCreateDialog, reusing the same dialog so the two paths cannot ask for different
+    /// things. The definition is persisted by the dialog itself; only the template row is pending
+    /// until Save, so cancelling this dialog afterwards leaves an orphan definition and no template
+    /// row. Accepted: that matches how the editor's inline tag create already behaves, and an unused
+    /// definition is harmless (and reusable) where a half-written one would not be.
+    /// </summary>
+    private async Task OpenCreateTagDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(TagDefinitionDialog.ExistingKeys), TagDictionary.Select(t => t.TagDefinitionKey).ToList() }
+        };
+
+        var dialog = await DialogService.ShowAsync<TagDefinitionDialog>("Create Tag Definition", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        if (result.Data is not TagDefinitionModel created) return;
+
+        // Keep both lists current: TagDictionary is what the create dialog checks for duplicate keys
+        // on a second create, _tagDictionary is what the picker and the row renderer read.
+        if (!TagDictionary.Any(t => t.TagDefinitionId == created.TagDefinitionId))
+            TagDictionary.Add(created);
+
+        if (!_tagDictionary.Any(t => t.TagDefinitionId == created.TagDefinitionId))
+        {
+            _tagDictionary.Add(created);
+            _tagDictionary = _tagDictionary
+                .OrderBy(d => d.DisplayOrder)
+                .ThenBy(d => d.DisplayName ?? d.TagDefinitionKey, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        if (!_template.Any(t => t.TagDefinitionId == created.TagDefinitionId))
+        {
+            _template.Add(new EntryPointTagTemplateModel { TagDefinitionId = created.TagDefinitionId });
+            SortTemplate();
+        }
+    }
+
+    /// <summary>Mirrors explorer-canvas.js: the node prints ShortCode, or the first three letters
+    /// of the type name upper-cased when there isn't one.</summary>
+    private string PreviewCode
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(_shortCode)) return _shortCode!.Trim();
+            if (!string.IsNullOrWhiteSpace(_typeName))
+            {
+                var trimmed = _typeName.Trim();
+                return trimmed[..Math.Min(3, trimmed.Length)].ToUpperInvariant();
+            }
+            return "?";
+        }
+    }
+
+    private string? DuplicateHint =>
+        !string.IsNullOrWhiteSpace(_typeName)
+        && ExistingNames.Any(n => string.Equals(n, _typeName.Trim(), StringComparison.OrdinalIgnoreCase))
+            ? "A resource type with this name already exists."
+            : null;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        _error = null;
+        _typeNameErrorText = null;
+        _typeNameError = string.IsNullOrWhiteSpace(_typeName);
+        if (_typeNameError)
+        {
+            _typeNameErrorText = "Type name is required";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var request = new SaveResourceTypeRequest
+            {
+                ResourceTypeId = Existing?.ResourceTypeId ?? 0,
+                TypeName = _typeName.Trim(),
+                ShortCode = string.IsNullOrWhiteSpace(_shortCode) ? null : _shortCode!.Trim(),
+                IconKey = string.IsNullOrWhiteSpace(_iconKey) ? null : _iconKey!.Trim(),
+                AllowCustomTags = _allowCustomTags,
+                // Null when this caller does not offer template editing, so the existing template is
+                // left alone rather than cleared. An empty LIST is different — it means "no tags".
+                EntryPointTags = TagDictionary.Count == 0 ? null : _template.ToList()
+            };
+
+            var response = await ResourceService.SaveResourceTypeAsync(request, CancellationToken.None);
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+            {
+                MudDialog.Close(DialogResult.Ok(response.ApiResponse.Data));
+                return;
+            }
+
+            ApplyServerErrors(response.ApiResponse.Errors);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    /// <summary>
+    /// Validation messages carry the field in PropertyName; ErrorBuilder messages (the
+    /// AlreadyExists duplicate) carry it in MessageCode. Check both so a duplicate name lands on
+    /// the name field rather than in a generic alert.
+    /// </summary>
+    private void ApplyServerErrors(List<Message>? errors)
+    {
+        var messages = errors ?? new List<Message>();
+        if (messages.Count == 0)
+        {
+            _error = "Could not save the resource type.";
+            return;
+        }
+
+        foreach (var message in messages)
+        {
+            var text = message.Details ?? message.Title ?? "Could not save the resource type.";
+
+            if (IsNameField(message.PropertyName) || IsNameField(message.MessageCode))
+            {
+                _typeNameError = true;
+                _typeNameErrorText = text;
+            }
+            else
+            {
+                _error = text;
+            }
+        }
+    }
+
+    private static bool IsNameField(string? field) =>
+        string.Equals(field, "TypeName", StringComparison.Ordinal)
+        || string.Equals(field, "request.TypeName", StringComparison.Ordinal);
+}

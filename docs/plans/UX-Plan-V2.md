@@ -1,8 +1,8 @@
-# HT Resource Mapper – UX & Architecture Plan
+# MacroPoint Azure Resource Explorer – UX & Architecture Plan
 
 > **Status / resume:** see [`Phase1-Status.md`](./Phase1-Status.md) — Phase 1 is functionally complete and
 > live-verified (import pipeline + new SSR UI + wiki "Visibility Resources" imported). Run via
-> [`UI/ResourceMapper.UI.Web/README.md`](../../UI/ResourceMapper.UI.Web/README.md).
+> [`UI/MacroPoint.Azure.ResourceExplorer.UI.Web/README.md`](../../UI/MacroPoint.Azure.ResourceExplorer.UI.Web/README.md).
 
 # File Locations
 

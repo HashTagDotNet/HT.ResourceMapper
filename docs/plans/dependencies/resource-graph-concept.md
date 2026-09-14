@@ -122,7 +122,7 @@ concept requires, and under-constrained.
 
 ### What exists
 
-- **Table** `Database/HTResourceMapperDb/Tables/ResourceDependency.sql` — a self-referencing
+- **Table** `Database/MacroPoint.Azure.ResourceExplorer.Db/Tables/ResourceDependency.sql` — a self-referencing
   junction:
 
   ```sql
@@ -135,12 +135,12 @@ concept requires, and under-constrained.
 
   One row = "`ResourceId` depends on `DependencyResourceId`."
 
-- **EF entity** `Modules/Common/ResourceMapper.Common.Server/Resources/Models/ResourceDependency.cs`
+- **EF entity** `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Resources/Models/ResourceDependency.cs`
   with two navigation properties, so both traversal directions come from one row:
   - `Resource.Dependencies` → out-edges ("what this depends on")
   - `Resource.Dependents`   → in-edges ("what depends on this")
 
-- **Import contract** `Modules/Common/ResourceMapper.Common.Shared/Import/Contracts/ImportContract.cs`
+- **Import contract** `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Shared/Import/Contracts/ImportContract.cs`
   accepts `List<string>? Dependencies` on each `ImportResourceItem` — a flat list of keys.
 
 ### What does NOT exist (dormant / unwired)

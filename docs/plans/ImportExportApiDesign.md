@@ -4,7 +4,7 @@
 
 This document captures the design decisions and implementation plan for a
 `POST /api/resources/import` endpoint that ingests a JSON document containing 0..N resources
-(plus optional reference data) into the ResourceMapper database.
+(plus optional reference data) into the ResourceExplorer database.
 
 A companion `GET /api/resources/export` endpoint is deferred; the schema and UID strategy
 are designed with it in mind.
@@ -26,7 +26,7 @@ are designed with it in mind.
 | 9 | Import response (success) | Summary: counts broken down by action per section (created/updated/skipped) |
 | 10 | Import response (failure) | Flat list of errors naming section + key + field + message; nothing written. Errors are returned in the `ImportResponse` Data payload; a single summary validation message on the `ApiResponse` wrapper drives the 400 status |
 | 11 | Custom tags | Every tag key on a resource **must** resolve to a tag definition (in the import payload or the DB). `ResourceType.AllowCustomTags` grants no exemption — `ResourceTag.TagDefinitionId` is a NOT NULL FK, so undefined tags cannot be stored |
-| 12 | TVP support | `HT.Microsoft.SqlClient.Extensions` is extended with table-valued parameter support (`AddTvp`) plus string output-parameter support (`AddVarchar` with direction, `ReadString`) |
+| 12 | TVP support | `MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions` is extended with table-valued parameter support (`AddTvp`) plus string output-parameter support (`AddVarchar` with direction, `ReadString`) |
 | 13 | `contentType` | Free-form string (max 50 chars). Not validated against a fixed list. `TagDefinition_Upsert` auto-registers unseen values in `TagContentType` (the table acts as a registry, not a validation gate). No schema change |
 | 14 | ResourceType resolution | `Resource_Upsert` takes `@TypeName` and resolves `ResourceTypeId` internally — the service never needs generated IDs back from the type-upsert pass |
 | 15 | Upsert sproc pattern | No MERGE. Pre-check IF/ELSE pattern with `@Result VARCHAR(10) OUTPUT` (`'created'`/`'updated'`/`'skipped'`); `Resource_Upsert` additionally returns `@ResourceId INT OUTPUT` in all cases, including skip |
@@ -140,57 +140,57 @@ also adds **one** summary validation message via `builder.Validation.AddValidati
 
 ## Deliverables & File Map
 
-> **⚠ Legacy SSDT project:** `HTResourceMapperDb.sqlproj` is legacy format — every new `.sql`
+> **⚠ Legacy SSDT project:** `MacroPoint.Azure.ResourceExplorer.Db.sqlproj` is legacy format — every new `.sql`
 > file must be added to the `.sqlproj` with an explicit `<Build Include>` entry.
 > The **top-level** `Tables\` and `Stored Procedures\` folders are the source of truth;
-> the nested `HTResourceMapperDb/HTResourceMapper/` folder tree is a stale duplicate not
+> the nested `MacroPoint.Azure.ResourceExplorer.Db/ResourceExplorer/` folder tree is a stale duplicate not
 > referenced by the project — do not add files there.
 
 ### Library changes (prerequisite)
 
 | File | Change |
 |------|--------|
-| `Libraries/SqlClient/HT.Microsoft.SqlClient.Extensions/SqlParametersExtensions.SqlCommandExt.cs` | Add `AddTvp(name, typeName, DataTable)` (SqlDbType.Structured); add `AddVarchar` overload with `ParameterDirection`; add `ReadString(this SqlCommand, parameterName)` |
+| `Libraries/SqlClient/MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions/SqlParametersExtensions.SqlCommandExt.cs` | Add `AddTvp(name, typeName, DataTable)` (SqlDbType.Structured); add `AddVarchar` overload with `ParameterDirection`; add `ReadString(this SqlCommand, parameterName)` |
 
 ### New files to create
 
 | File | Purpose |
 |------|---------|
-| `Modules/Common/ResourceMapper.Common.Shared/Import/Contracts/ImportContract.cs` | Request + response DTOs |
-| `Modules/Common/ResourceMapper.Common.Server/Resources/Interfaces/IImportService.cs` | Service interface |
-| `Modules/Common/ResourceMapper.Common.Server/Resources/Interfaces/IImportRepository.cs` | Repository interface |
-| `Modules/Common/ResourceMapper.Common.Server/Resources/ImportService.cs` | Service implementation |
-| `Modules/Common/ResourceMapper.Common.Server/Resources/ImportSqlRepository.cs` | SQL repository |
-| `UI/ResourceMapper.UI.Server/Controllers/Api/ResourceImportController.cs` | Controller |
-| `Database/HTResourceMapperDb/User Defined Types/ResourceKeyList.sql` | TVP type: `(ResourceKey NVARCHAR(250))` |
-| `Database/HTResourceMapperDb/User Defined Types/TagKeyValueList.sql` | TVP type: `(TagDefinitionKey NVARCHAR(50), TagValue NVARCHAR(2000))` |
-| `Database/HTResourceMapperDb/Stored Procedures/TagDefinition_GetAll.sql` | Pre-validation lookup |
-| `Database/HTResourceMapperDb/Stored Procedures/Resource_GetKeysByKeys.sql` | Bulk key existence check (TVP) |
-| `Database/HTResourceMapperDb/Stored Procedures/ResourceType_Upsert.sql` | |
-| `Database/HTResourceMapperDb/Stored Procedures/TagDefinition_Upsert.sql` | Auto-registers contentType |
-| `Database/HTResourceMapperDb/Stored Procedures/Resource_Upsert.sql` | Resolves TypeName internally |
-| `Database/HTResourceMapperDb/Stored Procedures/ResourceTag_SetForResource.sql` | Replaces all tags for a resource |
-| `Database/HTResourceMapperDb/Stored Procedures/ResourceDependency_SetForResource.sql` | Replaces all deps for a resource |
+| `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Shared/Import/Contracts/ImportContract.cs` | Request + response DTOs |
+| `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Resources/Interfaces/IImportService.cs` | Service interface |
+| `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Resources/Interfaces/IImportRepository.cs` | Repository interface |
+| `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Resources/ImportService.cs` | Service implementation |
+| `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Resources/ImportSqlRepository.cs` | SQL repository |
+| `UI/MacroPoint.Azure.ResourceExplorer.UI.Server/Controllers/Api/ResourceImportController.cs` | Controller |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/User Defined Types/ResourceKeyList.sql` | TVP type: `(ResourceKey NVARCHAR(250))` |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/User Defined Types/TagKeyValueList.sql` | TVP type: `(TagDefinitionKey NVARCHAR(50), TagValue NVARCHAR(2000))` |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/TagDefinition_GetAll.sql` | Pre-validation lookup |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/Resource_GetKeysByKeys.sql` | Bulk key existence check (TVP) |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/ResourceType_Upsert.sql` | |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/TagDefinition_Upsert.sql` | Auto-registers contentType |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/Resource_Upsert.sql` | Resolves TypeName internally |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/ResourceTag_SetForResource.sql` | Replaces all tags for a resource |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/ResourceDependency_SetForResource.sql` | Replaces all deps for a resource |
 | `bruno/bruno.json` | Bruno collection manifest (auto-discovered by VS Code extension) |
 | `bruno/import-upsert.bru` | Happy path request |
 | `bruno/import-skip.bru` | Skip existing resources |
 | `bruno/import-fail.bru` | Conflict → error |
 | `bruno/import-validation.bru` | Schema/reference error |
 | `bruno/import-empty.bru` | Empty resources array |
-| `_Tests/Modules/Common/ResourceMapper.Common.Server.Tests/ImportServiceTests.cs` | Unit tests |
+| `_Tests/Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server.Tests/ImportServiceTests.cs` | Unit tests |
 
 ### Files to modify
 
 | File | Change |
 |------|--------|
-| `Modules/Common/ResourceMapper.Common.Server/Utils/DependencyRegistration.cs` | Register `IImportService` + `IImportRepository` |
-| `Database/HTResourceMapperDb/HTResourceMapperDb.sqlproj` | `<Build Include>` entries for every new `.sql` file |
+| `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Utils/DependencyRegistration.cs` | Register `IImportService` + `IImportRepository` |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/MacroPoint.Azure.ResourceExplorer.Db.sqlproj` | `<Build Include>` entries for every new `.sql` file |
 
 ### Already exists (no action)
 
 | File | Note |
 |------|------|
-| `Database/HTResourceMapperDb/Stored Procedures/ResourceType_GetAll.sql` | Used as-is for the pre-validation lookup |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/ResourceType_GetAll.sql` | Used as-is for the pre-validation lookup |
 
 ---
 
@@ -203,7 +203,7 @@ public static SqlCommand AddTvp(this SqlCommand command, string parameterName,
     string typeName, DataTable rows)
 {
     var p = command.Parameters.Add(parameterName, SqlDbType.Structured);
-    p.TypeName = typeName;   // e.g. "[HTResourceMapper].[ResourceKeyList]"
+    p.TypeName = typeName;   // e.g. "[ResourceExplorer].[ResourceKeyList]"
     p.Value = rows;
     return command;
 }
@@ -220,7 +220,7 @@ public static string? ReadString(this SqlCommand command, string parameterName)
 
 ## Step 1 — Shared Contracts
 
-**`Modules/Common/ResourceMapper.Common.Shared/Import/Contracts/ImportContract.cs`**
+**`Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Shared/Import/Contracts/ImportContract.cs`**
 
 ```csharp
 public class ImportRequest
@@ -302,7 +302,7 @@ duplicate keys (validation error), then re-wraps each dictionary with
 
 ## Step 2 — Repository Interface & Stored Procedures
 
-**`Modules/Common/ResourceMapper.Common.Server/Resources/Interfaces/IImportRepository.cs`**
+**`Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Resources/Interfaces/IImportRepository.cs`**
 
 ```csharp
 public interface IImportRepository
@@ -338,7 +338,7 @@ public interface IImportRepository
 >
 > Repository call pattern (matches existing `ResourceSqlRepository`):
 > ```csharp
-> using var cmd = _db.Execute.SprocCommand("[HTResourceMapper].Resource_Upsert")
+> using var cmd = _db.Execute.SprocCommand("[ResourceExplorer].Resource_Upsert")
 >     .AddNVarchar("@ResourceKey", resource.Key)
 >     ...
 >     .AddVarchar("@Result", null, 10, ParameterDirection.Output)
@@ -352,14 +352,14 @@ public interface IImportRepository
 
 **`ResourceKeyList.sql`**
 ```sql
-CREATE TYPE [HTResourceMapper].[ResourceKeyList] AS TABLE (
+CREATE TYPE [ResourceExplorer].[ResourceKeyList] AS TABLE (
     [ResourceKey] NVARCHAR(250) NOT NULL
 );
 ```
 
 **`TagKeyValueList.sql`**
 ```sql
-CREATE TYPE [HTResourceMapper].[TagKeyValueList] AS TABLE (
+CREATE TYPE [ResourceExplorer].[TagKeyValueList] AS TABLE (
     [TagDefinitionKey] NVARCHAR(50) NOT NULL,
     [TagValue] NVARCHAR(2000) NULL
 );
@@ -373,7 +373,7 @@ All upsert sprocs use the **pre-check IF/ELSE pattern** (decision 15) — no MER
 **`TagDefinition_GetAll.sql`** — SELECT all TagDefinition rows joined to TagContentType
 (TagDefinitionKey, TagDefinitionUid, TagCode AS ContentType, AllowCustomValue, IsMultiValued, AllowedValues).
 
-**`Resource_GetKeysByKeys.sql`** — `@Keys [HTResourceMapper].[ResourceKeyList] READONLY`;
+**`Resource_GetKeysByKeys.sql`** — `@Keys [ResourceExplorer].[ResourceKeyList] READONLY`;
 returns the subset of keys that exist in `Resource`. Used for bulk conflict pre-check.
 
 **`ResourceType_Upsert.sql`**
@@ -381,17 +381,17 @@ returns the subset of keys that exist in `Resource`. Used for bulk conflict pre-
 -- @TypeName NVARCHAR(250), @ResourceTypeUid VARCHAR(40) (used only on create),
 -- @AllowCustomTags BIT, @OnConflict VARCHAR(10), @Result VARCHAR(10) OUTPUT
 DECLARE @Id INT;
-SELECT @Id = ResourceTypeId FROM [HTResourceMapper].ResourceType WHERE TypeName = @TypeName;
+SELECT @Id = ResourceTypeId FROM [ResourceExplorer].ResourceType WHERE TypeName = @TypeName;
 
 IF @Id IS NULL
 BEGIN
-    INSERT INTO [HTResourceMapper].ResourceType (ResourceTypeUid, TypeName, AllowCustomTags)
+    INSERT INTO [ResourceExplorer].ResourceType (ResourceTypeUid, TypeName, AllowCustomTags)
     VALUES (@ResourceTypeUid, @TypeName, @AllowCustomTags);
     SET @Result = 'created';
 END
 ELSE IF @OnConflict = 'upsert'
 BEGIN
-    UPDATE [HTResourceMapper].ResourceType
+    UPDATE [ResourceExplorer].ResourceType
     SET AllowCustomTags = @AllowCustomTags, UpdatedOn = SYSUTCDATETIME()
     WHERE ResourceTypeId = @Id;
     SET @Result = 'updated';
@@ -409,13 +409,13 @@ new registry rows use `MAX+1`:
 -- @OnConflict VARCHAR(10), @Result VARCHAR(10) OUTPUT
 DECLARE @ContentTypeId INT;
 SELECT @ContentTypeId = TagContentTypeId
-FROM [HTResourceMapper].TagContentType WHERE TagCode = @ContentType;
+FROM [ResourceExplorer].TagContentType WHERE TagCode = @ContentType;
 
 IF @ContentTypeId IS NULL
 BEGIN
     SELECT @ContentTypeId = ISNULL(MAX(TagContentTypeId), -1) + 1
-    FROM [HTResourceMapper].TagContentType;
-    INSERT INTO [HTResourceMapper].TagContentType (TagContentTypeId, TagCode)
+    FROM [ResourceExplorer].TagContentType;
+    INSERT INTO [ResourceExplorer].TagContentType (TagContentTypeId, TagCode)
     VALUES (@ContentTypeId, @ContentType);
 END
 -- ...then IF/ELSE upsert on TagDefinitionKey as above
@@ -428,14 +428,14 @@ END
 -- @TypeName NVARCHAR(250) NULL, @ResourceName NVARCHAR(250), @Description NVARCHAR(2000) NULL,
 -- @OnConflict VARCHAR(10), @ResourceId INT OUTPUT, @Result VARCHAR(10) OUTPUT
 DECLARE @ResourceTypeId INT =
-    (SELECT ResourceTypeId FROM [HTResourceMapper].ResourceType WHERE TypeName = @TypeName);
+    (SELECT ResourceTypeId FROM [ResourceExplorer].ResourceType WHERE TypeName = @TypeName);
 
 SELECT @ResourceId = ResourceId
-FROM [HTResourceMapper].[Resource] WHERE ResourceKey = @ResourceKey;
+FROM [ResourceExplorer].[Resource] WHERE ResourceKey = @ResourceKey;
 
 IF @ResourceId IS NULL
 BEGIN
-    INSERT INTO [HTResourceMapper].[Resource]
+    INSERT INTO [ResourceExplorer].[Resource]
         (ResourceUid, ResourceKey, ResourceTypeId, ResourceName, [Description])
     VALUES (@ResourceUid, @ResourceKey, @ResourceTypeId, @ResourceName, @Description);
     SET @ResourceId = SCOPE_IDENTITY();
@@ -443,7 +443,7 @@ BEGIN
 END
 ELSE IF @OnConflict = 'upsert'
 BEGIN
-    UPDATE [HTResourceMapper].[Resource]
+    UPDATE [ResourceExplorer].[Resource]
     SET ResourceName = @ResourceName, [Description] = @Description,
         ResourceTypeId = @ResourceTypeId, UpdatedOn = SYSUTCDATETIME()
     WHERE ResourceId = @ResourceId;
@@ -456,26 +456,26 @@ ELSE
 **`ResourceTag_SetForResource.sql`** — sproc-local transaction so a failed insert
 can't leave the resource with zero tags:
 ```sql
--- @ResourceId INT, @Tags [HTResourceMapper].[TagKeyValueList] READONLY
+-- @ResourceId INT, @Tags [ResourceExplorer].[TagKeyValueList] READONLY
 BEGIN TRAN;
-DELETE FROM [HTResourceMapper].[ResourceTag] WHERE ResourceId = @ResourceId;
-INSERT INTO [HTResourceMapper].[ResourceTag] (ResourceId, TagDefinitionId, TagValue)
+DELETE FROM [ResourceExplorer].[ResourceTag] WHERE ResourceId = @ResourceId;
+INSERT INTO [ResourceExplorer].[ResourceTag] (ResourceId, TagDefinitionId, TagValue)
 SELECT @ResourceId, td.TagDefinitionId, t.TagValue
 FROM @Tags t
-JOIN [HTResourceMapper].[TagDefinition] td ON td.TagDefinitionKey = t.TagDefinitionKey;
+JOIN [ResourceExplorer].[TagDefinition] td ON td.TagDefinitionKey = t.TagDefinitionKey;
 COMMIT;
 ```
 (The JOIN cannot drop rows: validation guarantees every tag key has a definition — decision 11.)
 
 **`ResourceDependency_SetForResource.sql`** — same local-transaction pattern:
 ```sql
--- @ResourceId INT, @DependencyKeys [HTResourceMapper].[ResourceKeyList] READONLY
+-- @ResourceId INT, @DependencyKeys [ResourceExplorer].[ResourceKeyList] READONLY
 BEGIN TRAN;
-DELETE FROM [HTResourceMapper].[ResourceDependency] WHERE ResourceId = @ResourceId;
-INSERT INTO [HTResourceMapper].[ResourceDependency] (ResourceId, DependencyResourceId)
+DELETE FROM [ResourceExplorer].[ResourceDependency] WHERE ResourceId = @ResourceId;
+INSERT INTO [ResourceExplorer].[ResourceDependency] (ResourceId, DependencyResourceId)
 SELECT @ResourceId, r.ResourceId
 FROM @DependencyKeys dk
-JOIN [HTResourceMapper].[Resource] r ON r.ResourceKey = dk.ResourceKey;
+JOIN [ResourceExplorer].[Resource] r ON r.ResourceKey = dk.ResourceKey;
 COMMIT;
 ```
 
@@ -483,7 +483,7 @@ COMMIT;
 
 ## Step 3 — Service Logic
 
-**`Modules/Common/ResourceMapper.Common.Server/Resources/Interfaces/IImportService.cs`**
+**`Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Resources/Interfaces/IImportService.cs`**
 
 ```csharp
 public interface IImportService
@@ -558,7 +558,7 @@ All key sets/dictionaries below use `StringComparer.OrdinalIgnoreCase` (decision
 
 ## Step 4 — Controller
 
-**`UI/ResourceMapper.UI.Server/Controllers/Api/ResourceImportController.cs`**
+**`UI/MacroPoint.Azure.ResourceExplorer.UI.Server/Controllers/Api/ResourceImportController.cs`**
 
 ```csharp
 [Route("api/resources")]
@@ -615,7 +615,7 @@ bruno/
 
 ## Step 7 — Tests
 
-**`_Tests/Modules/Common/ResourceMapper.Common.Server.Tests/ImportServiceTests.cs`**
+**`_Tests/Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server.Tests/ImportServiceTests.cs`**
 
 | Test method | Scenario | Expected |
 |-------------|----------|---------|
@@ -673,7 +673,7 @@ Prove the route, model binding, DI wiring, and Bruno tooling end-to-end before a
 ## Verification Steps (full implementation)
 
 1. Deploy DB project from Visual Studio (SSDT) — new types + sprocs
-2. `dotnet run --project UI/ResourceMapper.UI.Server`
+2. `dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Server`
 3. Bruno: run `import-upsert.bru` → expect 200, `created` counts
 4. Bruno: run `import-upsert.bru` again → expect 200, `updated` counts
 5. Bruno: run `import-skip.bru` → expect 200, `skipped` on second resource

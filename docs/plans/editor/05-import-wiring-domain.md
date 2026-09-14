@@ -47,7 +47,7 @@ receives the *same* domain-aware change as `Resource_Upsert`, so "Domain enters 
 for editor-created resources too — not just imported ones. Otherwise the editor could mint
 domain-less resources that no `SetForResource` would ever fix.
 
-## SQL — changed sprocs (`Database\HTResourceMapperDb\Stored Procedures\`)
+## SQL — changed sprocs (`Database\MacroPoint.Azure.ResourceExplorer.Db\Stored Procedures\`)
 
 Declarative SSDT: rebuild dacpac via full MSBuild, publish via SqlPackage **with
 `/p:DropObjectsNotInSource=True`**, **and republish after *every* sproc edit** (the slice-#4
@@ -221,7 +221,7 @@ desired-state reconciliation is deferred; revisit if import becomes the authorit
   "same resource + different domain must be supported" requirement); domain-change-on-update
   correctly rejected by `Resource_Save`; `Resource_CheckUnique` correctly scopes collisions to
   the matching domain only. `dotnet build` — zero `error CS` (only the pre-existing, documented
-  `HTResourceMapperDb.sqlproj` non-SDK limitation fails under `dotnet build`, unrelated).
+  `MacroPoint.Azure.ResourceExplorer.Db.sqlproj` non-SDK limitation fails under `dotnet build`, unrelated).
   `dotnet test` — 65/65 passing (52 prior + 13 new: domain override/default, required/vocab
   validation, same-key/different-domain non-duplicate, legacy `"string"`→`Text` mapping,
   resolvable/self-reference/unresolved/ambiguous dependencies, pre-existing-target resolution,

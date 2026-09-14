@@ -7,7 +7,7 @@ Second sub-slice of [UI-polish pass 2](./09-ui-polish.md); the big canvas rework
 `ResourceExplorer.razor`. **Verified by driving the app** — canvas pixel details (icon/caption
 positions, node size) are tuned in the browser, not on paper.
 
-> **Build note:** a running `ResourceMapper.UI.Web` instance locks build output. **Stop any running
+> **Build note:** a running `MacroPoint.Azure.ResourceExplorer.UI.Web` instance locks build output. **Stop any running
 > app** (e.g. `taskkill`/close it) before `dotnet build`/`dotnet run`.
 
 **Agreed design (see pass-2 section):**
@@ -257,8 +257,8 @@ function cssId(id) { return id.replace(/[^a-zA-Z0-9_-]/g, m => '\\' + m); }
 
 ## Execution notes
 
-**Files changed:** `UI/ResourceMapper.UI.Web/wwwroot/js/explorer/explorer-canvas.js` (reworked per
-§1), `UI/ResourceMapper.UI.Web/Components/Pages/ResourceExplorer.razor` (per §2).
+**Files changed:** `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/wwwroot/js/explorer/explorer-canvas.js` (reworked per
+§1), `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Pages/ResourceExplorer.razor` (per §2).
 
 **Final tuned node style** (differs from the brief's starting point — see "gotcha" below):
 ```javascript

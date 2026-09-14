@@ -88,7 +88,7 @@ consulting the one current `_model`.
 
 ## New — circuit-scoped nav-stack service
 
-`UI/ResourceMapper.UI.Web/Components/Editor/EditorNavStack.cs` (new), registered
+`UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Editor/EditorNavStack.cs` (new), registered
 **`AddScoped<EditorNavStack>()`** in `Program.cs` (scoped == per-circuit in Interactive Server ==
 survives route changes within a connection, cleared on refresh/reconnect — exactly the desired
 lifetime).
@@ -545,10 +545,10 @@ errors. `workers:1` / `fullyParallel:false` unchanged (shared localdb).
 
 ## Verification
 
-1. `dotnet build HT.ResourceMapper.slnx` clean (only the known non-SDK `sqlproj` MSB4278 under
+1. `dotnet build MacroPoint.Azure.ResourceExplorer.slnx` clean (only the known non-SDK `sqlproj` MSB4278 under
    `dotnet build`).
 2. `dotnet test` green — existing suite unchanged + the new `EditorNavStack` unit tests; the 2
-   pre-existing unrelated `HT.Api.Service.Contracts.Tests` failures remain out of scope (as noted in
+   pre-existing unrelated `MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.Tests` failures remain out of scope (as noted in
    #7/#8).
 3. **Drive the real browser** (the #1 requirement for this slice — it's almost entirely
    navigation/lifecycle behavior): `cd tools/e2e && npm run test:e2e` green for the three new specs
@@ -568,15 +568,15 @@ planning is on the stronger model; execution switches to the cheaper one.
   non-SDK sqlproj MSB4278 under `dotnet build`; unrelated). `dotnet test` — 157/157 relevant tests
   green (73 Shared + 84 Server, spanning the whole solution — 65 pre-existing Shared + 8 new
   `EditorNavStack` tests; Server suite unchanged since this slice is UI-only). The 2 pre-existing
-  `HT.Api.Service.Contracts.Tests` failures noted in #7/#8 remain, confirmed unrelated — untouched
+  `MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.Tests` failures noted in #7/#8 remain, confirmed unrelated — untouched
   by this slice.
 - **File-placement deviation from the plan (deliberate, low-risk):** `EditorNavStack`/`EditorFrame`/
-  `ReturnedChild` were placed in `Modules/Common/ResourceMapper.Common.Shared/Editor/` rather than
-  `UI/ResourceMapper.UI.Web/Components/Editor/` as originally planned. Reason: the class has zero
+  `ReturnedChild` were placed in `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Shared/Editor/` rather than
+  `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Editor/` as originally planned. Reason: the class has zero
   Blazor/Razor dependencies (only references `OpenEditorResponse`, already in
   `Common.Shared.Editor.Contracts`), and there is no dedicated UI test project in this solution —
   placing it in Common.Shared let its unit tests live in the existing, proven
-  `ResourceMapper.Common.Shared.Tests` project instead of standing up a new test project just for
+  `MacroPoint.Azure.ResourceExplorer.Common.Shared.Tests` project instead of standing up a new test project just for
   one small class. Behavior is unchanged; `Program.cs` still registers `AddScoped<EditorNavStack>()`
   and `ResourceEditor.razor` still `@inject`s it identically to the plan.
 - **A real bug found and fixed while driving the app (not caught by any unit test or a clean
@@ -654,7 +654,7 @@ planning is on the stronger model; execution switches to the cheaper one.
   cold `dotnet run` restart) — zero failures, versus intermittent failures in every run beforehand.
 - **New tests:** `EditorNavStackTests` (8 unit tests — push/peek/pop/depth/`HasFrames`/`Clear`
   semantics, `EditorFrame.Returned` round-tripping a `ReturnedChild`, and frame field carriage) in
-  `ResourceMapper.Common.Shared.Tests/Editor/`. Three new committed Playwright specs:
+  `MacroPoint.Azure.ResourceExplorer.Common.Shared.Tests/Editor/`. Three new committed Playwright specs:
   `delete.spec.js` (2 tests: with-dependents listing + Cancel + cascade-confirmed delete;
   no-dependents variant), `dirty-guard.spec.js` (2 tests: Cancel/Discard/Save via an in-app link
   click; the same via browser back/forward per RD1), `nested-create.spec.js` (3 tests: full

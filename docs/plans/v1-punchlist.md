@@ -1,4 +1,4 @@
-# HT.ResourceMapper — v1 Punchlist
+# MacroPoint.Azure.ResourceExplorer — v1 Punchlist
 
 > **This is the authoritative to-do list to v1.** It supersedes the "outstanding" sections of
 > `filter-plan/RESUME.md`, `explorer/00-implementation-plan-list.md`'s resume marker, and
@@ -236,7 +236,7 @@ app** — the original heading here overstated it.
 
 ```
 KeyNotFoundException: Configuration value for key
-'ResourceMapper:ConnectionStrings:Database:RO' is required.
+'MacroPoint:Azure:ResourceExplorer:ConnectionStrings:Database:RO' is required.
 ```
 
 **Cause.** The shell environment carries `ASPNETCORE_ENVIRONMENT=localhost` **and**
@@ -262,7 +262,7 @@ one-line diagnosis. Deployment is out of v1 scope, but *starting the app* is not
 using `Development` as its environment."* **This project is the outlier, not the shell.** The machine
 convention is `localhost`: `macropoint.com` and `macropoint-lite.com` both ship
 `appsettings.localhost.json` across their services, and the ambient `DOTNET_ENVIRONMENT=localhost`
-exists to serve them. HT.ResourceMapper is the only repo that pins `Development` — in its launch
+exists to serve them. MacroPoint.Azure.ResourceExplorer is the only repo that pins `Development` — in its launch
 profiles — and it parks its connection strings where **only** `Development` can reach them (user
 secrets, which `CreateBuilder` loads for that one environment name).
 
@@ -287,11 +287,11 @@ problem into one legible line instead of a bare 500.
 
 ### PL-60 — `CLAUDE.md` documents a project layout that no longer exists
 
-`UI/ResourceMapper.UI.Client` and `UI/ResourceMapper.UI.Server` contain **nothing but stale `obj/`
-folders** — no `.csproj`. The solution references exactly one UI project, `UI/ResourceMapper.UI.Web`.
+`UI/MacroPoint.Azure.ResourceExplorer.UI.Client` and `UI/MacroPoint.Azure.ResourceExplorer.UI.Server` contain **nothing but stale `obj/`
+folders** — no `.csproj`. The solution references exactly one UI project, `UI/MacroPoint.Azure.ResourceExplorer.UI.Web`.
 Consequences in the checked-in guidance:
 
-- `dotnet build UI/ResourceMapper.UI.Server` and `dotnet run --project UI/ResourceMapper.UI.Server`
+- `dotnet build UI/MacroPoint.Azure.ResourceExplorer.UI.Server` and `dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Server`
   (both in `CLAUDE.md`'s **Development Commands**) target a project that cannot be built or run.
 - `CLAUDE.md` describes the app as **"Blazor WebAssembly hosted by ASP.NET Core"**. `Program.cs` is a
   **Blazor Web App — static SSR with interactive-server islands**. Different hosting model, different
@@ -574,7 +574,7 @@ no familiarity accrues, every visit is effectively a first visit.
 | id | Item |
 |---|---|
 | PL-25a | Demo grid seed assigned no Domain tag → 75 resources couldn't take dependencies. Now an idempotent `MERGE` scoped to ids -1..-75, resolving the definition via `IsDomainTag=1`. Verified: 85 total, 0 missing, 30 non-prod / 55 prod, 0 duplicates. **Uncommitted.** |
-| PL-26 | Same script opened with an **unqualified `DELETE HTResourceMapper.Resource`** — wiped the explorer dataset and would hard-fail on `NO_ACTION` FKs; its "IDEMPOTENT" header was false. Removed; two consecutive clean runs verify. **Uncommitted.** |
+| PL-26 | Same script opened with an **unqualified `DELETE ResourceExplorer.Resource`** — wiped the explorer dataset and would hard-fail on `NO_ACTION` FKs; its "IDEMPOTENT" header was false. Removed; two consecutive clean runs verify. **Uncommitted.** |
 | PL-25b | *Remaining:* Dependencies tab says "Choose a Subscription on the General tab first" while that field is disabled — the app instructs an action it forbids. Defensive fix still open. **S** |
 
 ---
@@ -679,7 +679,7 @@ The doc is no longer a reliable spec. Confirmed drift: identity is `(Domain+Type
 decision #13 said free-form with auto-registration); the summary has a 4th `resourceRelationships`
 section; and `ResourceDependency_SetForResource`, `Resource_GetKeysByKeys` and the `ResourceKeyList`
 TVP described in the doc were never built. Its controller premise also targets
-`UI/ResourceMapper.UI.Server` hosting Blazor WASM — a project that no longer exists.
+`UI/MacroPoint.Azure.ResourceExplorer.UI.Server` hosting Blazor WASM — a project that no longer exists.
 
 `ImportService.cs` is the de-facto source of truth. Either update the doc or mark it historical.
 Leaving it as-is will mislead the next person. **S**
@@ -731,7 +731,7 @@ internal-vocabulary leak as PL-33 (Domain vs Subscription); fold into the PL-24 
 
 ## Session 2026-08-03 (later) — PL-49 / PL-46 / PL-48 fixed
 
-All three verified against live data on `(localdb)\MSSQLLocalDB\ResourceMapper`, not inferred.
+All three verified against live data on `(localdb)\MSSQLLocalDB\ResourceExplorer`, not inferred.
 
 ### PL-49 — **FIXED**, and it was bigger than captured
 
@@ -1083,11 +1083,11 @@ modes), and the add-affordance and multi-value questions (PL-18 / PL-20).
 - `cd tools/e2e && npm run test:e2e` — all specs should pass. **Coverage gap (PL-57):** the suite
   drives the editor only; the Domains, Tags-manager and cascade-delete surfaces are untested. Was 0/8 from PL-45 until PL-52 closed it;
   a red run is now a real signal again.
-- Drive the app: `ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS="http://localhost:5200" dotnet run --project UI/ResourceMapper.UI.Web --no-launch-profile`
+- Drive the app: `ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS="http://localhost:5200" dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web --no-launch-profile`
 - **Stop the app before building** — it locks build output
 - Screenshot driver: `tools/e2e` helpers; from Git Bash use `MSYS_NO_PATHCONV=1` or a `/` route
   argument gets rewritten into a Windows path
-- DB checks: `sqlcmd -S '(localdb)\MSSQLLocalDB' -d ResourceMapper` with `SET QUOTED_IDENTIFIER ON;`
+- DB checks: `sqlcmd -S '(localdb)\MSSQLLocalDB' -d ResourceExplorer` with `SET QUOTED_IDENTIFIER ON;`
   — **not** the SQL MCP
 
 ## Session 2026-09-13 (later) — live catalog landed, saved views designed
@@ -1123,7 +1123,7 @@ anonymous or something."*
 **What changed because of that.** The first version of this entry recorded a constraint to live
 with: everything personal keys on `ClientIdentity`'s random per-browser GUID, so nothing follows a
 person. Steve's steer turned it into a seam built now rather than a gap deferred —
-`ICurrentIdentity` returns a single `OwnerId` read from `ResourceMapper:Identity:OwnerId`,
+`ICurrentIdentity` returns a single `OwnerId` read from `MacroPoint:Azure:ResourceExplorer:Identity:OwnerId`,
 defaulting to the literal `anonymous`. Saved views, Explorer diagrams and the grid resume setting
 all move onto it (see `SavedViewsDesign.md`).
 

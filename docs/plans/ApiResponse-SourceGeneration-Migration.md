@@ -29,7 +29,7 @@ var category = response.ResultCategory;
 
 #### **After (Extension Methods)**
 ```csharp
-using HT.Api.Client.Contracts.Extensions; // Add this using
+using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Extensions; // Add this using
 
 var response = new ApiResponse();
 response.AddValidationError("Email", "Invalid format");
@@ -48,7 +48,7 @@ var category = response.GetResultCategory();
 Add the extension namespace to files using ApiResponse:
 
 ```csharp
-using HT.Api.Client.Contracts.Extensions;
+using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Extensions;
 ```
 
 ### 2. **Update Property Calls to Method Calls**
@@ -84,7 +84,7 @@ else if (response.HasClientErrors)
 
 #### **After**
 ```razor
-@using HT.Api.Client.Contracts.Extensions
+@using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Extensions
 
 @if (response.IsSuccess())
 {
@@ -105,7 +105,7 @@ else if (response.HasClientErrors())
 #### **Configure JSON Serialization**
 ```csharp
 // In Program.cs for Blazor WebAssembly
-using HT.Api.Client.Contracts.Serialization;
+using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Serialization;
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -192,7 +192,7 @@ if (!response.IsValidState())
 
 ### **Breaking Changes**
 - ? Computed properties removed (replaced with extension methods)
-- ? Must add `using HT.Api.Client.Contracts.Extensions;`
+- ? Must add `using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Extensions;`
 - ? Property syntax ? Method syntax
 
 ## Testing Updates
@@ -218,7 +218,7 @@ CS1061: 'ApiResponse' does not contain a definition for 'IsSuccess'
 
 **Solution:** Add the using directive:
 ```csharp
-using HT.Api.Client.Contracts.Extensions;
+using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Extensions;
 ```
 
 ### **Issue: JSON serialization not using source generation**

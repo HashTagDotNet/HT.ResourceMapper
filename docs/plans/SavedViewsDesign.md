@@ -44,7 +44,7 @@ public interface ICurrentIdentity
 }
 ```
 
-The only implementation for now reads `ResourceMapper:Identity:OwnerId` from configuration and
+The only implementation for now reads `MacroPoint:Azure:ResourceExplorer:Identity:OwnerId` from configuration and
 falls back to the literal **`anonymous`** when unset. One deployment, one owner — which is
 accurate: until an identity provider exists, every request really is the same person.
 
@@ -79,7 +79,7 @@ three tables.
 ## Data model
 
 ```
-[HTResourceMapper].[SavedView]
+[ResourceExplorer].[SavedView]
     SavedViewId   INT IDENTITY  PK
     SavedViewUid  VARCHAR(40)   UNIQUE        -- stable public id, as Diagram has
     OwnerId       VARCHAR(64)   NOT NULL      -- ICurrentIdentity.OwnerId ('anonymous' for now)

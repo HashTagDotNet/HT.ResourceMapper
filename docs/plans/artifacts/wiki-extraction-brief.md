@@ -5,7 +5,7 @@
 ## Mission
 
 Convert the legacy team wiki (`docs/research-files/azure-wiki.md`) into a single **import JSON file**
-that conforms to the HT.ResourceMapper import contract, so it can be imported into the app via its
+that conforms to the MacroPoint.Azure.ResourceExplorer import contract, so it can be imported into the app via its
 Import feature. Produce a *representative, schema-valid* subset — **not** an exhaustive scrape.
 
 ## Critical framing (read first)
@@ -41,7 +41,7 @@ Keep a running record of every question and its resolution in `wiki-extraction-n
 ## Inputs
 
 - **Source data:** `docs/research-files/azure-wiki.md` (read it fully).
-- **Contract (authoritative):** `Modules/Common/ResourceMapper.Common.Shared/Import/Contracts/ImportContract.cs`
+- **Contract (authoritative):** `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Shared/Import/Contracts/ImportContract.cs`
   and `docs/plans/ImportExportApiDesign.md` ("JSON Schema" + "Schema rules"). If they disagree, the C# contract wins.
 
 ## Deliverables

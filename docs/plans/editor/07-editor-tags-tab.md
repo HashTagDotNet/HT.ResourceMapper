@@ -192,7 +192,7 @@ Per our pattern, planning is on the stronger model; execution switches to the ch
 - **All steps completed and verified.** `dotnet build` — zero `error CS` (only the documented
   non-SDK sqlproj MSB4278 under `dotnet build`; unrelated). `dotnet test` — 163/163 relevant tests
   green (65 + 25 + 73, spanning Shared/Client-contracts/Server; the pre-existing 2 failures in
-  `HT.Api.Service.Contracts.Tests` were confirmed via `git stash` to already fail on `main` before
+  `MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.Tests` were confirmed via `git stash` to already fail on `main` before
   this slice — unrelated `CallStatusCode`→HTTP-status mapping, untouched by this work). New tests:
   8 in `ResourceServiceTests` (tag write + domain exclusion, required-tag-missing, Link-not-http
   rejection, primary-survives / primary-cleared, `EntryPointTemplates` projection, domain-tag

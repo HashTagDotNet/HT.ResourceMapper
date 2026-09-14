@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+    <link rel="stylesheet" href="_content/MudBlazor/MudBlazor.min.css" />
+    <link rel="stylesheet" href="app.css" />
+    @* Blazor CSS-isolation bundle (every *.razor.css in this project). Additive: without it,
+       scoped component styles are compiled but never served. *@
+    <link rel="stylesheet" href="MacroPoint.Azure.ResourceExplorer.UI.Web.styles.css" />
+    <HeadOutlet />
+</head>
+
+<body>
+    <Routes @rendermode="RenderMode.InteractiveServer" />
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="js/explorer/vendor/cytoscape.min.js"></script>
+    <script src="js/explorer/vendor/cytoscape-cxtmenu.js"></script>
+    <script src="js/explorer/vendor/cytoscape-svg.js"></script>
+    <script src="_framework/blazor.web.js"></script>
+</body>
+
+</html>

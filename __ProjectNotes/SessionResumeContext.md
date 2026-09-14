@@ -27,18 +27,18 @@
 - Enterprise-grade schema with UUIDs, referential integrity, temporal tracking
 
 ### Active Files When Session Suspended:
-- `Database\HTServices\ResourceMapper\Tables\ResourceDependency.sql` (current focus)
-- All SQL tables and stored procedures for ResourceMapper
+- `Database\HTServices\ResourceExplorer\Tables\ResourceDependency.sql` (current focus)
+- All SQL tables and stored procedures for ResourceExplorer
 - Planning documents in `__ProjectNotes\` folder
 
 ### Git Repository State:
 - **Branch**: develop
-- **Remote**: origin (https://github.com/HashTagDotNet/HT.ResourceMapper)
+- **Remote**: origin (https://github.com/HashTagDotNet/MacroPoint.Azure.ResourceExplorer)
 - **Latest Commit**: Planning documents committed with comprehensive context
 
 ### Next Session Priorities:
 1. **API Contract Development**: 
-   - Extend existing `HT.ApiContracts` library
+   - Extend existing `MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts` library
    - Create Resource, Tag, and Dependency DTOs
    - Define search and filtering contracts
 
@@ -71,7 +71,7 @@
    __ProjectNotes\UserStories.md          # Main story repository
    __ProjectNotes\Concept1.md             # Architectural decisions
    Libraries\ApiContracts\                  # Existing API patterns to extend
-   Database\HTServices\ResourceMapper\      # Database schema
+   Database\HTServices\ResourceExplorer\      # Database schema
    ```
 
 2. **Context Statement for AI**:
@@ -86,7 +86,7 @@
 - "Resource Management Application"
 - "User Stories US-001 through US-010"
 - "API Contract Development"
-- "ResourceMapper database schema"
+- "ResourceExplorer database schema"
 - "Tag-based search and filtering"
 - "Dependency analysis and visualization"
 

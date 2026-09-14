@@ -1,0 +1,329 @@
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.Editor
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.ResourceTypes
+@using MacroPoint.Azure.ResourceExplorer.UI.Web.Components.ResourceTypes
+@inject IDialogService DialogService
+
+@* azure-ux-design-v1 step 3 — first full application of the field anatomy (§2), sections (§3),
+   single column and PL-30 order (§6). Inputs drop MudBlazor's floating Label because the label now
+   lives in its own column; each carries an aria-label instead, so screen readers and Playwright's
+   getByLabel still resolve them. *@
+
+<div class="rm-section">
+    <div class="rm-section-heading">Identity</div>
+    <div class="rm-section-desc">
+        How this resource is uniquely identified. @DomainLabel, Resource Type and Key together form
+        the identity — @DomainLabel and Resource Type are fixed once saved.
+    </div>
+
+    <FormRow Label="@DomainLabel" Required="true"
+             Info="@($"The boundary this resource lives in. Resources can only depend on others in the same {DomainLabel}.")">
+        <MudSelect T="string" Value="@Model.Domain.EditedValue" ValueChanged="OnDomainChanged"
+                   aria-label="@DomainLabel" Disabled="@(ReadOnly || Model.IsPersisted || DomainLocked)"
+                   Placeholder="Select…" Variant="Variant.Outlined" Margin="Margin.Dense"
+                   HelperText="@DomainHelper"
+                   Error="@(Model.Domain.Level == EditorFieldLevel.Error)"
+                   ErrorText="@Model.Domain.Messages.FirstOrDefault()?.Message">
+            @foreach (var value in DomainAllowedValues)
+            {
+                <MudSelectItem Value="@value">@value</MudSelectItem>
+            }
+        </MudSelect>
+
+        @* The FK gap this row had: no way to catalogue a resource in a subscription the list did not
+           already offer, short of leaving the editor for the tag screen. Same shape and placement as
+           "Create new type…" below, and offered only while the select is live — a fixed field has
+           nothing to select into. *@
+        @if (CanCreateDomainValue)
+        {
+            <div class="rm-fk-action">
+                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
+                           OnClick="OpenCreateDomainValueDialog">
+                    Create @DomainLabel…
+                </MudButton>
+            </div>
+        }
+    </FormRow>
+
+    <FormRow Label="Resource Type" Required="true"
+             Info="Determines which tags this resource is prompted for, and the icon and short code it draws with in the explorer.">
+        <MudSelect T="int?" Value="@Model.ResourceTypeId" ValueChanged="OnTypeChanged"
+                   aria-label="Resource Type" Disabled="@(ReadOnly || Model.IsPersisted)"
+                   Placeholder="Select…" Variant="Variant.Outlined" Margin="Margin.Dense"
+                   HelperText="@(Model.IsPersisted ? "Fixed after save." : "e.g. Azure App Service, Database, Queue")"
+                   Error="@(Model.ResourceType.Level == EditorFieldLevel.Error)"
+                   ErrorText="@Model.ResourceType.Messages.FirstOrDefault()?.Message">
+            @foreach (var option in ResourceTypes)
+            {
+                <MudSelectItem Value="@((int?)option.ResourceTypeId)">@option.TypeName</MudSelectItem>
+            }
+        </MudSelect>
+
+        @* PL-29: mirrors TagsTab's "Create new tag…" — only offered while the Type select is
+           still live, i.e. Create mode. Type is immutable once the resource is persisted, so a
+           create-and-select action there would have nothing to select into. *@
+        @if (CanCreateType)
+        {
+            <div class="rm-fk-action">
+                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
+                           OnClick="OpenCreateTypeDialog">
+                    Create new type…
+                </MudButton>
+            </div>
+        }
+
+        @* Once the resource is saved the Type select goes fixed and takes its create-new-type action
+           with it, so this slot under the field is free — and it is where the eye already looks for
+           this row's action. Right-aligning it (the first cut) put it at the far edge of the panel,
+           where it was reliably missed.
+           Raises an event rather than linking to /resources directly: the parent pushes a frame so
+           closing the new resource returns HERE — same record, same mode, same tab — instead of
+           falling out to the resource list. Persisted-only: in Create mode you are already on a blank
+           resource, and a link to another one would just discard what you had typed. *@
+        @if (Model.IsPersisted)
+        {
+            <div class="rm-fk-action">
+                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
+                           OnClick="@(() => OnAddResourceRequested.InvokeAsync())">
+                    Add Resource
+                </MudButton>
+            </div>
+        }
+    </FormRow>
+
+    <FormRow Label="Key" Required="true"
+             Info="The stable identifier used by import, export and permalinks. Renaming it re-points those references.">
+        <MudTextField T="string" Value="@Model.Key.EditedValue" ValueChanged="OnKeyChanged" OnBlur="OnKeyBlurred"
+                      aria-label="Key" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      HelperText="@(Model.IsPersisted ? "e.g. ORDERS-API" : "Auto-filled from Name — edit to override. e.g. ORDERS-API")"
+                      Error="@(Model.Key.Level == EditorFieldLevel.Error)"
+                      ErrorText="@Model.Key.Messages.FirstOrDefault()?.Message" />
+    </FormRow>
+
+    <FormRow Label="Identity" Info="The three fields above, combined. This is what uniqueness is checked against.">
+        <div class="rm-identity-inline">
+            @(string.IsNullOrEmpty(Model.IdentityPreview.Display) ? "—" : Model.IdentityPreview.Display)
+        </div>
+    </FormRow>
+</div>
+
+<div class="rm-section">
+    <div class="rm-section-heading">Description</div>
+    <div class="rm-section-desc">How people recognise this resource in the catalog.</div>
+
+    <FormRow Label="Name" Info="The human-readable name shown in the grid and the explorer.">
+        <MudTextField T="string" Value="@Model.Name.EditedValue" ValueChanged="OnNameChanged"
+                      aria-label="Name" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      HelperText="e.g. Orders API"
+                      Error="@(Model.Name.Level == EditorFieldLevel.Error)"
+                      ErrorText="@Model.Name.Messages.FirstOrDefault()?.Message" />
+    </FormRow>
+
+    <FormRow Label="Description" Info="Shown in the grid's Description column and on hover.">
+        <MudTextField T="string" Value="@Model.Description.EditedValue" ValueChanged="OnDescriptionChanged"
+                      aria-label="Description" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Lines="3" HelperText="What it does and who relies on it — one or two lines." />
+    </FormRow>
+</div>
+
+@if (Model.IsPersisted)
+{
+    <MudText Typo="Typo.caption" Color="Color.Secondary">
+        Created @Model.CreatedOn?.ToString("g")
+        @if (Model.UpdatedOn is not null)
+        {
+            <span>&nbsp;·&nbsp;Updated @Model.UpdatedOn?.ToString("g")</span>
+        }
+    </MudText>
+}
+
+@code {
+    [Parameter] public ResourceEditorModel Model { get; set; } = default!;
+    [Parameter] public List<ResourceTypeOption> ResourceTypes { get; set; } = new();
+    [Parameter] public List<string> DomainAllowedValues { get; set; } = new();
+    [Parameter] public bool ReadOnly { get; set; }
+
+    /// <summary>
+    /// User-facing name of the domain/boundary field ("Subscription" here). Supplied by the parent
+    /// so every tab names it identically (PL-33) — this component used to derive it privately, which
+    /// is how Review drifted to "Domain".
+    /// </summary>
+    [Parameter] public string DomainLabel { get; set; } = "Domain";
+
+    /// <summary>True for a nested "Create new…" dependency target — locks Domain to the parent's
+    /// (same-domain rule); the parent already pre-set Model.Domain.EditedValue before render.</summary>
+    [Parameter] public bool DomainLocked { get; set; }
+
+    /// <summary>Parent performs the uniqueness-check service call and updates Model.IdentityPreview.</summary>
+    [Parameter] public EventCallback OnCheckUniqueness { get; set; }
+    [Parameter] public EventCallback OnFieldChanged { get; set; }
+
+    /// <summary>Fired (Create mode only, via the Type select) so the parent can re-seed the Tags tab's entry-point rows.</summary>
+    [Parameter] public EventCallback<int?> OnResourceTypeChanged { get; set; }
+
+    /// <summary>Fired (Create mode only, via the Domain select) so the parent can clear dependency
+    /// rows that were validated same-domain against the old domain (RD6).</summary>
+    [Parameter] public EventCallback OnResourceDomainChanged { get; set; }
+
+    /// <summary>Fired by "Add Resource". The parent owns the descent because only it can stash the
+    /// current state on the nav stack, which is what lets the new resource's Save/Cancel come back to
+    /// this exact record and tab.</summary>
+    [Parameter] public EventCallback OnAddResourceRequested { get; set; }
+
+    private bool _keyManuallyEdited;
+
+    /// <summary>PL-29: inline type create is only offered where the Type select is enabled.</summary>
+    private bool CanCreateType => !ReadOnly && !Model.IsPersisted;
+
+    /// <summary>False when the catalog has no domain tag designated — DomainValue_Add would have
+    /// nothing to append to, so the action hides rather than opening a dialog that cannot save.</summary>
+    [Parameter] public bool HasDomainTag { get; set; }
+
+    /// <summary>Mirrors CanCreateType: the same "only where the select is live" rule. DomainLocked
+    /// excluded too — a nested create cannot change its parent's boundary, so a new value there
+    /// would be unselectable.</summary>
+    private bool CanCreateDomainValue =>
+        !ReadOnly && !Model.IsPersisted && !DomainLocked && HasDomainTag;
+
+    /// <summary>
+    /// PL-25b: the nested-create case genuinely is locked, so say why. Otherwise say what "fixed
+    /// after save" means for this field rather than leaving the helper slot empty.
+    /// </summary>
+    private string DomainHelper =>
+        DomainLocked ? $"Locked to the parent resource's {DomainLabel}."
+        : Model.IsPersisted ? "Fixed after save."
+        : "Pick the boundary first — it limits which resources this one can depend on.";
+
+    /// <summary>
+    /// Creates a domain value and selects it, so the flow that needed a new subscription ends on the
+    /// same field it started from. The picklist is patched in memory from the list the dialog returns
+    /// — re-fetching the whole editor payload here would throw away the user's other unsaved edits.
+    /// </summary>
+    private async Task OpenCreateDomainValueDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(DomainValueDialog.FieldLabel), DomainLabel },
+            { nameof(DomainValueDialog.ExistingValues), DomainAllowedValues.ToList() }
+        };
+
+        var dialog = await DialogService.ShowAsync<DomainValueDialog>($"Create {DomainLabel}", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        if (result.Data is DomainValueDialog.DomainValueResult created)
+        {
+            foreach (var value in created.AllowedValues)
+            {
+                if (!DomainAllowedValues.Contains(value))
+                    DomainAllowedValues.Add(value);
+            }
+
+            await OnDomainChanged(created.Value);
+        }
+    }
+
+    /// <summary>
+    /// Inline "create new type", shaped exactly like TagsTab.OpenCreateDialog: show the same
+    /// dialog the /resource-types screen uses, and on OK fold the new row into the in-memory
+    /// picklist and select it — no page reload, no second service call to refetch the list.
+    /// </summary>
+    private async Task OpenCreateTypeDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(ResourceTypeDialog.ExistingNames), ResourceTypes.Select(t => t.TypeName).ToList() }
+        };
+
+        var dialog = await DialogService.ShowAsync<ResourceTypeDialog>("New Resource Type", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        if (result.Data is ResourceTypeModel created)
+        {
+            if (!ResourceTypes.Any(t => t.ResourceTypeId == created.ResourceTypeId))
+            {
+                ResourceTypes.Add(new ResourceTypeOption
+                {
+                    ResourceTypeId = created.ResourceTypeId,
+                    TypeName = created.TypeName,
+                    ResourceTypeUid = created.ResourceTypeUid
+                });
+                // Keep the picklist in the same name order the server returns it in.
+                ResourceTypes.Sort((a, b) => string.Compare(a.TypeName, b.TypeName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Route through the normal selection path so the Tags tab re-seeds from the new
+            // type's (empty) entry-point template and the identity preview re-checks uniqueness.
+            await OnTypeChanged(created.ResourceTypeId);
+        }
+    }
+
+    private async Task OnTypeChanged(int? value)
+    {
+        Model.ResourceTypeId = value;
+        Model.ResourceType.EditedValue = ResourceTypes.FirstOrDefault(o => o.ResourceTypeId == value)?.TypeName ?? string.Empty;
+        await NotifyChangedAndCheckUniqueness();
+        await OnResourceTypeChanged.InvokeAsync(value);
+    }
+
+    private async Task OnDomainChanged(string value)
+    {
+        Model.Domain.EditedValue = value;
+        await NotifyChangedAndCheckUniqueness();
+        await OnResourceDomainChanged.InvokeAsync();
+    }
+
+    private async Task OnNameChanged(string value)
+    {
+        Model.Name.EditedValue = value;
+        if (!Model.IsPersisted && !_keyManuallyEdited)
+            Model.Key.EditedValue = Slugify(value);
+        await NotifyChangedAndCheckUniqueness();
+    }
+
+    private async Task OnKeyChanged(string value)
+    {
+        Model.Key.EditedValue = value;
+        _keyManuallyEdited = true;
+        await OnFieldChanged.InvokeAsync();
+    }
+
+    private async Task OnKeyBlurred(Microsoft.AspNetCore.Components.Web.FocusEventArgs args) =>
+        await NotifyChangedAndCheckUniqueness();
+
+    private async Task OnDescriptionChanged(string value)
+    {
+        Model.Description.EditedValue = value;
+        await OnFieldChanged.InvokeAsync();
+    }
+
+    private async Task NotifyChangedAndCheckUniqueness()
+    {
+        await OnFieldChanged.InvokeAsync();
+        if (EditorValidation.IsIdentityComplete(Model))
+            await OnCheckUniqueness.InvokeAsync();
+        StateHasChanged();
+    }
+
+    private static string Slugify(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return string.Empty;
+        var sb = new System.Text.StringBuilder();
+        var lastWasDash = false;
+        foreach (var c in name.Trim().ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                sb.Append(c);
+                lastWasDash = false;
+            }
+            else if (!lastWasDash && sb.Length > 0)
+            {
+                sb.Append('-');
+                lastWasDash = true;
+            }
+        }
+        if (sb.Length > 0 && sb[^1] == '-') sb.Length--;
+        return sb.ToString();
+    }
+}

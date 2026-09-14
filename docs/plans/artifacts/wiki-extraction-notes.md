@@ -2,7 +2,7 @@
 
 ## Scope done
 - **Visibility Resources** table (top of `azure-wiki.md`) → `wiki-import.json` (21 resources, 7 types).
-- Imported live to LocalDB `ResourceMapper`: 21 created, renders in the grid.
+- Imported live to LocalDB `ResourceExplorer`: 21 created, renders in the grid.
 
 ## Model used (confirmed with user)
 Each **Azure-link cell** in this table is its own resource:

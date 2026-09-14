@@ -169,7 +169,7 @@ The MudBlazor locator helpers (`mud-helpers.js` — `clickSelect`, `clickSelectI
     screenshot: 'only-on-failure', trace: 'retain-on-failure' }` — **system Chrome, no bundled
     Chromium download** (`channel: 'chrome'`, the proven #7 setup — so `npx playwright install` is
     NOT needed).
-  - `webServer: { command: 'dotnet run --project UI/ResourceMapper.UI.Web --no-launch-profile',
+  - `webServer: { command: 'dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web --no-launch-profile',
     cwd: <repo root>, url: baseURL, env: { ASPNETCORE_ENVIRONMENT: 'Development', ASPNETCORE_URLS },
     reuseExistingServer: !process.env.CI, timeout: 120_000 }` — the runner starts/stops the app and
     waits for it, replacing the manual `dotnet run &` / `taskkill` dance (RD19).
@@ -361,9 +361,9 @@ The MudBlazor locator helpers (`mud-helpers.js` — `clickSelect`, `clickSelectI
 1. DB builds + publishes (full MSBuild dacpac → SqlPackage `/p:DropObjectsNotInSource=True`;
    **republish after both the new sproc and the `ResourceRelationship_GetForResource` edit**); both
    sprocs verified via `sqlcmd`.
-2. `dotnet build HT.ResourceMapper.slnx` clean (only the known non-SDK `sqlproj` MSB4278);
+2. `dotnet build MacroPoint.Azure.ResourceExplorer.slnx` clean (only the known non-SDK `sqlproj` MSB4278);
    `dotnet test` green (existing 73 server + new relationship tests; the 2 pre-existing unrelated
-   `HT.Api.Service.Contracts.Tests` failures remain out of scope).
+   `MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.Tests` failures remain out of scope).
 3. `cd tools/e2e && npm install && npm run test:e2e` green — the committed suite starts the app
    (webServer), seeds localdb, runs `dependencies.spec.js`, and cleans up. Confirm it also passes on
    a **second** run (idempotent seed/teardown, RD16) and leaves no E2E rows behind.
@@ -377,7 +377,7 @@ execution switches to the cheaper one.
 - **All steps completed and verified.** `dotnet build` — zero `error CS` (only the documented
   non-SDK sqlproj MSB4278 under `dotnet build`; unrelated). `dotnet test` — 84/84 relevant tests
   green (65 Shared + 25 Client-contracts + 84 Server, spanning the whole solution; the same 2
-  pre-existing `HT.Api.Service.Contracts.Tests` failures noted in #7 remain, confirmed unrelated —
+  pre-existing `MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.Tests` failures noted in #7 remain, confirmed unrelated —
   untouched by this slice). 11 new `ResourceServiceTests`: DependsOn add/remove, DependentOn
   far-side write (RD7), empty-list-wipes-one-direction-only (RD1/RD3), cross-domain rejection
   (RD4), self-loop rejection (RD5), unknown-uid rejection, duplicate-uid dedup, the Edit-mode

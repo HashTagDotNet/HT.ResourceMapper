@@ -37,7 +37,7 @@ It modifies the two canvas files + `App.razor` + `app.css`. **No backend changes
 
 ---
 
-## 1. Load the cxtmenu extension (`UI\ResourceMapper.UI.Web\Components\App.razor`)
+## 1. Load the cxtmenu extension (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\Components\App.razor`)
 
 Add the extension `<script>` **after** `cytoscape.min.js` and **before** `blazor.web.js`:
 
@@ -55,7 +55,7 @@ Add the extension `<script>` **after** `cytoscape.min.js` and **before** `blazor
 
 ---
 
-## 2. Replace the canvas module (`UI\ResourceMapper.UI.Web\wwwroot\js\explorer\explorer-canvas.js`)
+## 2. Replace the canvas module (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\wwwroot\js\explorer\explorer-canvas.js`)
 
 Replace the **entire file** with the following (it folds slices 2–3 together with the new
 labels/tooltip/menu — provided whole to avoid ambiguous partial edits):
@@ -350,7 +350,7 @@ Add the handler (beside `CollapseAllAsync`):
 
 ---
 
-## 4. CSS (`UI\ResourceMapper.UI.Web\wwwroot\app.css`)
+## 4. CSS (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\wwwroot\app.css`)
 
 The canvas container must be `position: relative` so the tooltip positions against it; add the
 tooltip style. Replace the slice-3 `.rm-explorer-canvas` block with the one below (adds
@@ -387,7 +387,7 @@ tooltip style. Replace the slice-3 `.rm-explorer-canvas` block with the one belo
 
 ## UI verification hook (visible slice)
 
-- [ ] **Step 5: Build + run.** `dotnet build` clean; `dotnet run --project UI/ResourceMapper.UI.Web`.
+- [ ] **Step 5: Build + run.** `dotnet build` clean; `dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web`.
 - [ ] **Step 6: Drive it** (reuse the `AAS001` / "Production Web App" demo data;
   uid `DEMO5d0ee27dbbf148589cdcf2248f579b91`). Explore it, then confirm:
   1. Each node label is prefixed with `▸` (collapsed) / `▾` (expanded).
@@ -425,7 +425,7 @@ tooltip style. Replace the slice-3 `.rm-explorer-canvas` block with the one belo
 Implemented exactly as specified (Steps 1–4 applied verbatim/as-diffed). Verified with
 `dotnet build` (clean aside from the expected sqlproj MSB4278) and `dotnet test`
 (396/398 passing; the 2 failures are the pre-existing, unrelated
-`HT.Api.Service.Contracts.Tests` failures noted in the brief).
+`MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.Tests` failures noted in the brief).
 
 Browser-driven verification (Playwright, ad-hoc scripts, headless system Chrome) against
 `AAS001` / "Production Web App" (`DEMO5d0ee27dbbf148589cdcf2248f579b91`):

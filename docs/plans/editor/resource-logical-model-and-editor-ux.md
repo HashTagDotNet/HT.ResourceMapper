@@ -2,7 +2,7 @@
 
 ## 1. Context & purpose
 
-This is the settled **logical resource model** for HT.ResourceMapper, consolidated across
+This is the settled **logical resource model** for MacroPoint.Azure.ResourceExplorer, consolidated across
 several design passes. It is intended as the **foundation for a full end-to-end build** — the
 exercise goal is to take this model to a *near-perfect working stack* — so it aims to be
 internally consistent and implementation-ready. Implementation is a later phase; this document

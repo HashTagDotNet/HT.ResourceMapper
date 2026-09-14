@@ -21,7 +21,7 @@ carry today. This slice adds them to `ResourceType` and threads them through the
 
 ---
 
-## 1. Schema — add columns (`Database\HTResourceMapperDb\Tables\ResourceType.sql`)
+## 1. Schema — add columns (`Database\MacroPoint.Azure.ResourceExplorer.Db\Tables\ResourceType.sql`)
 
 Add the two columns (after `AllowCustomTags`, before `CreatedOn`):
 
@@ -33,20 +33,20 @@ Add the two columns (after `AllowCustomTags`, before `CreatedOn`):
 Apply to localdb via `sqlcmd` (additive `ALTER`, guarded):
 
 ```sql
-IF COL_LENGTH('[HTResourceMapper].[ResourceType]','ShortCode') IS NULL
-    ALTER TABLE [HTResourceMapper].[ResourceType] ADD [ShortCode] VARCHAR(10) NULL;
-IF COL_LENGTH('[HTResourceMapper].[ResourceType]','IconKey') IS NULL
-    ALTER TABLE [HTResourceMapper].[ResourceType] ADD [IconKey] VARCHAR(40) NULL;
+IF COL_LENGTH('[ResourceExplorer].[ResourceType]','ShortCode') IS NULL
+    ALTER TABLE [ResourceExplorer].[ResourceType] ADD [ShortCode] VARCHAR(10) NULL;
+IF COL_LENGTH('[ResourceExplorer].[ResourceType]','IconKey') IS NULL
+    ALTER TABLE [ResourceExplorer].[ResourceType] ADD [IconKey] VARCHAR(40) NULL;
 ```
 
 - [ ] **Step 1:** Add the columns to `ResourceType.sql` and apply the guarded `ALTER` to localdb.
 
 ---
 
-## 2. Seed the codes/icons (`Database\HTResourceMapperDb\Scripts\05_Seed_ResourceTypeCodes.sql`)
+## 2. Seed the codes/icons (`Database\MacroPoint.Azure.ResourceExplorer.Db\Scripts\05_Seed_ResourceTypeCodes.sql`)
 
 New idempotent seed keyed on `TypeName` (the exact current type names, including the existing
-`ServcieFabric` typo — match verbatim). Add it to `HTResourceMapperDb.sqlproj` as a **`<None>`** item
+`ServcieFabric` typo — match verbatim). Add it to `MacroPoint.Azure.ResourceExplorer.Db.sqlproj` as a **`<None>`** item
 (manual seed, matching the other `NN_Seed_*.sql`), and apply to localdb via `sqlcmd`.
 
 ```sql
@@ -54,7 +54,7 @@ New idempotent seed keyed on `TypeName` (the exact current type names, including
 -- TypeName). IconKey is an opaque key the UI maps to a glyph.
 UPDATE t
 SET ShortCode = v.ShortCode, IconKey = v.IconKey, UpdatedOn = SYSUTCDATETIME()
-FROM [HTResourceMapper].[ResourceType] t
+FROM [ResourceExplorer].[ResourceType] t
 INNER JOIN (VALUES
     ('Azure App Service',  'APP', 'web'),
     ('Application',        'APL', 'apps'),
@@ -75,26 +75,26 @@ INNER JOIN (VALUES
 
 ---
 
-## 3. Read sproc (`Database\HTResourceMapperDb\Stored Procedures\Resource_GetForExplorer.sql`)
+## 3. Read sproc (`Database\MacroPoint.Azure.ResourceExplorer.Db\Stored Procedures\Resource_GetForExplorer.sql`)
 
 Add `rt.ShortCode` and `rt.IconKey` to **each** of the three SELECTs (Self / DependsOn / DependentOn).
 Replace the whole sproc body with this (only the two new projected columns per SELECT changed):
 
 ```sql
-CREATE PROCEDURE [HTResourceMapper].[Resource_GetForExplorer]
+CREATE PROCEDURE [ResourceExplorer].[Resource_GetForExplorer]
     @ResourceUid VARCHAR(40)
 AS
 BEGIN
     SET NOCOUNT ON;
 
     DECLARE @ResourceId INT =
-        (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceUid = @ResourceUid);
+        (SELECT ResourceId FROM [ResourceExplorer].[Resource] WHERE ResourceUid = @ResourceUid);
 
     IF @ResourceId IS NULL
         RETURN;
 
     DECLARE @DomainTagDefId INT =
-        (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE IsDomainTag = 1);
+        (SELECT TagDefinitionId FROM [ResourceExplorer].[TagDefinition] WHERE IsDomainTag = 1);
 
     SELECT
         'Self' AS Direction,
@@ -104,10 +104,10 @@ BEGIN
         rt.IconKey     AS IconKey,
         dt.TagValue    AS Domain,
         purl.TagValue  AS PrimaryUrl
-    FROM [HTResourceMapper].[Resource] r
-    INNER JOIN [HTResourceMapper].[ResourceType] rt ON rt.ResourceTypeId = r.ResourceTypeId
-    LEFT JOIN [HTResourceMapper].[ResourceTag] dt ON dt.ResourceId = r.ResourceId AND dt.TagDefinitionId = @DomainTagDefId
-    LEFT JOIN [HTResourceMapper].[ResourceTag] purl ON purl.ResourceId = r.ResourceId AND purl.TagDefinitionId = r.PrimaryTagDefinitionId
+    FROM [ResourceExplorer].[Resource] r
+    INNER JOIN [ResourceExplorer].[ResourceType] rt ON rt.ResourceTypeId = r.ResourceTypeId
+    LEFT JOIN [ResourceExplorer].[ResourceTag] dt ON dt.ResourceId = r.ResourceId AND dt.TagDefinitionId = @DomainTagDefId
+    LEFT JOIN [ResourceExplorer].[ResourceTag] purl ON purl.ResourceId = r.ResourceId AND purl.TagDefinitionId = r.PrimaryTagDefinitionId
     WHERE r.ResourceId = @ResourceId
 
     UNION ALL
@@ -120,11 +120,11 @@ BEGIN
         rt.IconKey     AS IconKey,
         dt.TagValue    AS Domain,
         purl.TagValue  AS PrimaryUrl
-    FROM [HTResourceMapper].[ResourceRelationship] rel
-    INNER JOIN [HTResourceMapper].[Resource] other ON other.ResourceId = rel.ToResourceId
-    INNER JOIN [HTResourceMapper].[ResourceType] rt ON rt.ResourceTypeId = other.ResourceTypeId
-    LEFT JOIN [HTResourceMapper].[ResourceTag] dt ON dt.ResourceId = other.ResourceId AND dt.TagDefinitionId = @DomainTagDefId
-    LEFT JOIN [HTResourceMapper].[ResourceTag] purl ON purl.ResourceId = other.ResourceId AND purl.TagDefinitionId = other.PrimaryTagDefinitionId
+    FROM [ResourceExplorer].[ResourceRelationship] rel
+    INNER JOIN [ResourceExplorer].[Resource] other ON other.ResourceId = rel.ToResourceId
+    INNER JOIN [ResourceExplorer].[ResourceType] rt ON rt.ResourceTypeId = other.ResourceTypeId
+    LEFT JOIN [ResourceExplorer].[ResourceTag] dt ON dt.ResourceId = other.ResourceId AND dt.TagDefinitionId = @DomainTagDefId
+    LEFT JOIN [ResourceExplorer].[ResourceTag] purl ON purl.ResourceId = other.ResourceId AND purl.TagDefinitionId = other.PrimaryTagDefinitionId
     WHERE rel.FromResourceId = @ResourceId
 
     UNION ALL
@@ -137,11 +137,11 @@ BEGIN
         rt.IconKey     AS IconKey,
         dt.TagValue    AS Domain,
         purl.TagValue  AS PrimaryUrl
-    FROM [HTResourceMapper].[ResourceRelationship] rel
-    INNER JOIN [HTResourceMapper].[Resource] other ON other.ResourceId = rel.FromResourceId
-    INNER JOIN [HTResourceMapper].[ResourceType] rt ON rt.ResourceTypeId = other.ResourceTypeId
-    LEFT JOIN [HTResourceMapper].[ResourceTag] dt ON dt.ResourceId = other.ResourceId AND dt.TagDefinitionId = @DomainTagDefId
-    LEFT JOIN [HTResourceMapper].[ResourceTag] purl ON purl.ResourceId = other.ResourceId AND purl.TagDefinitionId = other.PrimaryTagDefinitionId
+    FROM [ResourceExplorer].[ResourceRelationship] rel
+    INNER JOIN [ResourceExplorer].[Resource] other ON other.ResourceId = rel.FromResourceId
+    INNER JOIN [ResourceExplorer].[ResourceType] rt ON rt.ResourceTypeId = other.ResourceTypeId
+    LEFT JOIN [ResourceExplorer].[ResourceTag] dt ON dt.ResourceId = other.ResourceId AND dt.TagDefinitionId = @DomainTagDefId
+    LEFT JOIN [ResourceExplorer].[ResourceTag] purl ON purl.ResourceId = other.ResourceId AND purl.TagDefinitionId = other.PrimaryTagDefinitionId
     WHERE rel.ToResourceId = @ResourceId
 
     ORDER BY Direction, ResourceName;
@@ -156,7 +156,7 @@ Apply to localdb as `CREATE OR ALTER` (the file keeps `CREATE`).
 
 ## 4. Thread the fields through C#
 
-### 4a. Repo row (`Modules\Common\ResourceMapper.Common.Server\Resources\Models\ExplorerNodeRow.cs`)
+### 4a. Repo row (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\Resources\Models\ExplorerNodeRow.cs`)
 
 Add:
 ```csharp
@@ -164,7 +164,7 @@ Add:
         public string? IconKey { get; set; }
 ```
 
-### 4b. Repository reader (`Modules\Common\ResourceMapper.Common.Server\Explorer\ExplorerSqlRepository.cs`)
+### 4b. Repository reader (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\Explorer\ExplorerSqlRepository.cs`)
 
 In the `GetForExplorerAsync` mapper, add:
 ```csharp
@@ -172,7 +172,7 @@ In the `GetForExplorerAsync` mapper, add:
                 IconKey = dr.ReadString("IconKey"),
 ```
 
-### 4c. Shared DTOs (`Modules\Common\ResourceMapper.Common.Shared\Explorer\`)
+### 4c. Shared DTOs (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Shared\Explorer\`)
 
 Add to **both** `ExplorerNodeModel.cs` and `ExplorerNeighborModel.cs`:
 ```csharp
@@ -180,7 +180,7 @@ Add to **both** `ExplorerNodeModel.cs` and `ExplorerNeighborModel.cs`:
         public string? IconKey { get; set; }
 ```
 
-### 4d. Service mapping (`Modules\Common\ResourceMapper.Common.Server\Explorer\ExplorerService.cs`)
+### 4d. Service mapping (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\Explorer\ExplorerService.cs`)
 
 In `GetNodeAsync`, set the two fields on the center `ExplorerNodeModel` (from `self`) and on each
 `ExplorerNeighborModel` (from `r`):
@@ -218,7 +218,7 @@ assert they flow through. Minimal change:
 ## Verification
 
 1. Apply schema `ALTER` + seed + sproc to localdb via `sqlcmd`.
-2. **Exercise:** `EXEC [HTResourceMapper].[Resource_GetForExplorer] @ResourceUid='DEMOEXP-checkout'` → each row now has non-null `ShortCode`/`IconKey` (e.g. the seed's type shows its code). Verify the seed populated all types: `SELECT TypeName, ShortCode, IconKey FROM [HTResourceMapper].[ResourceType]` → no NULLs for the listed types.
+2. **Exercise:** `EXEC [ResourceExplorer].[Resource_GetForExplorer] @ResourceUid='DEMOEXP-checkout'` → each row now has non-null `ShortCode`/`IconKey` (e.g. the seed's type shows its code). Verify the seed populated all types: `SELECT TypeName, ShortCode, IconKey FROM [ResourceExplorer].[ResourceType]` → no NULLs for the listed types.
 3. `dotnet build` clean; `dotnet test` — `ExplorerServiceTests` pass, no regression.
 
 ---

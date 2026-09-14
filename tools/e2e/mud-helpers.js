@@ -1,4 +1,4 @@
-// Reusable Playwright helpers for driving MudBlazor components in the HT.ResourceMapper UI.
+// Reusable Playwright helpers for driving MudBlazor components in the MacroPoint.Azure.ResourceExplorer UI.
 //
 // MudBlazor renders form controls in ways that break naive Playwright locators — these helpers
 // encode the DOM patterns discovered while driving the editor (see ../README.md "Gotchas").

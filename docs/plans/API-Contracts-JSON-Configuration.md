@@ -97,8 +97,8 @@ logger.LogDebug("API Response: {Response}", json);
 
 ### ??? **Console Application / Worker Service**
 ```csharp
-using HT.Api.Client.Contracts.Serialization;
-using HT.Api.Client.Contracts.Extensions;
+using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Serialization;
+using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Extensions;
 
 // Works with any .NET application
 class ApiClient
@@ -210,8 +210,8 @@ public class DesktopApiService
 
 ### ?? **ASP.NET Core Minimal API**
 ```csharp
-using HT.Api.Client.Contracts.Serialization;
-using HT.Api.Client.Contracts.Extensions;
+using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Serialization;
+using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 

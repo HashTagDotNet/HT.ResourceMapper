@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HT.ResourceMapper is a cloud resource management application — a searchable catalog of resources across multiple cloud environments with advanced tagging, metadata management, and dependency tracking. Conceptually an enterprise-grade bookmark manager for cloud infrastructure.
+MacroPoint.Azure.ResourceExplorer is a cloud resource management application — a searchable catalog of resources across multiple cloud environments with advanced tagging, metadata management, and dependency tracking. Conceptually an enterprise-grade bookmark manager for cloud infrastructure.
 
 ## Development Commands
 
@@ -14,22 +14,22 @@ HT.ResourceMapper is a cloud resource management application — a searchable ca
 dotnet build
 
 # Build specific project
-dotnet build UI/ResourceMapper.UI.Server
+dotnet build UI/MacroPoint.Azure.ResourceExplorer.UI.Server
 
 # Run the server (hosts Blazor WebAssembly client)
-dotnet run --project UI/ResourceMapper.UI.Server
+dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Server
 
 # Run all tests
 dotnet test
 
 # Run tests for a specific class
-dotnet test --filter "FullyQualifiedName~ResourceMapper.Common.Server.Tests.ResourceService"
+dotnet test --filter "FullyQualifiedName~MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.ResourceService"
 
 # Run a single test method
 dotnet test --filter "FullyQualifiedName=Namespace.ClassName.MethodName"
 ```
 
-> **Note**: The SQL database project (`Database/HTResourceMapperDb/HTResourceMapperDb.sqlproj`) is an **old-style SSDT / DACPAC** project (`TargetFrameworkVersion v4.7.2`; imports `Microsoft.Data.Tools.Schema.SqlTasks.targets`). It builds in **Visual Studio 2026** or **full MSBuild** — **not** `dotnet build` — to produce a `.dacpac`, and is published to `(localdb)\MSSQLLocalDB\ResourceMapper` via **SqlPackage** or VS Publish using `localhost.publish.xml`. It is **declarative**: edit the `.sql` files (desired state) and the publish engine diffs against the target. Reference/system seed lives in `Scripts/Script.PostDeployment1.sql` (a `PostDeploy` item; idempotent `MERGE`). Because it is not SDK-style, a solution-wide `dotnet build` does not build the DB project — build/publish it separately.
+> **Note**: The SQL database project (`Database/MacroPoint.Azure.ResourceExplorer.Db/MacroPoint.Azure.ResourceExplorer.Db.sqlproj`) is an **old-style SSDT / DACPAC** project (`TargetFrameworkVersion v4.7.2`; imports `Microsoft.Data.Tools.Schema.SqlTasks.targets`). It builds in **Visual Studio 2026** or **full MSBuild** — **not** `dotnet build` — to produce a `.dacpac`, and is published to `(localdb)\MSSQLLocalDB\ResourceExplorer` via **SqlPackage** or VS Publish using `localhost.publish.xml`. It is **declarative**: edit the `.sql` files (desired state) and the publish engine diffs against the target. Reference/system seed lives in `Scripts/Script.PostDeployment1.sql` (a `PostDeploy` item; idempotent `MERGE`). Because it is not SDK-style, a solution-wide `dotnet build` does not build the DB project — build/publish it separately.
 
 ### Browser-driven UI verification
 
@@ -44,7 +44,7 @@ template to copy and adapt per feature.
 ## Solution Structure
 
 ```
-Libraries/       HT.* shared utility libraries (net8.0/net9.0)
+Libraries/       MacroPoint.Azure.ResourceExplorer.* shared utility libraries (net8.0/net9.0)
 Modules/         Feature modules as Client/Server/Shared triplets
 UI/              Blazor WASM client + ASP.NET Core server host
 Database/        SQL Server database project (old-style SSDT / DACPAC; builds in VS / full MSBuild)
@@ -70,9 +70,9 @@ This registers `GlobalConfig`, `IDbConnector`, `IResourceRepository`, and `IReso
 ### API Response Pattern
 Two-layer contract system:
 
-**`HT.Api.Client.Contracts`** — Wire **envelope only** (`ApiResponse<T>`, `Message`, `MetaData`, `CallStatusCode`). Used by Blazor client. It does **not** hold per-feature resource DTOs — those live in `Common.Shared` alongside each feature (e.g. `ResourceMapper.Common.Shared.HomePage` for the grid, `ResourceMapper.Common.Shared.Editor` for the resource editor), each with its own `Contracts` subfolder for request/response envelopes.
+**`MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts`** — Wire **envelope only** (`ApiResponse<T>`, `Message`, `MetaData`, `CallStatusCode`). Used by Blazor client. It does **not** hold per-feature resource DTOs — those live in `Common.Shared` alongside each feature (e.g. `MacroPoint.Azure.ResourceExplorer.Common.Shared.HomePage` for the grid, `MacroPoint.Azure.ResourceExplorer.Common.Shared.Editor` for the resource editor), each with its own `Contracts` subfolder for request/response envelopes.
 
-**`HT.Api.Service.Contracts`** — Server-side wrapper (`ApiServiceResponse<T>`) plus a fluent `ServiceResponseBuilder<T>`:
+**`MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts`** — Server-side wrapper (`ApiServiceResponse<T>`) plus a fluent `ServiceResponseBuilder<T>`:
 ```csharp
 var builder = ServiceResponseBuilder<MyDto>.Create();
 builder.Validation.AddValidation("fieldName", "error message");
@@ -85,16 +85,16 @@ var response = builder.BuildResponse();  // auto-sets CallStatus from errors
 All controllers inherit `ApiControllerBase` which provides `MapServiceResponseToActionResult<T>(ApiServiceResponse<T>)` to translate service responses to appropriate HTTP `ActionResult` with status codes and custom reason phrases.
 
 ### Database Access
-`IDbConnector` abstraction (from `HT.Microsoft.SqlClient.Extensions`) exposes separate read-only (`.RO`) and read-write (`.Execute`) connections. Repositories use extension methods for sproc calls:
+`IDbConnector` abstraction (from `MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions`) exposes separate read-only (`.RO`) and read-write (`.Execute`) connections. Repositories use extension methods for sproc calls:
 ```csharp
 await _db.RO.SprocCommand("Resource_GetItems")
     .AddNVarchar("@SearchFor", request.SearchFor)
     .ExecuteQueryAsync<ResourceRow>(cancellationToken);
 ```
-Connection strings are read from `ResourceMapper:ConnectionStrings:Database:RO` and `ResourceMapper:ConnectionStrings:Database:RW`.
+Connection strings are read from `MacroPoint:Azure:ResourceExplorer:ConnectionStrings:Database:RO` and `MacroPoint:Azure:ResourceExplorer:ConnectionStrings:Database:RW`.
 
 ### Editor Model Pattern
-`SingleValueEditor` in `Modules/Common/ResourceMapper.Common.Shared/Editor/` tracks change state for form fields:
+`SingleValueEditor` in `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Shared/Editor/` tracks change state for form fields:
 ```csharp
 public class SingleValueEditor {
     public string OriginalValue { get; set; }
@@ -125,7 +125,7 @@ See `test-conventions.md` (root) and `docs/test-conventions.md` for the full ref
 
 ## Key Technologies
 
-- **.NET 10.0** / C# 13, nullable reference types enabled everywhere; `$(HTTargetFramework)` in `Directory.Build.props` sets TFM for all projects
+- **.NET 10.0** / C# 13, nullable reference types enabled everywhere; `$(ResourceExplorerTargetFramework)` in `Directory.Build.props` sets TFM for all projects
 - **Central Package Management** via `Directory.Packages.props` — all NuGet versions live there, no `Version=` in individual `.csproj` files
 - **Blazor WebAssembly** hosted by ASP.NET Core, MudBlazor 9.x component library
 - **SQL Server** with stored procedures; `Microsoft.Data.SqlClient`
@@ -134,9 +134,9 @@ See `test-conventions.md` (root) and `docs/test-conventions.md` for the full ref
 
 ## Configuration
 
-`HT.Microsoft.IConfiguration.Extensions` provides type-safe access:
+`MacroPoint.Azure.ResourceExplorer.Configuration.Extensions` provides type-safe access:
 ```csharp
-config.GetString("ResourceMapper:ConnectionStrings:Database:RW")
+config.GetString("MacroPoint:Azure:ResourceExplorer:ConnectionStrings:Database:RW")
 config.GetTypedSection<MyOptions>("Section:Key")
 config.IsDevelopment()
 config.ValidateRequiredKeys("key1", "key2")

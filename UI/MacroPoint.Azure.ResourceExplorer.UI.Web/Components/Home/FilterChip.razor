@@ -1,0 +1,120 @@
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.HomePage.Contracts
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.HomePage.Filtering
+
+<div style="position:relative;display:inline-block;">
+    <div class="rm-chip @(_open ? "rm-chip-open" : "")">
+        @* No DisableElevation: MudBlazor 9 has no such parameter, so it was splatting onto the DOM as a
+           dead attribute (MUD0002) — Variant.Text has no shadow to disable in the first place. *@
+        <MudButton Variant="Variant.Text" Size="Size.Small" Class="rm-chip-label"
+                   OnClick="Toggle" aria-label="@($"Edit {ResourceFilterState.ColumnDisplay(Filter)} filter")">
+            @ResourceFilterState.ChipLabel(Filter)
+        </MudButton>
+        <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" Class="rm-chip-x"
+                       OnClick="Remove" aria-label="@($"Remove {ResourceFilterState.ColumnDisplay(Filter)} filter")" />
+    </div>
+
+    <MudPopover Open="_open" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft"
+                Class="rm-filter-popover" Elevation="8">
+        @if (_open)
+        {
+            @if (Filter.Kind == ResourceGridFilterKind.Text)
+            {
+                <TextFilterEditor Filter="Filter" OnApply="Apply" OnCancel="Cancel" />
+            }
+            else
+            {
+                <EnumerableFilterEditor Filter="Filter" FacetLoader="FacetLoader" OnApply="Apply" OnCancel="Cancel" />
+            }
+        }
+    </MudPopover>
+</div>
+
+@if (_open)
+{
+    <MudOverlay Visible="true" OnClick="Cancel" AutoClose="false" Class="rm-filter-overlay" />
+}
+
+@code {
+    [Parameter] public ActiveFilter Filter { get; set; } = default!;
+    [Parameter] public Func<ActiveFilter, Task<ResourceGridFacetResponse?>> FacetLoader { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback<ActiveFilter> OnRemove { get; set; }
+
+    /// <summary>
+    /// True while this filter is brand-new and has never been applied. Governs the revert-and-remove
+    /// behaviour on Cancel — a filter the user never actually constrained shouldn't squat a slot.
+    /// </summary>
+    [Parameter] public bool IsNew { get; set; }
+
+    /// <summary>
+    /// Open-editor request from the parent, as a monotonically increasing token (0 = no request).
+    /// A token rather than a bool because the request has to be *repeatable*: the manage-filters
+    /// panel can ask to edit the same chip any number of times, and a one-shot bool only ever fires
+    /// once per component instance.
+    /// </summary>
+    [Parameter] public int OpenToken { get; set; }
+
+    private bool _open;
+    private int _lastOpenToken;
+
+    // Snapshot for cancel-revert.
+    private HashSet<string> _snapValues = new();
+    private bool _snapBlank;
+    private ResourceGridFilterOperator _snapOperator;
+    private string? _snapText;
+
+    protected override void OnParametersSet()
+    {
+        if (OpenToken != 0 && OpenToken != _lastOpenToken)
+        {
+            _lastOpenToken = OpenToken;
+            Open();
+        }
+    }
+
+    // Awaited: Cancel() can invoke OnRemove, and firing it and forgetting swallowed both the
+    // continuation and any exception it raised (CS4014).
+    private async Task Toggle()
+    {
+        if (_open) await Cancel();
+        else Open();
+    }
+
+    private void Open()
+    {
+        _snapValues = new HashSet<string>(Filter.SelectedValues, StringComparer.Ordinal);
+        _snapBlank = Filter.IncludeBlank;
+        _snapOperator = Filter.Operator;
+        _snapText = Filter.Text;
+        _open = true;
+    }
+
+    private async Task Apply()
+    {
+        _open = false;
+        // A brand-new filter left empty (never constrained) is auto-removed rather than squatting a slot.
+        if (!ResourceFilterState.IsConstraining(Filter))
+        {
+            await OnRemove.InvokeAsync(Filter);
+            return;
+        }
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task Cancel()
+    {
+        _open = false;
+        // Revert working edits.
+        Filter.SelectedValues.Clear();
+        foreach (var v in _snapValues) Filter.SelectedValues.Add(v);
+        Filter.IncludeBlank = _snapBlank;
+        Filter.Operator = _snapOperator;
+        Filter.Text = _snapText;
+
+        // If this was a brand-new, never-applied filter, remove it on cancel.
+        if (!ResourceFilterState.IsConstraining(Filter) && IsNew)
+            await OnRemove.InvokeAsync(Filter);
+    }
+
+    private async Task Remove() => await OnRemove.InvokeAsync(Filter);
+}

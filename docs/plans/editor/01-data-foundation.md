@@ -11,17 +11,17 @@ contracts, services, import, UI) have a correct foundation to build on.
 **Ground rules confirmed this session:**
 - **Greenfield / data not retained** → no backfill, no refactorlog, no migration scripts.
   Author desired-state `.sql`; a **drop-and-recreate publish** is fine.
-- **Keep the old-style SSDT project** (`Database\HTResourceMapperDb\HTResourceMapperDb.sqlproj`,
-  the one in `HT.ResourceMapper.slnx`). It is **declarative** (edit `.sql` = desired state;
+- **Keep the old-style SSDT project** (`Database\MacroPoint.Azure.ResourceExplorer.Db\MacroPoint.Azure.ResourceExplorer.Db.sqlproj`,
+  the one in `MacroPoint.Azure.ResourceExplorer.slnx`). It is **declarative** (edit `.sql` = desired state;
   publish diffs). Build via VS / full MSBuild → dacpac; publish via SqlPackage or VS to
-  `(localdb)\MSSQLLocalDB\ResourceMapper` using `localhost.publish.xml`.
+  `(localdb)\MSSQLLocalDB\ResourceExplorer` using `localhost.publish.xml`.
 - **Scope = the DB project + repo housekeeping only.** C# POCOs, sprocs, and repo readers are
   intentionally **out of scope** (slices 2–3). The app will be temporarily out of sync with the
   DB between slices — expected for a bottom-up build; slice-1 verification is DB-level.
 
-## Schema changes (edit desired-state `.sql` under `Database\HTResourceMapperDb\`)
+## Schema changes (edit desired-state `.sql` under `Database\MacroPoint.Azure.ResourceExplorer.Db\`)
 
-All paths below are under `Database\HTResourceMapperDb\`. Enum-ish columns use a short string +
+All paths below are under `Database\MacroPoint.Azure.ResourceExplorer.Db\`. Enum-ish columns use a short string +
 `CHECK` (readable, no lookup table). `RequirementLevel ∈ (Error, Suggested, Optional)`.
 
 **`Tables\Resource.sql`**
@@ -31,7 +31,7 @@ All paths below are under `Database\HTResourceMapperDb\`. Enum-ish columns use a
   `Domain+Type+Key`; domain is a tag, so the full triple can't be a DB constraint). Keep the
   column `NOT NULL`; add non-unique `INDEX IX_Resource_ResourceKey (ResourceKey)` for lookups.
 - **Add** `PrimaryTagDefinitionId INT NULL CONSTRAINT [FK_Resource_PrimaryTagDefinitionId]
-  FOREIGN KEY REFERENCES [HTResourceMapper].[TagDefinition](TagDefinitionId)` (NO ACTION on
+  FOREIGN KEY REFERENCES [ResourceExplorer].[TagDefinition](TagDefinitionId)` (NO ACTION on
   delete → can't delete a definition that is some resource's primary).
 
 **`Tables\TagDefinition.sql`**
@@ -73,7 +73,7 @@ All paths below are under `Database\HTResourceMapperDb\`. Enum-ish columns use a
 
 ## Project file, seed & housekeeping
 
-**`HTResourceMapperDb.sqlproj`** (`<Build>`/`<None>` items are explicit — old-style, no globbing):
+**`MacroPoint.Azure.ResourceExplorer.Db.sqlproj`** (`<Build>`/`<None>` items are explicit — old-style, no globbing):
 - Remove `<Build Include="Tables\TagValueType.sql" />`.
 - Rename `<Build Include="Tables\ResourceDependency.sql" />` → `Tables\ResourceRelationship.sql`.
 - Add a post-deploy item: `<PostDeploy Include="Scripts\Script.PostDeployment1.sql" />` (this
@@ -87,9 +87,9 @@ All paths below are under `Database\HTResourceMapperDb\`. Enum-ish columns use a
   `RequirementLevel='Error'`, `DisplayOrder=10`, fixed `TagDefinitionUid`.
 
 **Housekeeping (requested):**
-- Delete stale, non-built duplicate trees: `Database\HTResourceMapperDb\HTResourceMapper\`,
-  `Database\ResourceMapperDatabase\`, `Database\HTResourceMapper-nothing\`, and the orphaned
-  SDK-preview `Database\HT.Services.sqlproj` (+ its private files).
+- Delete stale, non-built duplicate trees: `Database\MacroPoint.Azure.ResourceExplorer.Db\ResourceExplorer\`,
+  `Database\ResourceExplorerDatabase\`, `Database\ResourceExplorer-nothing\`, and the orphaned
+  SDK-preview database project (+ its private files).
 - Update `Scripts\Demo_Purge_ResourceItemsForGrid.sql`: `ResourceDependency` → `ResourceRelationship`;
   remove the `TagValueType` delete (table dropped). (Demo scripts are manual `<None>`.)
 - Fix `CLAUDE.md`: correct the DB-project description — it is **old-style SSDT**
@@ -112,12 +112,12 @@ content-type auto-register vs the CHECK; `Resource_GetItems` `ResourceTypeId IS 
 ## Verification (DB-level)
 
 1. **Build dacpac** with full MSBuild (VS 2026 installed):
-   `MSBuild Database\HTResourceMapperDb\HTResourceMapperDb.sqlproj /t:Build` → confirm
-   `bin\Debug\HTResourceMapperDb.dacpac` builds with **no errors** (validates all `.sql` +
+   `MSBuild Database\MacroPoint.Azure.ResourceExplorer.Db\MacroPoint.Azure.ResourceExplorer.Db.sqlproj /t:Build` → confirm
+   `bin\Debug\MacroPoint.Azure.ResourceExplorer.Db.dacpac` builds with **no errors** (validates all `.sql` +
    post-deploy compiles; catches dropped-object references).
-2. **Publish (recreate)** to `(localdb)\MSSQLLocalDB\ResourceMapper` via SqlPackage
+2. **Publish (recreate)** to `(localdb)\MSSQLLocalDB\ResourceExplorer` via SqlPackage
    `/Action:Publish /SourceFile:…dacpac /Profile:…\localhost.publish.xml` (or VS Publish).
-   Target DB name **must be `ResourceMapper`** (known publish-target trap).
+   Target DB name **must be `ResourceExplorer`** (known publish-target trap).
 3. **Confirm with `sqlcmd`** (per project convention, use sqlcmd — not the SQL MCP):
    - `ResourceRelationship` exists; `ResourceDependency` and `TagValueType` do **not**.
    - `Resource`: `ResourceTypeId` is `NOT NULL`, `PrimaryTagDefinitionId` FK present, no UNIQUE

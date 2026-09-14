@@ -30,11 +30,11 @@ npm run test:e2e
 ```
 
 This is fully self-contained: `playwright.config.js`'s `webServer` starts
-`dotnet run --project UI/ResourceMapper.UI.Web` (reusing an already-running dev server on
+`dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web` (reusing an already-running dev server on
 `:5200` instead of double-starting one — set `CI=1` to force a fresh server instead), waits for
 it, then a `globalSetup` seeds the DB fixture (cleanup-then-seed, so a crashed prior run leaves
 no residue) before any spec runs, and a `globalTeardown` cleans it up after. Requires the dacpac
-to already be published to `(localdb)\MSSQLLocalDB\ResourceMapper` (see the root `CLAUDE.md`) —
+to already be published to `(localdb)\MSSQLLocalDB\ResourceExplorer` (see the root `CLAUDE.md`) —
 this suite doesn't build/publish the DB itself.
 
 The fixture (`sql/seed.sql`) seeds a dedicated `E2eDepType` resource type + two `E2e`-prefixed
@@ -55,7 +55,7 @@ instance + a published dacpac, none of which this suite sets up itself.
 
 ```bash
 ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS="http://localhost:5200" \
-  dotnet run --project UI/ResourceMapper.UI.Web --no-launch-profile &
+  dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web --no-launch-profile &
 ```
 
 Wait for it with `waitForServer` (see `mud-helpers.js`) rather than a fixed sleep. When done,

@@ -1,4 +1,4 @@
-# Resource Mapper
+# MacroPoint Azure Resource Explorer
 
 ## Solution Structure
 

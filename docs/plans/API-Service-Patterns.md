@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the established patterns for handling API requests with testable validation in the ResourceMapper project. The patterns emphasize simplicity, testability, and maintainability without requiring injectable validation classes.
+This document outlines the established patterns for handling API requests with testable validation in the ResourceExplorer project. The patterns emphasize simplicity, testability, and maintainability without requiring injectable validation classes.
 
 ## Core Principles
 
@@ -15,7 +15,7 @@ This document outlines the established patterns for handling API requests with t
 
 ### 1. BaseApiService Class
 
-**Location**: `Modules\Common\ResourceMapper.Common.Server\Base\BaseApiService.cs`
+**Location**: `Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\Base\BaseApiService.cs`
 
 The base class provides common patterns for all API services:
 

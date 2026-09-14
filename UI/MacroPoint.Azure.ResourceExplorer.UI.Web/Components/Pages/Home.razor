@@ -1,0 +1,554 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Routing
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Interfaces
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.Settings.Interfaces
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.Identity
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.SavedViews
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.SavedViews.Interfaces
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.SavedViews
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.HomePage.Contracts
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.HomePage.Filtering
+@using MacroPoint.Azure.ResourceExplorer.UI.Web.Components.Home
+@implements IDisposable
+@inject IResourceService ResourceService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@inject IClientSettingsService ClientSettings
+@inject ISavedViewService SavedViewService
+@inject ICurrentIdentity Identity
+@inject GridViewContext GridView
+
+<PageTitle>Resources — MacroPoint Azure Resource Explorer</PageTitle>
+
+<div class="rm-page">
+@* §7: every route gets the shell treatment. The grid had no page title at all — the only thing
+   naming it was the browser tab. *@
+<PageHeader Title="Resources" IsHome="true"
+            Description="Every catalogued resource, across every subscription." />
+
+<ResourceFilterBar State="_state" TagKeys="_tagKeys" Total="_total" Shown="@(_items?.Count ?? 0)"
+                   FacetLoader="LoadFacet" OnReload="HandleReload" />
+
+@if (_loadError is not null)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mb-3">@_loadError</MudAlert>
+}
+
+<MudDataGrid @ref="_grid" T="ResourceGridItemModel" ServerData="LoadGridData"
+             Dense="true" Hover="true" Elevation="0" SortMode="SortMode.Single"
+             FixedHeader="true" Height="100%" Class="rm-grid"
+             Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
+    <Columns>
+        <PropertyColumn Property="x => x.ResourceName" Title="Name" InitialDirection="SortDirection.Ascending" />
+        <PropertyColumn Property="x => x.ResourceType" Title="Type" />
+        @* PL-12(a): the raw text wrapped to 5–6 lines and tripled row height. The cell template clamps
+           it to a couple of lines (see .rm-desc) and carries the full text in `title`, so nothing is
+           lost. PropertyColumn keeps its sorting — only the rendering changes. *@
+        <PropertyColumn Property="x => x.Description" Title="Description" CellClass="rm-desc-cell">
+            <CellTemplate>
+                <span class="rm-desc" title="@context.Item.Description">@context.Item.Description</span>
+            </CellTemplate>
+        </PropertyColumn>
+        @* PL-12(b): size-to-content so an empty Tags column stops reserving width from Description. *@
+        <TemplateColumn Title="Tags" Sortable="false" CellClass="rm-tags-cell" HeaderClass="rm-tags-cell">
+            <CellTemplate>
+                @if (context.Item.Tags is null || context.Item.Tags.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">—</MudText>
+                }
+                else
+                {
+                    @* Grouped by tag, not by value: a multi-valued tag prints its label once and
+                       lists its values, instead of repeating "App Insights Filter:" four times.
+                       GroupBy preserves first-appearance order, so the sproc's tag ordering
+                       still decides the sequence. Link tags stay one chip per value - each is
+                       separately clickable and copyable. *@
+                    <div class="d-flex flex-wrap rm-tags">
+                        @foreach (var tagGroup in context.Item.Tags.GroupBy(t => t.TagDisplayName))
+                        {
+                            @if (string.Equals(tagGroup.First().ContentType, "Link", StringComparison.OrdinalIgnoreCase))
+                            {
+                                @foreach (var tag in tagGroup)
+                                {
+                                    <span class="rm-tag">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" Class="rm-tagicon" />
+                                        <MudLink Href="@tag.TagValue" Target="_blank" Typo="Typo.body2">@tag.TagDisplayName</MudLink>
+                                        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
+                                                       Class="rm-copy" aria-label="Copy link"
+                                                       OnClick="@(() => CopyAsync(tag.TagValue))" />
+                                    </span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="rm-tagtext">
+                                    <span class="rm-tagkey">@tagGroup.Key:</span>
+                                    @string.Join(", ", tagGroup.Select(t => t.TagValue))
+                                </span>
+                            }
+                        }
+                    </div>
+                }
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="" Sortable="false" CellClass="rm-actions-cell">
+            <CellTemplate>
+                @{
+                    var links = context.Item.Tags?
+                        .Where(t => string.Equals(t.ContentType, "Link", StringComparison.OrdinalIgnoreCase))
+                        .ToList() ?? new List<ResourceGridTagModel>();
+                }
+                <div class="rm-actions">
+                    @* PL-07: this was the one row action of four with no tooltip, in both its states.
+                       Disabled state — a MudTooltip cannot fire on a disabled button (Mud sets
+                       pointer-events: none), so the explanation goes on a wrapper span whose native
+                       `title` still receives the hover. *@
+                    @if (links.Count == 0)
+                    {
+                        <span title="No external links on this resource">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Link" Size="Size.Small"
+                                           Disabled="true" aria-label="No external links" />
+                        </span>
+                    }
+                    else
+                    {
+                        @* Populated state — the punchlist noted a hover tooltip would fight a
+                           hover-opened menu. Resolved by making the menu open on CLICK instead: the
+                           tooltip then behaves exactly like the other three actions, and a
+                           hover-only disclosure was unreachable on touch anyway (same class as
+                           PL-12c). *@
+                        <MudTooltip Text="Open external links">
+                        <MudMenu Icon="@Icons.Material.Outlined.Link" Size="Size.Small"
+                                 AriaLabel="External links" Dense="true">
+                            @foreach (var link in links)
+                            {
+                                @* The whole row opens the link: a menu item that looks clickable but
+                                   only responds on a small leading icon reads as broken. The icon is
+                                   now decorative, and Copy stops propagation so it copies without
+                                   also navigating. *@
+                                <MudMenuItem OnClick="@(() => OpenExternal(link.TagValue))">
+                                    <div class="d-flex align-center rm-linkitem">
+                                        <MudIcon Icon="@Icons.Material.Outlined.OpenInNew" Size="Size.Small"
+                                                 Class="mr-1" />
+                                        <span class="flex-grow-1">@link.TagDisplayName</span>
+                                        <span @onclick:stopPropagation="true">
+                                            <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
+                                                           aria-label="@($"Copy {link.TagDisplayName} link")"
+                                                           OnClick="@(() => CopyAsync(link.TagValue))" />
+                                        </span>
+                                    </div>
+                                </MudMenuItem>
+                            }
+                        </MudMenu>
+                        </MudTooltip>
+                    }
+                    <MudTooltip Text="Open details">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
+                                       aria-label="Open details"
+                                       OnClick="@(() => OpenDetails(context.Item.ResourceUid))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Explore dependencies">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Schema" Size="Size.Small"
+                                       aria-label="Explore dependencies"
+                                       OnClick="@(() => Explore(context.Item.ResourceUid))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Copy details link">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Share" Size="Size.Small"
+                                       aria-label="Copy details link"
+                                       OnClick="@(() => CopyDetailsLink(context.Item.ResourceUid))" />
+                    </MudTooltip>
+                </div>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <NoRecordsContent>
+        <div class="pa-10 d-flex justify-center">
+            <MudText Color="Color.Secondary">No matches — adjust your filters, or use the menu's&nbsp;<strong>Import…</strong>&nbsp;to load data.</MudText>
+        </div>
+    </NoRecordsContent>
+</MudDataGrid>
+</div>
+
+@code {
+    private ResourceFilterState _state = new();
+    private List<ResourceGridItemModel>? _items;
+    private int _total;
+    private string? _loadError;
+    private IReadOnlyList<string> _tagKeys = new List<string>();
+
+    private MudDataGrid<ResourceGridItemModel>? _grid;
+    private bool _pushNext;
+    private string _lastQuery = "";
+
+    // Counts last pushed to ResourceFilterBar. -1 forces the first load to render (see NotifyCountsChanged).
+    private int _shownRendered = -1;
+    private int _totalRendered = -1;
+
+    // Sort intent parsed from the URL, captured before the grid's initial load can mutate _state.
+    private string _urlOrderBy = "ResourceName";
+    private string _urlOrderDirection = "Asc";
+
+    // Server-backed "resume where you left off" (per-client setting). Persistence is gated until the
+    // first-render resume check has run, so the grid's default initial load can't clobber a saved view.
+    private const string GridViewSettingKey = "home.gridView";
+    private string _ownerId = string.Empty;
+    /// <summary>Set during startup; suppresses the now-unreadable resume write.</summary>
+    private bool _hasDefaultView;
+    private bool _resumeChecked;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Restore state from the URL (safe on both prerender and interactive passes).
+        _state = ResourceFilterState.FromQueryString(Navigation.Uri);
+        _urlOrderBy = _state.OrderBy;
+        _urlOrderDirection = _state.OrderDirection;
+        _lastQuery = _state.ToQueryString();
+        Navigation.LocationChanged += OnLocationChanged;
+
+        // The Saved Views menu lives in the layout and cannot reach this page directly; it raises
+        // this instead. Publish the starting query at the same time so Save As has something to
+        // write even before the first filter change.
+        GridView.OpenRequested += ApplySavedViewAsync;
+        GridView.SetCurrentQuery(_lastQuery);
+
+        try
+        {
+            var keys = await ResourceService.GetTagFilterKeys(CancellationToken.None);
+            if (keys.IsSuccess() && keys.ApiResponse.Data is not null)
+                _tagKeys = keys.ApiResponse.Data;
+        }
+        catch
+        {
+            // Tag-key list is non-critical; the bar simply won't offer tag filters.
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _grid is null)
+            return;
+
+        // Resume: when the URL carries no state of its own, restore the last-saved view from the
+        // server-side per-client setting. An explicit / deep-linked URL (any query string) always
+        // wins over the saved setting.
+        _ownerId = Identity.OwnerId;
+
+        var restored = false;
+        if (string.IsNullOrEmpty(new Uri(Navigation.Uri).Query))
+        {
+            // 1. An explicit URL already won by reaching this branch at all.
+            // 2. The owner's starred saved view, if there is one.
+            restored = await TryRestoreDefaultViewAsync();
+
+            // 3. Otherwise the resume setting, unchanged.
+            string? saved = null;
+            if (!restored)
+            {
+                try
+                {
+                    var settingResp = await ClientSettings.GetAsync(_ownerId, GridViewSettingKey);
+                    saved = settingResp.IsSuccess() ? settingResp.ApiResponse.Data?.Value : null;
+                }
+                catch { /* settings unavailable — fall back to the default view */ }
+            }
+
+            if (!restored && !string.IsNullOrWhiteSpace(saved))
+            {
+                var savedState = ResourceFilterState.FromQueryString(saved!);
+                var savedQuery = savedState.ToQueryString();
+                // Only resume if it represents something other than the default view.
+                if (!string.Equals(savedQuery, new ResourceFilterState().ToQueryString(), StringComparison.Ordinal))
+                {
+                    _state = savedState;
+                    _urlOrderBy = savedState.OrderBy;
+                    _urlOrderDirection = savedState.OrderDirection;
+                    _lastQuery = savedQuery; // set before NavigateTo so the self-echo guard ignores it
+                    Navigation.NavigateTo(new Uri(Navigation.Uri).AbsolutePath + savedQuery, forceLoad: false, replace: true);
+                    restored = true;
+                }
+            }
+        }
+
+        // Reflect the (possibly restored) sort on the grid. The Name column declares
+        // InitialDirection=Ascending, so a default sort already shows "Name ↑". For any other sort,
+        // SetSortAsync moves the indicator AND re-queries — which also applies restored filters /
+        // search / display-count. If the sort is default but other state was restored, reload explicitly.
+        var field = MapStateSortField(_urlOrderBy);
+        var desc = string.Equals(_urlOrderDirection, "Desc", StringComparison.OrdinalIgnoreCase);
+
+        if (!(field == "ResourceName" && !desc))
+        {
+            Func<ResourceGridItemModel, object?> selector = field switch
+            {
+                "ResourceType" => x => x.ResourceType,
+                "Description" => x => x.Description,
+                _ => x => x.ResourceName
+            };
+            await _grid.SetSortAsync(field, desc ? SortDirection.Descending : SortDirection.Ascending, selector);
+        }
+        else if (restored)
+        {
+            await _grid.ReloadServerData();
+        }
+
+        // Restore happened after the first render, so the filter bar rendered empty. Re-render the
+        // page so ResourceFilterBar redraws its chips from the now-restored _state.
+        if (restored)
+            StateHasChanged();
+
+        // From here on, URL writes are safe to persist (resume decision has been made).
+        _resumeChecked = true;
+    }
+
+    private static string MapStateSortField(string orderBy) => orderBy switch
+    {
+        "TypeName" => "ResourceType",
+        "Description" => "Description",
+        _ => "ResourceName"
+    };
+
+    // The grid's server-side data source: returns the top-N (DisplayCount) of the filtered/sorted set.
+    private async Task<GridData<ResourceGridItemModel>> LoadGridData(GridState<ResourceGridItemModel> gridState, CancellationToken cancellationToken)
+    {
+        var sort = gridState.SortDefinitions.FirstOrDefault();
+        if (sort is not null)
+        {
+            _state.OrderBy = MapSortColumn(sort.SortBy);
+            _state.OrderDirection = sort.Descending ? "Desc" : "Asc";
+        }
+
+        try
+        {
+            var response = await ResourceService.GetResourceGridItems(_state.ToGridRequest(), cancellationToken);
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+            {
+                _items = response.ApiResponse.Data.Items ?? new();
+                _total = response.ApiResponse.Data.TotalItems;
+                _loadError = null;
+            }
+            else
+            {
+                _items = new();
+                _total = 0;
+                _loadError = "Unable to load resources.";
+            }
+        }
+        catch
+        {
+            _items = new();
+            _total = 0;
+            _loadError = "Unable to load resources — the database may not be available yet.";
+        }
+
+        UpdateUrl(_pushNext);
+        _pushNext = false;
+
+        NotifyCountsChanged();
+
+        return new GridData<ResourceGridItemModel> { Items = _items, TotalItems = _total };
+    }
+
+    // PL-A1: MudDataGrid repaints itself from the GridData returned above, but ResourceFilterBar is a
+    // *sibling* — nothing re-rendered this page, so the bar kept the previous pass's numbers and read
+    // "Showing 0 of 0" over a full grid. Only a re-render of Home can push new Total/Shown parameters
+    // down to the bar, so the repaint has to happen here.
+    //
+    // Loop safety: this is called from the grid's own ServerData callback, and re-rendering Home also
+    // re-renders MudDataGrid. MudDataGrid does not reload on a parameter refresh (reloads come from
+    // sort/page/filter changes or an explicit ReloadServerData), but the equality guard makes that
+    // guarantee unnecessary — a second pass would find the counts unchanged and not request another
+    // render, so any cycle terminates after one iteration instead of spinning.
+    private void NotifyCountsChanged()
+    {
+        var shown = _items?.Count ?? 0;
+        if (shown == _shownRendered && _total == _totalRendered)
+            return;
+
+        _shownRendered = shown;
+        _totalRendered = _total;
+        StateHasChanged();
+    }
+
+    private async Task<ResourceGridFacetResponse?> LoadFacet(ActiveFilter filter)
+    {
+        var request = new ResourceGridFacetRequest
+        {
+            Column = filter.Column,
+            TagKey = filter.TagKey,
+            SearchFor = _state.SearchFor,
+            Filters = _state.ToGridRequest().Filters
+        };
+        var response = await ResourceService.GetResourceGridFacet(request, CancellationToken.None);
+        return response.IsSuccess() ? response.ApiResponse.Data : null;
+    }
+
+    private async Task HandleReload(bool pushHistory)
+    {
+        _pushNext = pushHistory;
+        if (_grid is not null)
+            await _grid.ReloadServerData();
+    }
+
+    private void UpdateUrl(bool push)
+    {
+        _lastQuery = _state.ToQueryString();
+        var path = new Uri(Navigation.Uri).AbsolutePath;
+        Navigation.NavigateTo(path + _lastQuery, forceLoad: false, replace: !push);
+
+        // Tell the Saved Views menu what Save would write. It lives in the layout's hamburger and
+        // cannot see this page's state any other way.
+        GridView.SetCurrentQuery(_lastQuery);
+
+        // Persist the current view so a later visit with a bare URL resumes here. Gated on
+        // _resumeChecked so the grid's default initial load can't overwrite a saved view before
+        // we've had the chance to restore it.
+        if (_resumeChecked)
+            _ = PersistViewAsync(_lastQuery);
+    }
+
+    /// <summary>
+    /// Loads the owner's starred saved view, if any. Returns true when it took over the grid.
+    /// <para>
+    /// Ordering matters and is easy to get wrong: _lastQuery is assigned BEFORE NavigateTo so
+    /// OnLocationChanged recognises the navigation as self-inflicted and does not reload, and
+    /// replace:true keeps the bare URL out of the back stack so Back does not bounce. Both are
+    /// copied from the resume branch below, which had to solve the same problem.
+    /// </para>
+    /// </summary>
+    private async Task<bool> TryRestoreDefaultViewAsync()
+    {
+        SavedViewModel? defaultView = null;
+        try
+        {
+            var response = await SavedViewService.ListAsync(_ownerId, CancellationToken.None);
+            defaultView = response.IsSuccess()
+                ? response.ApiResponse.Data?.FirstOrDefault(v => v.IsDefault)
+                : null;
+        }
+        catch
+        {
+            // Saved views unavailable — fall through to the resume setting rather than failing the page.
+            return false;
+        }
+
+        _hasDefaultView = defaultView is not null;
+
+        if (defaultView is null || string.IsNullOrWhiteSpace(defaultView.QueryString))
+            return false;
+
+        var state = ResourceFilterState.FromQueryString(defaultView.QueryString);
+        _state = state;
+        _urlOrderBy = state.OrderBy;
+        _urlOrderDirection = state.OrderDirection;
+        _lastQuery = state.ToQueryString();
+
+        Navigation.NavigateTo(new Uri(Navigation.Uri).AbsolutePath + _lastQuery,
+                              forceLoad: false, replace: true);
+
+        GridView.SetCurrentQuery(_lastQuery);
+        // Record it as open using the NORMALISED query, so Save is not enabled on arrival.
+        GridView.SetOpenView(defaultView.SavedViewUid, defaultView.Name, _lastQuery);
+        return true;
+    }
+
+    private async Task PersistViewAsync(string query)
+    {
+        if (string.IsNullOrEmpty(_ownerId)) return;
+
+        // With a starred view set, the resume slot is unreachable on startup - writing it on every
+        // navigation would be a write nothing ever reads.
+        if (_hasDefaultView) return;
+
+        try { await ClientSettings.SetAsync(_ownerId, GridViewSettingKey, query); }
+        catch { /* settings unavailable — best-effort persistence */ }
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        var incoming = ResourceFilterState.FromQueryString(e.Location);
+        if (string.Equals(incoming.ToQueryString(), _lastQuery, StringComparison.Ordinal))
+            return; // a navigation we initiated — ignore
+
+        // Browser Back/Forward (or an external link): adopt the state and reload without re-navigating.
+        _state = incoming;
+        _lastQuery = incoming.ToQueryString();
+        if (_grid is not null)
+            await InvokeAsync(() => _grid.ReloadServerData());
+    }
+
+    private static string MapSortColumn(string? sortBy) => sortBy switch
+    {
+        "ResourceType" => "TypeName",
+        "Description" => "Description",
+        _ => "ResourceName"
+    };
+
+    /// <summary>
+    /// Loads a saved view's query. Mirrors what the resume path does: assign _lastQuery BEFORE
+    /// navigating so OnLocationChanged treats it as self-inflicted, and replace rather than push so
+    /// Back does not bounce between the previous query and this one.
+    /// </summary>
+    private async Task ApplySavedViewAsync(SavedViewModel view)
+    {
+        var state = ResourceFilterState.FromQueryString(view.QueryString);
+        _state = state;
+        _urlOrderBy = state.OrderBy;
+        _urlOrderDirection = state.OrderDirection;
+        _lastQuery = state.ToQueryString();
+
+        Navigation.NavigateTo(new Uri(Navigation.Uri).AbsolutePath + _lastQuery,
+                              forceLoad: false, replace: true);
+        GridView.SetCurrentQuery(_lastQuery);
+        // Record it as open using the NORMALISED query: comparing against the raw stored string
+        // would make Save look enabled the moment the view was opened.
+        GridView.SetOpenView(view.SavedViewUid, view.Name, _lastQuery);
+
+        await HandleReload(pushHistory: false);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        GridView.OpenRequested -= ApplySavedViewAsync;
+        GridView.GridDetached();
+    }
+
+    private const string DetailRoute = "/resources";
+
+    private void OpenDetails(string uid) =>
+        Navigation.NavigateTo($"{DetailRoute}/{uid}");
+
+    private void Explore(string uid) =>
+        Navigation.NavigateTo($"/explore/{uid}");
+
+    private async Task CopyDetailsLink(string uid)
+    {
+        var abs = Navigation.ToAbsoluteUri($"{DetailRoute}/{uid}").ToString();
+        await CopyAsync(abs);
+    }
+
+    private async Task OpenExternal(string url) =>
+        await JS.InvokeVoidAsync("open", url, "_blank");
+
+    private async Task CopyAsync(string url)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
+            Snackbar.Add("Link copied", Severity.Normal, config =>
+            {
+                config.Icon = Icons.Material.Outlined.ContentCopy;   // match the copy-button icon
+                config.VisibleStateDuration = 500;   // brief confirmation — 0.5s is enough
+                config.ShowTransitionDuration = 100;
+                config.HideTransitionDuration = 150;
+            });
+        }
+        catch
+        {
+            Snackbar.Add("Couldn't copy link", Severity.Warning);
+        }
+    }
+}

@@ -4,7 +4,7 @@
 //
 // Run against an already-running server:
 //   ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS="http://localhost:5200" \
-//     dotnet run --project UI/ResourceMapper.UI.Web --no-launch-profile &
+//     dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web --no-launch-profile &
 //   node example-drive-editor.js
 
 const path = require('path');

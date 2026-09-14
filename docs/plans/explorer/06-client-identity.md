@@ -28,16 +28,16 @@ parameter into `IDiagramService` (slice 5) by slice 7.
 
 ---
 
-## 1. The identity helper (`UI\ResourceMapper.UI.Web\Explorer\ClientIdentity.cs`)
+## 1. The identity helper (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\Explorer\ClientIdentity.cs`)
 
-New `Explorer\` folder in the Web project; namespace `ResourceMapper.UI.Web.Explorer`.
+New `Explorer\` folder in the Web project; namespace `MacroPoint.Azure.ResourceExplorer.UI.Web.Explorer`.
 
 ```csharp
 using System;
 using System.Threading.Tasks;
 using Microsoft.JSInterop;
 
-namespace ResourceMapper.UI.Web.Explorer
+namespace MacroPoint.Azure.ResourceExplorer.UI.Web.Explorer
 {
     /// <summary>
     /// Anonymous per-client identity for the explorer: a durable GUID kept in the browser's
@@ -86,7 +86,7 @@ namespace ResourceMapper.UI.Web.Explorer
 Add the `@using` (with the other usings at the top):
 
 ```razor
-@using ResourceMapper.UI.Web.Explorer
+@using MacroPoint.Azure.ResourceExplorer.UI.Web.Explorer
 ```
 
 Add the field (beside `_preset`):
@@ -141,7 +141,7 @@ Add beside `OnPresetChanged`:
 
 ## UI verification hook (visible slice)
 
-- [ ] **Step 3: Build + run.** `dotnet build` clean; `dotnet run --project UI/ResourceMapper.UI.Web`.
+- [ ] **Step 3: Build + run.** `dotnet build` clean; `dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web`.
 - [ ] **Step 4: Drive it.** Explore any resource, then confirm:
   1. The control bar shows `Client: xxxxxxxx…` (first 8 chars of a 32-char GUID).
   2. **Reload** the page → the **same** id (persisted in `localStorage`).

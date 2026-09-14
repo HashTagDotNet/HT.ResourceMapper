@@ -20,7 +20,7 @@ serializes to/from `DiagramJson`. **Sharing (link + read-only + Save-a-copy) is 
   Fit / Collapse-all / Display-preset / client caption. (Making it a *floating overlay* is a slice-9
   polish item; a top toolbar delivers the actions now.)
 - **Dialogs follow the existing editor dialog pattern** — model `DiagramNameDialog` and
-  `OpenDiagramDialog` on `UI/ResourceMapper.UI.Web/Components/Editor/ConfirmDeleteDialog.razor` /
+  `OpenDiagramDialog` on `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Editor/ConfirmDeleteDialog.razor` /
   `UnsavedChangesDialog.razor` / `TagDefinitionDialog.razor` and how `ResourceEditor.razor` opens them
   via `IDialogService` — those are the version-correct (MudBlazor 9.5) conventions for the cascading
   dialog-instance type, `DialogResult`, and `DialogService.ShowAsync`. **Read one before writing these.**
@@ -97,7 +97,7 @@ export function currentPresetValue() { return currentPreset; }
 
 ---
 
-## 2. Dialog components (`UI\ResourceMapper.UI.Web\Components\Explorer\`)
+## 2. Dialog components (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\Components\Explorer\`)
 
 > **Read `Components/Editor/UnsavedChangesDialog.razor` (or `ConfirmDeleteDialog.razor`) first** and copy
 > its MudDialog conventions exactly — the cascading dialog-instance parameter type, `MudDialog.Close(...)`/
@@ -108,7 +108,7 @@ export function currentPresetValue() { return currentPreset; }
 Structure (adapt the cascading-instance type to match the editor dialogs):
 
 ```razor
-@namespace ResourceMapper.UI.Web.Components.Explorer
+@namespace MacroPoint.Azure.ResourceExplorer.UI.Web.Components.Explorer
 
 <MudDialog>
     <DialogContent>
@@ -136,9 +136,9 @@ Structure (adapt the cascading-instance type to match the editor dialogs):
 ### 2b. `OpenDiagramDialog.razor` — list + open + per-row delete
 
 ```razor
-@namespace ResourceMapper.UI.Web.Components.Explorer
-@using ResourceMapper.Common.Server.Explorer.Interfaces
-@using ResourceMapper.Common.Shared.Explorer.Diagrams
+@namespace MacroPoint.Azure.ResourceExplorer.UI.Web.Components.Explorer
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer.Diagrams
 @inject IDiagramService DiagramService
 
 <MudDialog>
@@ -220,10 +220,10 @@ Structure (adapt the cascading-instance type to match the editor dialogs):
 Add at the top (with existing usings):
 
 ```razor
-@using ResourceMapper.Common.Server.Explorer.Interfaces
-@using ResourceMapper.Common.Shared.Explorer.Diagrams
-@using ResourceMapper.Common.Shared.Explorer.Diagrams.Contracts
-@using ResourceMapper.UI.Web.Components.Explorer
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer.Diagrams
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer.Diagrams.Contracts
+@using MacroPoint.Azure.ResourceExplorer.UI.Web.Components.Explorer
 @inject IDiagramService DiagramService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -373,7 +373,7 @@ are now here; the free-text hint is dropped in favor of the toolbar + tooltips.)
 
 ## UI verification hook (visible slice)
 
-- [ ] **Step 4: Build + run.** `dotnet build` clean; `dotnet run --project UI/ResourceMapper.UI.Web`.
+- [ ] **Step 4: Build + run.** `dotnet build` clean; `dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web`.
 - [ ] **Step 5: Drive it** at `/explore/DEMOEXP-checkout` (the demo graph):
   1. Expand a few nodes, drag them into an arrangement, pick a Display preset.
   2. **Save As** → enter a name → toolbar shows the name, a "Saved" snackbar appears.

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>$(ResourceExplorerTargetFramework)</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Libraries\ApiContracts\MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts\MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\Libraries\Configuration\MacroPoint.Azure.ResourceExplorer.Configuration.Extensions\MacroPoint.Azure.ResourceExplorer.Configuration.Extensions.csproj" />
+    <ProjectReference Include="..\..\..\Libraries\Logging\MacroPoint.Azure.ResourceExplorer.Logging.Extensions\MacroPoint.Azure.ResourceExplorer.Logging.Extensions.csproj" />
+    <ProjectReference Include="..\..\..\Libraries\SqlClient\MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions.Abstractions\MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\Libraries\SqlClient\MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions\MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions.csproj" />
+    <ProjectReference Include="..\MacroPoint.Azure.ResourceExplorer.Common.Shared\MacroPoint.Azure.ResourceExplorer.Common.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Base\" />
+  </ItemGroup>
+
+</Project>

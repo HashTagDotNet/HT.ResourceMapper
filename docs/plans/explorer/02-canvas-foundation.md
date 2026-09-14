@@ -41,11 +41,11 @@ UI slice builds on.
 
 `wwwroot/js/explorer/vendor/cytoscape.min.js` (v3.30.2, MIT) already exists in the working tree.
 
-- [ ] **Step 1:** Confirm the file is present and ~373 KB (`ls -l UI/ResourceMapper.UI.Web/wwwroot/js/explorer/vendor/cytoscape.min.js`). It will be committed with this slice. Do not download anything.
+- [ ] **Step 1:** Confirm the file is present and ~373 KB (`ls -l UI/MacroPoint.Azure.ResourceExplorer.UI.Web/wwwroot/js/explorer/vendor/cytoscape.min.js`). It will be committed with this slice. Do not download anything.
 
 ---
 
-## 2. Load Cytoscape in the host page (`UI\ResourceMapper.UI.Web\Components\App.razor`)
+## 2. Load Cytoscape in the host page (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\Components\App.razor`)
 
 Add the vendor `<script>` **before** `blazor.web.js` so the `cytoscape` global exists before the ES
 module imports at runtime:
@@ -63,7 +63,7 @@ module imports at runtime:
 
 ---
 
-## 3. The canvas ES module (`UI\ResourceMapper.UI.Web\wwwroot\js\explorer\explorer-canvas.js`)
+## 3. The canvas ES module (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\wwwroot\js\explorer\explorer-canvas.js`)
 
 A thin wrapper over the global `cytoscape`. One instance per page; all node/edge/expansion state
 lives here. Exposes `init`, `addGraph`, `markExpanded`, `collapse`, `fit`, `dispose`.
@@ -172,7 +172,7 @@ export function dispose() {
 
 ---
 
-## 4. Canvas host CSS (`UI\ResourceMapper.UI.Web\wwwroot\app.css`)
+## 4. Canvas host CSS (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\wwwroot\app.css`)
 
 Cytoscape needs an explicitly-sized container. Append:
 
@@ -197,7 +197,7 @@ Cytoscape needs an explicitly-sized container. Append:
 
 ---
 
-## 5. The explorer page (`UI\ResourceMapper.UI.Web\Components\Pages\ResourceExplorer.razor`)
+## 5. The explorer page (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\Components\Pages\ResourceExplorer.razor`)
 
 Route `/explore/{ResourceUid}`. Initializes the module post-prerender, seeds the graph via
 `IExplorerService.GetNodeAsync` (slice 1), and handles tap→expand/collapse.
@@ -205,8 +205,8 @@ Route `/explore/{ResourceUid}`. Initializes the module post-prerender, seeds the
 ```razor
 @page "/explore/{ResourceUid}"
 @using Microsoft.JSInterop
-@using ResourceMapper.Common.Server.Explorer.Interfaces
-@using ResourceMapper.Common.Shared.Explorer
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @inject IExplorerService ExplorerService
@@ -312,7 +312,7 @@ Route `/explore/{ResourceUid}`. Initializes the module post-prerender, seeds the
 
 ---
 
-## 6. Grid "Explore" launch (`UI\ResourceMapper.UI.Web\Components\Pages\Home.razor`)
+## 6. Grid "Explore" launch (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\Components\Pages\Home.razor`)
 
 Add an "Explore" `MudIconButton` beside the existing **Open details** edit button in the per-row
 actions `TemplateColumn`, and an `Explore` handler beside `OpenDetails` (`NavigationManager` is
@@ -335,11 +335,11 @@ private void Explore(string uid) =>
 ## UI verification hook (this IS the visible slice)
 
 - [ ] **Step 7: Build + run.** `dotnet build` (repo root) must succeed, then
-  `dotnet run --project UI/ResourceMapper.UI.Web`.
+  `dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web`.
 - [ ] **Step 8: Seed data if needed.** The canvas needs a resource **with relationships** to be
   interesting. If localdb still has no `ResourceRelationship` rows (slice 1 found none), insert a
   few via `sqlcmd` for manual verification — e.g. pick two existing `ResourceUid`s and
-  `INSERT INTO [HTResourceMapper].[ResourceRelationship](FromResourceId,ToResourceId) ...`. Record
+  `INSERT INTO [ResourceExplorer].[ResourceRelationship](FromResourceId,ToResourceId) ...`. Record
   what you inserted; you may leave a small demo set in place for the user to click through (note it
   in the report so they know it's test data).
 - [ ] **Step 9: Drive it in a browser.** From the home grid, click the **Explore** (schema) icon on a
@@ -360,7 +360,7 @@ private void Explore(string uid) =>
 
 ## Verification
 
-1. `dotnet build` (repo root) succeeds (the `HTResourceMapperDb.sqlproj` `MSB4278` under `dotnet build` is expected).
+1. `dotnet build` (repo root) succeeds (the `MacroPoint.Azure.ResourceExplorer.Db.sqlproj` `MSB4278` under `dotnet build` is expected).
 2. `dotnet test` (full suite) — unchanged from slice 1 (this slice adds no unit tests; confirm nothing regressed).
 3. Manual browser drive per Steps 8–9 above — the primary gate for this slice.
 

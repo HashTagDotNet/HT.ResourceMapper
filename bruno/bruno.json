@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "name": "ResourceMapper",
+  "name": "MacroPoint Azure Resource Explorer",
   "type": "collection",
   "ignore": ["node_modules", ".git"]
 }

@@ -29,7 +29,7 @@ carried note** (don't leak the owner's private `DiagramUid` to a read-only recip
 
 ## 1. Server: ownership flag on share read
 
-### 1a. Shared DTO — add `IsOwner` (`Modules\Common\ResourceMapper.Common.Shared\Explorer\Diagrams\DiagramModel.cs`)
+### 1a. Shared DTO — add `IsOwner` (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Shared\Explorer\Diagrams\DiagramModel.cs`)
 
 Add the property:
 
@@ -37,7 +37,7 @@ Add the property:
         public bool IsOwner { get; set; }
 ```
 
-### 1b. Service signature + logic (`Modules\Common\ResourceMapper.Common.Server\Explorer\`)
+### 1b. Service signature + logic (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\Explorer\`)
 
 In `Interfaces\IDiagramService.cs`, change `GetByShareIdAsync` to take the caller's client id:
 
@@ -306,7 +306,7 @@ and after assigning `model`, add:
 
 ## UI verification hook (visible slice)
 
-- [ ] **Step 5: Build + run.** `dotnet build` clean; `dotnet run --project UI/ResourceMapper.UI.Web`.
+- [ ] **Step 5: Build + run.** `dotnet build` clean; `dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web`.
 - [ ] **Step 6: Drive it** at `/explore/DEMOEXP-checkout`:
   1. Save-As a diagram, then click **Share** → a `.../explore/shared/{ShareId}` link is copied
      (snackbar confirms).

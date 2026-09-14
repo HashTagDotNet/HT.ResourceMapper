@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>$(ResourceExplorerTargetFramework)</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Libraries\ApiContracts\MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts\MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

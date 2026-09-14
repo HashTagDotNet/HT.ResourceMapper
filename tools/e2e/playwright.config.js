@@ -27,7 +27,7 @@ module.exports = defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'dotnet run --project UI/ResourceMapper.UI.Web --no-launch-profile',
+    command: 'dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web --no-launch-profile',
     // Repo root, NOT this folder — the exact cwd bug hit while smoke-testing the #7 tooling
     // (a project-relative `dotnet run` can't resolve its path from tools/e2e) — RD19.
     cwd: path.resolve(__dirname, '..', '..'),

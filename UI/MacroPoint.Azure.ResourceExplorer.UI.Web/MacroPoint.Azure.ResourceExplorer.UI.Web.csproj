@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>$(ResourceExplorerTargetFramework)</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Reuse the prior host's UserSecretsId so local connection-string secrets carry over. -->
+    <UserSecretsId>1a3b74ec-d315-416c-9c29-a2781962918d</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MudBlazor" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Libraries\ApiContracts\MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts\MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.csproj" />
+    <ProjectReference Include="..\..\Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\MacroPoint.Azure.ResourceExplorer.Common.Server.csproj" />
+    <ProjectReference Include="..\..\Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Shared\MacroPoint.Azure.ResourceExplorer.Common.Shared.csproj" />
+  </ItemGroup>
+
+  <ProjectExtensions><VisualStudio><UserProperties properties_4launchsettings_1json__JsonSchema="" /></VisualStudio></ProjectExtensions>
+
+</Project>

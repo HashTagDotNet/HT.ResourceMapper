@@ -1,0 +1,37 @@
+﻿---- NOTE:  Remember to enable COMMIT below
+--GO
+--DROP PROC IF EXISTS #SeedTagType
+--GO
+--CREATE PROC #SeedTagType(
+--    @TagTypeId INT
+--    ,@TagCode VARCHAR(50)
+--)
+--AS
+--BEGIN
+--    UPDATE TOP(1)
+--        [ResourceExplorer].TagContentTypes
+--    SET
+--        TagCode = @TagCode
+--    WHERE
+--        TagTypeId = @TagTypeId
+--    IF @@ROWCOUNT = 0
+--    BEGIN
+--        INSERT INTO [ResourceExplorer].TagContentTypes (
+--            TagTypeId,
+--            TagCode
+--        ) VALUES (
+--            @TagTypeId
+--            ,@TagCode
+--        )
+--    END
+--END
+--GO
+
+--EXEC #SeedTagType @TagTypeId=0, @TagCode='Text'
+--EXEC #SeedTagType @TagTypeId=1, @TagCode='Link'
+
+--SELECT * FROM [ResourceExplorer].TagContentTypes
+--ROLLBACK
+----COMMIT
+--GO
+--DROP PROC IF EXISTS #SeedTagType

@@ -36,7 +36,7 @@ CSS/host addition. No backend changes.
 
 ---
 
-## 1. JS module changes (`UI\ResourceMapper.UI.Web\wwwroot\js\explorer\explorer-canvas.js`)
+## 1. JS module changes (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\wwwroot\js\explorer\explorer-canvas.js`)
 
 ### 1a. Track the seed id and route Shift-click to removal
 
@@ -165,7 +165,7 @@ export function removeNode(uid) {
 
 ---
 
-## 2. Page changes (`UI\ResourceMapper.UI.Web\Components\Pages\ResourceExplorer.razor`)
+## 2. Page changes (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\Components\Pages\ResourceExplorer.razor`)
 
 ### 2a. Control bar + hint (markup)
 
@@ -320,7 +320,7 @@ lines): `@using Microsoft.JSInterop` is already present and provides `JSDisconne
 
 ---
 
-## 3. CSS (`UI\ResourceMapper.UI.Web\wwwroot\app.css`)
+## 3. CSS (`UI\MacroPoint.Azure.ResourceExplorer.UI.Web\wwwroot\app.css`)
 
 Add the control-bar rule and shrink the canvas height to make room for it. Replace the slice-2
 `.rm-explorer-canvas` height and add `.rm-explorer-bar`:
@@ -350,7 +350,7 @@ Add the control-bar rule and shrink the canvas height to make room for it. Repla
 
 ## UI verification hook (visible slice)
 
-- [x] **Step 4: Build + run.** `dotnet build` clean; `dotnet run --project UI/ResourceMapper.UI.Web`.
+- [x] **Step 4: Build + run.** `dotnet build` clean; `dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web`.
 - [x] **Step 5: Drive it** (reuse the slice-2 demo data around `AAS001`, or reseed similarly). From
   the grid, Explore a resource with dependencies, then confirm:
   1. **Drag** several nodes into a deliberate arrangement.
@@ -388,14 +388,14 @@ Add the control-bar rule and shrink the canvas height to make room for it. Repla
 Applied Steps 1–3 exactly as specified (1a–1d in `explorer-canvas.js`, 2a–2b in
 `ResourceExplorer.razor`, the CSS block in `app.css`); no deviations from the brief's code. Verified
 with `dotnet build` (clean, only the expected sqlproj `MSB4278`) and `dotnet test` (398 total, 2
-pre-existing/unrelated `HT.Api.Service.Contracts.Tests` failures, everything else — including all
+pre-existing/unrelated `MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.Tests` failures, everything else — including all
 396 other tests — green, no regression vs slice 2).
 
 **Demo data:** slice 2's `AAS001`-centered `ResourceRelationship` rows were still present (5 rows),
 but they only reached one hop from the seed in every direction, so expanding a *non-seed* node never
 introduced a genuinely new node — insufficient to prove position-preserving placement. Added one
 extra demo row via `sqlcmd` (`APP007` (User Authentication) → `APP008` (Notification Service)) to
-`(localdb)\MSSQLLocalDB\ResourceMapper` so expanding `APP007` after the seed load pulls in a real
+`(localdb)\MSSQLLocalDB\ResourceExplorer` so expanding `APP007` after the seed load pulls in a real
 second-hop node. Left in place as reusable demo data (not cleaned up), matching slice 2's precedent.
 
 **Browser verification:** driven headlessly via Playwright (`playwright-core` + system Chrome), not

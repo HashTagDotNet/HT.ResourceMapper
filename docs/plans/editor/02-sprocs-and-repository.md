@@ -19,7 +19,7 @@ service/controller/UI changes here (slice #4+).
   `DisplayName`/`DisplayOrder`, Domain facet, and primary-link projection to the UI slices.
 - **Build relationship + delete CRUD now** (sprocs + repo methods), unconsumed until #6–9.
 
-## SQL — change existing sprocs (`Database\HTResourceMapperDb\Stored Procedures\`)
+## SQL — change existing sprocs (`Database\MacroPoint.Azure.ResourceExplorer.Db\Stored Procedures\`)
 
 - **`Resource_Upsert.sql`** — resolve `@ResourceTypeId` from `@TypeName`; **guard: if it resolves
   NULL, `RAISERROR` / return an error `@Result` instead of inserting NULL** (ResourceTypeId is now
@@ -62,7 +62,7 @@ service/controller/UI changes here (slice #4+).
   `IF NOT EXISTS (...) INSERT`; the `CHECK (From<>To)` guards self-loops.
 - **`ResourceRelationship_Remove.sql`** `@FromResourceId INT, @ToResourceId INT` — `DELETE` the edge.
 
-## C# model layer (`Modules\Common\ResourceMapper.Common.Server\Resources\Models\`)
+## C# model layer (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\Resources\Models\`)
 
 - **Rename `ResourceDependency.cs` → `ResourceRelationship.cs`**: `[Table("ResourceRelationship",…)]`,
   props `RelationshipId`, `FromResourceId`, `ToResourceId`, `CreatedOn`, `UpdatedOn`; navs
@@ -91,7 +91,7 @@ service/controller/UI changes here (slice #4+).
   - `DeleteResourceAsync(int resourceId, …)`.
   - These are unconsumed until slice #4/#6–9 (compile + covered by sproc-level verification now).
 
-## Tests (`_Tests\Common\Server\ResourceMapper.Common.Server.Tests\`)
+## Tests (`_Tests\Common\Server\MacroPoint.Azure.ResourceExplorer.Common.Server.Tests\`)
 
 - Update any test that constructs `TagDefinition` with an `int` `IsSystemTag` (now `bool`) or
   references the removed `ResourceTypeTag`/`TagValueType` shapes. `UpsertResourceAsync` /
@@ -109,9 +109,9 @@ methods that call the new repo methods → **#4**.
 
 ## Verification
 
-1. **DB builds + publishes:** `MSBuild HTResourceMapperDb.sqlproj /t:Rebuild` (VS18 MSBuild) → dacpac
+1. **DB builds + publishes:** `MSBuild MacroPoint.Azure.ResourceExplorer.Db.sqlproj /t:Rebuild` (VS18 MSBuild) → dacpac
    with no errors (validates all sproc changes compile against the schema); `sqlpackage
-   /Action:Publish` to `(localdb)\MSSQLLocalDB\ResourceMapper`.
+   /Action:Publish` to `(localdb)\MSSQLLocalDB\ResourceExplorer`.
 2. **Exercise the sprocs via `sqlcmd`** with a tiny sample: seed a ResourceType + a couple
    TagDefinitions; `Resource_Upsert` (verify created→updated, and the type-guard error path when
    `@TypeName` is bogus); `TagDefinition_Upsert` (verify new columns set; verify a non-Text/Link

@@ -1,4 +1,4 @@
-# HT Resource Mapper – UX & Architecture Plan
+# MacroPoint Azure Resource Explorer – UX & Architecture Plan
 
 # Project Summary
 
@@ -33,7 +33,7 @@
 ### AppBar
 - Spans **full width** across the entire page, sitting above the nav drawer (not beside it)
 - **Left**: Hamburger menu (≡) — toggles the nav drawer open/closed
-- **Center**: App title "ResourceMapper"
+- **Center**: App title "ResourceExplorer"
 - **Right**: Dark mode toggle
 
 ### Nav Drawer

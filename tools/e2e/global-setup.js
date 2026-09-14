@@ -6,7 +6,7 @@ const path = require('path');
 
 const SQLCMD = 'C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn\\SQLCMD.EXE';
 const SERVER = '(localdb)\\MSSQLLocalDB';
-const DATABASE = 'ResourceMapper';
+const DATABASE = 'ResourceExplorer';
 
 function runSql(file) {
   execFileSync(SQLCMD, ['-S', SERVER, '-d', DATABASE, '-i', file], { stdio: 'inherit' });

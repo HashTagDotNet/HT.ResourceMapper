@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>$(ResourceExplorerTargetFramework)</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions.Abstractions\MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

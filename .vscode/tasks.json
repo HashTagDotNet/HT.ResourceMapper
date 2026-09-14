@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/UI/ResourceMapper.UI.Server/ResourceMapper.UI.Server.csproj",
+                "${workspaceFolder}/UI/MacroPoint.Azure.ResourceExplorer.UI.Server/MacroPoint.Azure.ResourceExplorer.UI.Server.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -19,7 +19,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/UI/ResourceMapper.UI.Server/ResourceMapper.UI.Server.csproj",
+                "${workspaceFolder}/UI/MacroPoint.Azure.ResourceExplorer.UI.Server/MacroPoint.Azure.ResourceExplorer.UI.Server.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -33,7 +33,7 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/UI/ResourceMapper.UI.Server/ResourceMapper.UI.Server.csproj"
+                "${workspaceFolder}/UI/MacroPoint.Azure.ResourceExplorer.UI.Server/MacroPoint.Azure.ResourceExplorer.UI.Server.csproj"
             ],
             "problemMatcher": "$msCompile"
         }

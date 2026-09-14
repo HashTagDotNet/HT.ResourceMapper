@@ -1,0 +1,112 @@
+﻿@inherits LayoutComponentBase
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Interfaces
+@inject IResourceService ResourceService
+
+<MudThemeProvider Theme="@_theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="0" Color="Color.Surface" Dense="true"
+               Style="border-bottom:1px solid var(--mud-palette-divider);">
+        @* PL-08: there was no route back to the grid from the editor or the explorer other than the
+           browser's Back button. Two exits now: a Home entry at the top of the menu, and the product
+           title itself, which is what most people reach for first. *@
+        <MudMenu Icon="@Icons.Material.Outlined.Menu" Color="Color.Inherit" Dense="true" AriaLabel="Application menu">
+            <MudMenuItem Href="/" Icon="@Icons.Material.Outlined.Home">Home</MudMenuItem>
+            <MudDivider />
+            <MudMenuItem Href="/resources" Icon="@Icons.Material.Outlined.Add">Create Resource</MudMenuItem>
+            <MudMenuItem Href="/resource-types" Icon="@Icons.Material.Outlined.Category">Resource Types</MudMenuItem>
+            <MudMenuItem Href="/domains" Icon="@Icons.Material.Outlined.Workspaces">@_domainsLabel</MudMenuItem>
+            <MudMenuItem Href="/tags" Icon="@Icons.Material.Outlined.Sell">Tags</MudMenuItem>
+            <MudMenuItem Href="/import" Icon="@Icons.Material.Outlined.UploadFile">Import…</MudMenuItem>
+            <MudDivider />
+            <SavedViewsMenu />
+        </MudMenu>
+        <MudLink Href="/" Typo="Typo.subtitle1" Color="Color.Inherit" Underline="Underline.Hover"
+                 Class="ml-2" Style="font-weight:600;letter-spacing:.2px;"
+                 aria-label="MacroPoint Azure Resource Explorer — back to the resource list">
+            MacroPoint Azure Resource Explorer
+        </MudLink>
+        <MudSpacer />
+    </MudAppBar>
+
+    <MudMainContent Class="rm-main">
+        <MudContainer MaxWidth="MaxWidth.False" Class="px-8 pt-2 pb-4" Style="height:100%;">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    /// <summary>
+    /// Menu label for the domain-vocabulary screen. The route is fixed (/domains) but the wording comes
+    /// from the domain tag's DisplayName, so a deployment that calls it "Subscription" gets
+    /// "Subscriptions" in the menu, on the page and in the editor from one source — the drift PL-33
+    /// fixed inside the editor, applied to navigation too. "Domains" is only the fallback: shown while
+    /// the dictionary is still loading, or when no domain tag is designated at all.
+    /// </summary>
+    private string _domainsLabel = "Domains";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Best-effort: a failure here must not take the whole layout (and therefore every page) down,
+        // so the label simply stays at its fallback.
+        try
+        {
+            var tags = await ResourceService.GetTagDictionaryAsync(CancellationToken.None);
+            var label = tags.IsSuccess()
+                ? tags.ApiResponse.Data?.FirstOrDefault(t => t.IsDomainTag)?.DisplayName
+                : null;
+
+            if (!string.IsNullOrWhiteSpace(label))
+                _domainsLabel = label!.EndsWith("s", StringComparison.OrdinalIgnoreCase) ? label : label + "s";
+        }
+        catch
+        {
+            // keep the fallback
+        }
+    }
+
+    // Modern, lightweight, professional light theme (slate neutrals + restrained blue accent).
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#2563EB",
+            Secondary = "#64748B",
+            Background = "#F8FAFC",
+            Surface = "#FFFFFF",
+            AppbarBackground = "#FFFFFF",
+            AppbarText = "#1E293B",
+            TextPrimary = "#1E293B",
+            TextSecondary = "#64748B",
+            Divider = "#E2E8F0",
+            DrawerBackground = "#FFFFFF",
+            ActionDefault = "#64748B"
+        },
+        LayoutProperties = new LayoutProperties
+        {
+            DefaultBorderRadius = "8px"
+        },
+        // azure-ux-design-v1 step 1, layer 1 (MudTheme in C# — the most upgrade-safe lever).
+        // The density table asks for ~11.5px labels / ~12.5px field text / ~10.5px helper. Field
+        // HEIGHT is padding-driven and stays at Mud's 40px dense floor (§4a finding 1) — this only
+        // sets the type scale.
+        //
+        // MEASURED ADDENDUM to §4a: there is NO layer-1 lever for field text either.
+        // `Typography.Input` does not exist in MudBlazor 9 (CS0117), and §4a already found the
+        // `--mud-typography-input-size` variable inert. Field text is therefore set in layer 2,
+        // scoped to .rm-form-field in app.css. Inputs otherwise inherit Default.
+        Typography = new Typography
+        {
+            Default = new DefaultTypography { FontSize = ".8125rem" },   // 13px base
+            Body1 = new Body1Typography { FontSize = ".8125rem" },
+            Body2 = new Body2Typography { FontSize = ".75rem" },         // 12px
+            Caption = new CaptionTypography { FontSize = ".6875rem" },   // 11px helper/meta
+            Subtitle2 = new Subtitle2Typography { FontSize = ".8125rem", FontWeight = "600" },
+            Button = new ButtonTypography { FontSize = ".75rem" }
+        }
+    };
+}

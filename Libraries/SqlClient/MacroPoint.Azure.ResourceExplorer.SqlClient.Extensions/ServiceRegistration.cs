@@ -1,0 +1,25 @@
+﻿using MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions.Abstractions;
+using MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions.Abstractions.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
+// ReSharper disable InconsistentNaming
+
+namespace MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions
+{
+    public static class ServiceRegistration
+    {
+        public static IServiceCollection AddHTSqlClient(this IServiceCollection services, string rwConnectionString, string roConnectionString, DbConnectorOptions options)
+        {
+            services.TryAddSingleton<IDbConnector>(new DbConnector(rwConnectionString, roConnectionString, options));
+
+            return services;
+        }
+        public static IServiceCollection AddHTSqlClient(this IServiceCollection services, string connectionString, DbConnectorOptions options)
+        {
+            services.TryAddSingleton<IDbConnector>(new DbConnector(connectionString, options));
+
+            return services;
+        }
+    }
+}

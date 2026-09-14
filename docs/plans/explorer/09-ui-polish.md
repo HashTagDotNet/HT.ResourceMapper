@@ -226,7 +226,7 @@ Executed 2026-07-19/20. All three changes applied verbatim per the plan, with on
   slice), so there's nowhere to zoom further in until zoomed out first. Not a regression.
 
 `dotnet build` clean (sqlproj MSB4278 aside); `dotnet test` 410 total / 408 passed / 2 failed (the 2
-pre-existing unrelated `HT.Api.Service.Contracts.Tests` failures). Browser-driven via Playwright
+pre-existing unrelated `MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.Tests` failures). Browser-driven via Playwright
 against `/explore/DEMOEXP-checkout` (demo data already seeded in localdb).
 
 Slice #9 (pass 1) done. Slice #10 (client settings migration) next.

@@ -15,9 +15,9 @@
 - **Do not upgrade Moq (4.18.4) or FluentAssertions (7.1.0).** Pinned deliberately.
 - **Central Package Management** — all NuGet versions live in `Directory.Packages.props`; never put `Version=` in a `.csproj`.
 - **Test conventions** (`test-conventions.md`): `MethodName_StateUnderTest_ExpectedBehavior` naming with no "Should" prefix; `// ReSharper disable InconsistentNaming` at the top of every test file; `[Trait]` at class level only, using the hierarchical namespace form; `[Trait("Category", "Unit")]` always present; Arrange-Act-Assert; helper methods in a `#region` at the bottom; **every FluentAssertions call takes a `because` clause**.
-- **The SQL project is old-style SSDT.** `dotnet build` does **not** build it. Apply SQL to `(localdb)\MSSQLLocalDB\ResourceMapper` with `sqlcmd`, and add every new `.sql` file to `HTResourceMapperDb.sqlproj` as a `<Build Include=...>` item.
-- **Stop the running app before `dotnet build`** — it locks `ResourceMapper.UI.Web.exe`. Symptom is `MSB3027 ... file is locked by`.
-- **Run the app as:** `ASPNETCORE_ENVIRONMENT=localhost ASPNETCORE_URLS="http://localhost:5200" dotnet run --project UI/ResourceMapper.UI.Web --no-launch-profile`
+- **The SQL project is old-style SSDT.** `dotnet build` does **not** build it. Apply SQL to `(localdb)\MSSQLLocalDB\ResourceExplorer` with `sqlcmd`, and add every new `.sql` file to `MacroPoint.Azure.ResourceExplorer.Db.sqlproj` as a `<Build Include=...>` item.
+- **Stop the running app before `dotnet build`** — it locks `MacroPoint.Azure.ResourceExplorer.UI.Web.exe`. Symptom is `MSB3027 ... file is locked by`.
+- **Run the app as:** `ASPNETCORE_ENVIRONMENT=localhost ASPNETCORE_URLS="http://localhost:5200" dotnet run --project UI/MacroPoint.Azure.ResourceExplorer.UI.Web --no-launch-profile`
 - **UI titles are Title Case** — "Manage Saved Views", not "Manage saved views".
 - **Browser-verify UI changes.** `dotnet build` passing is not evidence a UI change works; drive it with `tools/e2e` helpers. Do not commit ad-hoc drive scripts.
 - **`sqlcmd` needs Windows-style paths** from Git Bash (`Database\...`), and `SET QUOTED_IDENTIFIER ON;`.
@@ -36,21 +36,21 @@
 
 | File | Responsibility |
 |---|---|
-| `Modules/Common/ResourceMapper.Common.Server/Identity/ICurrentIdentity.cs` | The seam — one property, `OwnerId` |
-| `Modules/Common/ResourceMapper.Common.Server/Identity/ConfiguredIdentity.cs` | Config-backed single owner |
-| `Database/HTResourceMapperDb/Tables/SavedView.sql` | The table |
-| `Database/HTResourceMapperDb/User Defined Types/SavedViewOrderList.sql` | TVP for reorder |
-| `Database/HTResourceMapperDb/Stored Procedures/SavedView_{Upsert,ListForOwner,Delete,SetDefault,Reorder}.sql` | CRUD |
-| `Modules/Common/ResourceMapper.Common.Shared/SavedViews/SavedViewModel.cs` | The DTO the UI binds to |
-| `Modules/Common/ResourceMapper.Common.Shared/SavedViews/Contracts/SaveViewRequest.cs` | Save/Save As payload |
-| `Modules/Common/ResourceMapper.Common.Server/SavedViews/Interfaces/ISavedViewRepository.cs` | Data contract |
-| `Modules/Common/ResourceMapper.Common.Server/SavedViews/Interfaces/ISavedViewService.cs` | Service contract |
-| `Modules/Common/ResourceMapper.Common.Server/SavedViews/SavedViewSqlRepository.cs` | Sproc calls |
-| `Modules/Common/ResourceMapper.Common.Server/SavedViews/SavedViewService.cs` | Validation + orchestration |
-| `UI/ResourceMapper.UI.Web/Components/Layout/SavedViewsMenu.razor` | The hamburger submenu |
-| `UI/ResourceMapper.UI.Web/Components/SavedViews/SaveViewDialog.razor` | Name prompt for Save As |
-| `UI/ResourceMapper.UI.Web/Components/Pages/SavedViews.razor` | The manage page |
-| `UI/ResourceMapper.UI.Web/Controllers/Api/SavedViewsController.cs` | HTTP API for all five operations |
+| `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Identity/ICurrentIdentity.cs` | The seam — one property, `OwnerId` |
+| `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Identity/ConfiguredIdentity.cs` | Config-backed single owner |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/Tables/SavedView.sql` | The table |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/User Defined Types/SavedViewOrderList.sql` | TVP for reorder |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/SavedView_{Upsert,ListForOwner,Delete,SetDefault,Reorder}.sql` | CRUD |
+| `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Shared/SavedViews/SavedViewModel.cs` | The DTO the UI binds to |
+| `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Shared/SavedViews/Contracts/SaveViewRequest.cs` | Save/Save As payload |
+| `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/SavedViews/Interfaces/ISavedViewRepository.cs` | Data contract |
+| `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/SavedViews/Interfaces/ISavedViewService.cs` | Service contract |
+| `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/SavedViews/SavedViewSqlRepository.cs` | Sproc calls |
+| `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/SavedViews/SavedViewService.cs` | Validation + orchestration |
+| `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Layout/SavedViewsMenu.razor` | The hamburger submenu |
+| `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/SavedViews/SaveViewDialog.razor` | Name prompt for Save As |
+| `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Pages/SavedViews.razor` | The manage page |
+| `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Controllers/Api/SavedViewsController.cs` | HTTP API for all five operations |
 | `_Tests/.../Identity/ConfiguredIdentityTests.cs` | Seam tests |
 | `_Tests/.../SavedViews/SavedViewServiceTests.cs` | Service tests |
 | `tools/e2e/tests/saved-views.spec.js` | End-to-end round trip |
@@ -59,48 +59,48 @@
 
 | File | Change |
 |---|---|
-| `Database/HTResourceMapperDb/Tables/{ClientSetting,Diagram}.sql` | `ClientId` → `OwnerId` |
-| `Database/HTResourceMapperDb/Stored Procedures/{ClientSetting_*,Diagram_*}.sql` | `@ClientId` → `@OwnerId` |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/Tables/{ClientSetting,Diagram}.sql` | `ClientId` → `OwnerId` |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/{ClientSetting_*,Diagram_*}.sql` | `@ClientId` → `@OwnerId` |
 | `Modules/Common/.../Settings/ClientSettingsSqlRepository.cs`, `.../Explorer/DiagramSqlRepository.cs` | Parameter rename |
 | `Modules/Common/.../Utils/DependencyRegistration.cs` | Register identity + saved views |
-| `UI/ResourceMapper.UI.Web/Components/Pages/Home.razor` | Startup resolution, menu wiring |
-| `UI/ResourceMapper.UI.Web/Components/Pages/ResourceExplorer.razor` | Use `ICurrentIdentity`; delete the client-id chip |
-| `UI/ResourceMapper.UI.Web/Components/Layout/MainLayout.razor` | Add the submenu |
-| `UI/ResourceMapper.UI.Web/Explorer/ClientIdentity.cs` | **Deleted** |
-| `Database/HTResourceMapperDb/HTResourceMapperDb.sqlproj` | `<Build Include>` for every new `.sql` |
+| `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Pages/Home.razor` | Startup resolution, menu wiring |
+| `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Pages/ResourceExplorer.razor` | Use `ICurrentIdentity`; delete the client-id chip |
+| `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Layout/MainLayout.razor` | Add the submenu |
+| `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Explorer/ClientIdentity.cs` | **Deleted** |
+| `Database/MacroPoint.Azure.ResourceExplorer.Db/MacroPoint.Azure.ResourceExplorer.Db.sqlproj` | `<Build Include>` for every new `.sql` |
 
 ---
 
 ### Task 1: The identity seam
 
 **Files:**
-- Create: `Modules/Common/ResourceMapper.Common.Server/Identity/ICurrentIdentity.cs`
-- Create: `Modules/Common/ResourceMapper.Common.Server/Identity/ConfiguredIdentity.cs`
-- Create: `_Tests/Common/Server/ResourceMapper.Common.Server.Tests/Identity/ConfiguredIdentityTests.cs`
-- Modify: `Modules/Common/ResourceMapper.Common.Server/Utils/DependencyRegistration.cs`
+- Create: `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Identity/ICurrentIdentity.cs`
+- Create: `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Identity/ConfiguredIdentity.cs`
+- Create: `_Tests/Common/Server/MacroPoint.Azure.ResourceExplorer.Common.Server.Tests/Identity/ConfiguredIdentityTests.cs`
+- Modify: `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Utils/DependencyRegistration.cs`
 
 **Interfaces:**
-- Consumes: `IConfiguration`, and `GetString` from `HT.Microsoft.IConfiguration.Extensions`.
+- Consumes: `IConfiguration`, and `GetString` from `MacroPoint.Azure.ResourceExplorer.Configuration.Extensions`.
 - Produces: `ICurrentIdentity.OwnerId` (a non-empty `string`). Every later task uses this instead of a client id.
 
 - [ ] **Step 1: Write the failing test**
 
-`_Tests/Common/Server/ResourceMapper.Common.Server.Tests/Identity/ConfiguredIdentityTests.cs`:
+`_Tests/Common/Server/MacroPoint.Azure.ResourceExplorer.Common.Server.Tests/Identity/ConfiguredIdentityTests.cs`:
 
 ```csharp
 // ReSharper disable InconsistentNaming
 
 using Microsoft.Extensions.Configuration;
-using ResourceMapper.Common.Server.Identity;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Identity;
 
-namespace ResourceMapper.Common.Server.Tests.Identity
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Identity
 {
     [Trait("Category", "Unit")]
-    [Trait("Category", "ResourceMapper")]
-    [Trait("Category", "ResourceMapper/Common")]
-    [Trait("Category", "ResourceMapper/Common/Server")]
-    [Trait("Category", "ResourceMapper/Common/Server/Identity")]
-    [Trait("Category", "ResourceMapper/Common/Server/Identity/ConfiguredIdentity")]
+    [Trait("Category", "ResourceExplorer")]
+    [Trait("Category", "ResourceExplorer/Common")]
+    [Trait("Category", "ResourceExplorer/Common/Server")]
+    [Trait("Category", "ResourceExplorer/Common/Server/Identity")]
+    [Trait("Category", "ResourceExplorer/Common/Server/Identity/ConfiguredIdentity")]
     public class ConfiguredIdentityTests
     {
         [Fact]
@@ -133,7 +133,7 @@ namespace ResourceMapper.Common.Server.Tests.Identity
         private static IConfiguration Config(string? ownerId)
         {
             var values = new Dictionary<string, string?>();
-            if (ownerId is not null) values["ResourceMapper:Identity:OwnerId"] = ownerId;
+            if (ownerId is not null) values["MacroPoint:Azure:ResourceExplorer:Identity:OwnerId"] = ownerId;
             return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
         }
 
@@ -152,7 +152,7 @@ Expected: FAIL — `ConfiguredIdentity` does not exist (compile error).
 `ICurrentIdentity.cs`:
 
 ```csharp
-namespace ResourceMapper.Common.Server.Identity
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Identity
 {
     /// <summary>
     /// Who owns the personal artefacts: saved views, explorer diagrams, grid settings.
@@ -172,16 +172,16 @@ namespace ResourceMapper.Common.Server.Identity
 ```csharp
 using Microsoft.Extensions.Configuration;
 
-namespace ResourceMapper.Common.Server.Identity
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Identity
 {
     /// <summary>
-    /// Single-owner identity, read from ResourceMapper:Identity:OwnerId. Falls back to
+    /// Single-owner identity, read from MacroPoint:Azure:ResourceExplorer:Identity:OwnerId. Falls back to
     /// 'anonymous' when unset, which is accurate: every request really is the same person until
     /// an identity provider exists.
     /// </summary>
     public class ConfiguredIdentity : ICurrentIdentity
     {
-        public const string ConfigKey = "ResourceMapper:Identity:OwnerId";
+        public const string ConfigKey = "MacroPoint:Azure:ResourceExplorer:Identity:OwnerId";
         public const string DefaultOwnerId = "anonymous";
 
         public ConfiguredIdentity(IConfiguration configuration)
@@ -213,7 +213,7 @@ Expected: PASS, 3 tests.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Modules/Common/ResourceMapper.Common.Server/Identity _Tests/Common/Server/ResourceMapper.Common.Server.Tests/Identity Modules/Common/ResourceMapper.Common.Server/Utils/DependencyRegistration.cs
+git add Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Identity _Tests/Common/Server/MacroPoint.Azure.ResourceExplorer.Common.Server.Tests/Identity Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Utils/DependencyRegistration.cs
 git commit -m "feat(identity): single configured owner behind ICurrentIdentity"
 ```
 
@@ -224,11 +224,11 @@ git commit -m "feat(identity): single configured owner behind ICurrentIdentity"
 Diagrams and grid settings currently key on a per-browser GUID. This moves them onto `ICurrentIdentity` so there is one identity model, and deletes the UI that existed to work around not having one.
 
 **Files:**
-- Modify: `Database/HTResourceMapperDb/Tables/ClientSetting.sql`, `Tables/Diagram.sql`
-- Modify: `Database/HTResourceMapperDb/Stored Procedures/ClientSetting_Get.sql`, `ClientSetting_Upsert.sql`, `Diagram_Upsert.sql`, `Diagram_Delete.sql`, `Diagram_ListForClient.sql`
+- Modify: `Database/MacroPoint.Azure.ResourceExplorer.Db/Tables/ClientSetting.sql`, `Tables/Diagram.sql`
+- Modify: `Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/ClientSetting_Get.sql`, `ClientSetting_Upsert.sql`, `Diagram_Upsert.sql`, `Diagram_Delete.sql`, `Diagram_ListForClient.sql`
 - Modify: `Modules/Common/.../Settings/ClientSettingsSqlRepository.cs`, `Settings/ClientSettingsService.cs` (+ their interfaces), `Explorer/DiagramSqlRepository.cs`, `Explorer/DiagramService.cs` (+ interfaces)
-- Modify: `UI/ResourceMapper.UI.Web/Components/Pages/Home.razor`, `Components/Pages/ResourceExplorer.razor`
-- Delete: `UI/ResourceMapper.UI.Web/Explorer/ClientIdentity.cs`
+- Modify: `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Pages/Home.razor`, `Components/Pages/ResourceExplorer.razor`
+- Delete: `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Explorer/ClientIdentity.cs`
 - Modify: `_Tests/.../Explorer/DiagramServiceTests.cs` (parameter renames)
 
 **Interfaces:**
@@ -244,16 +244,16 @@ Leave `ShareId` alone — it is a share token, not an owner.
 
 - [ ] **Step 2: Rename `Diagram_ListForClient` and update all five procedures**
 
-`git mv "Database/HTResourceMapperDb/Stored Procedures/Diagram_ListForClient.sql" "Database/HTResourceMapperDb/Stored Procedures/Diagram_ListForOwner.sql"`, rename the procedure inside it, then replace `@ClientId` with `@OwnerId` and `ClientId` with `OwnerId` throughout all five procedure files. Update the `<Build Include>` entry for the renamed file in `HTResourceMapperDb.sqlproj`.
+`git mv "Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/Diagram_ListForClient.sql" "Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/Diagram_ListForOwner.sql"`, rename the procedure inside it, then replace `@ClientId` with `@OwnerId` and `ClientId` with `OwnerId` throughout all five procedure files. Update the `<Build Include>` entry for the renamed file in `MacroPoint.Azure.ResourceExplorer.Db.sqlproj`.
 
 - [ ] **Step 3: Apply to localdb**
 
 Because these are `CREATE PROCEDURE` scripts, apply them with `CREATE OR ALTER`, and the tables with explicit `sp_rename`:
 
 ```bash
-sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceMapper -Q "SET QUOTED_IDENTIFIER ON;
-EXEC sp_rename 'HTResourceMapper.ClientSetting.ClientId', 'OwnerId', 'COLUMN';
-EXEC sp_rename 'HTResourceMapper.Diagram.ClientId', 'OwnerId', 'COLUMN';"
+sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceExplorer -Q "SET QUOTED_IDENTIFIER ON;
+EXEC sp_rename 'ResourceExplorer.ClientSetting.ClientId', 'OwnerId', 'COLUMN';
+EXEC sp_rename 'ResourceExplorer.Diagram.ClientId', 'OwnerId', 'COLUMN';"
 ```
 
 Then apply each procedure file with its `CREATE PROCEDURE` swapped to `CREATE OR ALTER PROCEDURE`.
@@ -264,11 +264,11 @@ Rename the `clientId` parameter to `ownerId` in `IClientSettingsRepository`, `IC
 
 - [ ] **Step 5: Switch the call sites and delete the workaround UI**
 
-In `Home.razor` and `ResourceExplorer.razor`: `@inject ICurrentIdentity Identity`, replace `_clientId = await ClientIdentity.GetOrCreateAsync(JS);` with `_clientId = Identity.OwnerId;` (rename the field to `_ownerId`), and delete the `using ResourceMapper.UI.Web.Explorer;` import.
+In `Home.razor` and `ResourceExplorer.razor`: `@inject ICurrentIdentity Identity`, replace `_clientId = await ClientIdentity.GetOrCreateAsync(JS);` with `_clientId = Identity.OwnerId;` (rename the field to `_ownerId`), and delete the `using MacroPoint.Azure.ResourceExplorer.UI.Web.Explorer;` import.
 
 In `ResourceExplorer.razor`, delete the client-id block at `:71` — the `Client: xxxxxxxx…` caption, its `MudTooltip`/copy button, and the `CopyClientIdAsync` method. It exists only to carry a browser id to another browser, which is the problem being removed.
 
-Delete `UI/ResourceMapper.UI.Web/Explorer/ClientIdentity.cs`.
+Delete `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Explorer/ClientIdentity.cs`.
 
 - [ ] **Step 6: Fix the diagram service tests**
 
@@ -297,7 +297,7 @@ git commit -m "refactor(identity): key settings and diagrams on OwnerId, drop th
 The whole UI depends on a `MudMenu` nested inside the hamburger `MudMenu`. MudBlazor 9.5 supports it, but nothing in this codebase does it yet. Prove it before building on it — if it does not work, the design changes to a flyout or a dedicated page and the later tasks change shape.
 
 **Files:**
-- Modify: `UI/ResourceMapper.UI.Web/Components/Layout/MainLayout.razor`
+- Modify: `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Layout/MainLayout.razor`
 
 **Interfaces:**
 - Produces: a confirmed-working submenu structure the Task 8 component copies.
@@ -316,7 +316,7 @@ In `MainLayout.razor`, inside the existing `MudMenu` and after the `Import…` i
 
 - [ ] **Step 2: Build and drive it**
 
-Stop the app, `dotnet build UI/ResourceMapper.UI.Web`, restart, then open the hamburger and hover `Saved Views` in a real browser.
+Stop the app, `dotnet build UI/MacroPoint.Azure.ResourceExplorer.UI.Web`, restart, then open the hamburger and hover `Saved Views` in a real browser.
 
 Expected: the submenu opens beside the parent, both spike items are visible and clickable, and the parent menu does not close when moving onto the submenu.
 
@@ -344,7 +344,7 @@ Remove the two spike items; leave the `MudMenu` shell in place for Task 6.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add UI/ResourceMapper.UI.Web/Components/Layout/MainLayout.razor
+git add UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Layout/MainLayout.razor
 git commit -m "chore(nav): add the Saved Views submenu shell"
 ```
 
@@ -353,12 +353,12 @@ git commit -m "chore(nav): add the Saved Views submenu shell"
 ### Task 4: The table and the reorder type
 
 **Files:**
-- Create: `Database/HTResourceMapperDb/Tables/SavedView.sql`
-- Create: `Database/HTResourceMapperDb/User Defined Types/SavedViewOrderList.sql`
-- Modify: `Database/HTResourceMapperDb/HTResourceMapperDb.sqlproj`
+- Create: `Database/MacroPoint.Azure.ResourceExplorer.Db/Tables/SavedView.sql`
+- Create: `Database/MacroPoint.Azure.ResourceExplorer.Db/User Defined Types/SavedViewOrderList.sql`
+- Modify: `Database/MacroPoint.Azure.ResourceExplorer.Db/MacroPoint.Azure.ResourceExplorer.Db.sqlproj`
 
 **Interfaces:**
-- Produces: `[HTResourceMapper].[SavedView]` and `[HTResourceMapper].[SavedViewOrderList]`, both consumed by Task 5.
+- Produces: `[ResourceExplorer].[SavedView]` and `[ResourceExplorer].[SavedViewOrderList]`, both consumed by Task 5.
 
 - [ ] **Step 1: Write the table**
 
@@ -367,7 +367,7 @@ git commit -m "chore(nav): add the Saved Views submenu shell"
 -- '?n=...&s=...&f=...' payload and is OPAQUE to the server -- it is never parsed here, exactly as
 -- Diagram.DiagramJson is not. That is why the filter format can change without a migration.
 -- NVARCHAR(MAX) is deliberate: four filters over high-cardinality tags already exceed 2000 chars.
-CREATE TABLE [HTResourceMapper].[SavedView]
+CREATE TABLE [ResourceExplorer].[SavedView]
 (
     [SavedViewId] INT NOT NULL IDENTITY(1,1)
         CONSTRAINT [PK_SavedView_SavedViewId] PRIMARY KEY (SavedViewId)
@@ -388,12 +388,12 @@ CREATE TABLE [HTResourceMapper].[SavedView]
 GO
 -- The menu lists an owner's views on every page load.
 CREATE NONCLUSTERED INDEX [IX_SavedView_OwnerId]
-    ON [HTResourceMapper].[SavedView] ([OwnerId]);
+    ON [ResourceExplorer].[SavedView] ([OwnerId]);
 GO
 -- At most one default per owner, enforced by the database rather than by code remembering to
 -- clear the previous one. Same pattern as UX_ResourceTypeTag_DefaultPrimary.
 CREATE UNIQUE NONCLUSTERED INDEX [UX_SavedView_Default]
-    ON [HTResourceMapper].[SavedView] ([OwnerId])
+    ON [ResourceExplorer].[SavedView] ([OwnerId])
     WHERE [IsDefault] = 1;
 ```
 
@@ -401,7 +401,7 @@ CREATE UNIQUE NONCLUSTERED INDEX [UX_SavedView_Default]
 
 ```sql
 -- One row per view, carrying its new position. Lets a drag commit in a single round trip.
-CREATE TYPE [HTResourceMapper].[SavedViewOrderList] AS TABLE
+CREATE TYPE [ResourceExplorer].[SavedViewOrderList] AS TABLE
 (
     [SavedViewUid] VARCHAR(40) NOT NULL,
     [SortOrder]    INT         NOT NULL
@@ -410,7 +410,7 @@ CREATE TYPE [HTResourceMapper].[SavedViewOrderList] AS TABLE
 
 - [ ] **Step 3: Register both in the project**
 
-Add to `HTResourceMapperDb.sqlproj` beside the other `<Build Include>` items:
+Add to `MacroPoint.Azure.ResourceExplorer.Db.sqlproj` beside the other `<Build Include>` items:
 
 ```xml
 <Build Include="Tables\SavedView.sql" />
@@ -420,21 +420,21 @@ Add to `HTResourceMapperDb.sqlproj` beside the other `<Build Include>` items:
 - [ ] **Step 4: Apply to localdb and verify the default constraint bites**
 
 ```bash
-sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceMapper -i "Database\HTResourceMapperDb\Tables\SavedView.sql"
-sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceMapper -i "Database\HTResourceMapperDb\User Defined Types\SavedViewOrderList.sql"
-sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceMapper -Q "SET QUOTED_IDENTIFIER ON;
-INSERT INTO HTResourceMapper.SavedView (SavedViewUid, OwnerId, Name, QueryString, IsDefault)
+sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceExplorer -i "Database\MacroPoint.Azure.ResourceExplorer.Db\Tables\SavedView.sql"
+sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceExplorer -i "Database\MacroPoint.Azure.ResourceExplorer.Db\User Defined Types\SavedViewOrderList.sql"
+sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceExplorer -Q "SET QUOTED_IDENTIFIER ON;
+INSERT INTO ResourceExplorer.SavedView (SavedViewUid, OwnerId, Name, QueryString, IsDefault)
 VALUES ('sv-t1','t','A','?n=100',1),('sv-t2','t','B','?n=100',1);"
 ```
 
 Expected: the second row is REJECTED with a duplicate key error on `UX_SavedView_Default`. That failure is the proof the constraint works.
 
-Then clean up: `sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceMapper -Q "DELETE FROM HTResourceMapper.SavedView WHERE OwnerId='t';"`
+Then clean up: `sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceExplorer -Q "DELETE FROM ResourceExplorer.SavedView WHERE OwnerId='t';"`
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Database/HTResourceMapperDb
+git add Database/MacroPoint.Azure.ResourceExplorer.Db
 git commit -m "feat(db): SavedView table and reorder table type"
 ```
 
@@ -443,8 +443,8 @@ git commit -m "feat(db): SavedView table and reorder table type"
 ### Task 5: The stored procedures
 
 **Files:**
-- Create: `Database/HTResourceMapperDb/Stored Procedures/SavedView_Upsert.sql`, `SavedView_ListForOwner.sql`, `SavedView_Delete.sql`, `SavedView_SetDefault.sql`, `SavedView_Reorder.sql`
-- Modify: `Database/HTResourceMapperDb/HTResourceMapperDb.sqlproj`
+- Create: `Database/MacroPoint.Azure.ResourceExplorer.Db/Stored Procedures/SavedView_Upsert.sql`, `SavedView_ListForOwner.sql`, `SavedView_Delete.sql`, `SavedView_SetDefault.sql`, `SavedView_Reorder.sql`
+- Modify: `Database/MacroPoint.Azure.ResourceExplorer.Db/MacroPoint.Azure.ResourceExplorer.Db.sqlproj`
 
 **Interfaces:**
 - Consumes: the table and TVP from Task 4.
@@ -456,7 +456,7 @@ git commit -m "feat(db): SavedView table and reorder table type"
 -- Create or update one saved view. Matches on (SavedViewUid, OwnerId) so an owner can only
 -- update its own rows; a uid owned by someone else is refused rather than blind-inserted into a
 -- unique-key violation. Also serves rename: Name is just another updated column.
-CREATE PROCEDURE [HTResourceMapper].[SavedView_Upsert]
+CREATE PROCEDURE [ResourceExplorer].[SavedView_Upsert]
     @SavedViewUid VARCHAR(40),
     @OwnerId VARCHAR(64),
     @Name NVARCHAR(200),
@@ -467,15 +467,15 @@ BEGIN
 
     DECLARE @Result VARCHAR(10);
 
-    IF EXISTS (SELECT 1 FROM [HTResourceMapper].[SavedView]
+    IF EXISTS (SELECT 1 FROM [ResourceExplorer].[SavedView]
                WHERE SavedViewUid = @SavedViewUid AND OwnerId = @OwnerId)
     BEGIN
-        UPDATE [HTResourceMapper].[SavedView]
+        UPDATE [ResourceExplorer].[SavedView]
         SET Name = @Name, QueryString = @QueryString, UpdatedOn = SYSUTCDATETIME()
         WHERE SavedViewUid = @SavedViewUid AND OwnerId = @OwnerId;
         SET @Result = 'updated';
     END
-    ELSE IF EXISTS (SELECT 1 FROM [HTResourceMapper].[SavedView] WHERE SavedViewUid = @SavedViewUid)
+    ELSE IF EXISTS (SELECT 1 FROM [ResourceExplorer].[SavedView] WHERE SavedViewUid = @SavedViewUid)
     BEGIN
         SET @Result = 'denied';
     END
@@ -483,9 +483,9 @@ BEGIN
     BEGIN
         -- New views land at the end of the owner's list.
         DECLARE @NextOrder INT =
-            ISNULL((SELECT MAX(SortOrder) + 1 FROM [HTResourceMapper].[SavedView] WHERE OwnerId = @OwnerId), 0);
+            ISNULL((SELECT MAX(SortOrder) + 1 FROM [ResourceExplorer].[SavedView] WHERE OwnerId = @OwnerId), 0);
 
-        INSERT INTO [HTResourceMapper].[SavedView] (SavedViewUid, OwnerId, Name, QueryString, SortOrder)
+        INSERT INTO [ResourceExplorer].[SavedView] (SavedViewUid, OwnerId, Name, QueryString, SortOrder)
         VALUES (@SavedViewUid, @OwnerId, @Name, @QueryString, @NextOrder);
         SET @Result = 'created';
     END
@@ -501,14 +501,14 @@ END
 
 ```sql
 -- An owner's saved views, in manual order then by name. Drives both the menu and the manage page.
-CREATE PROCEDURE [HTResourceMapper].[SavedView_ListForOwner]
+CREATE PROCEDURE [ResourceExplorer].[SavedView_ListForOwner]
     @OwnerId VARCHAR(64)
 AS
 BEGIN
     SET NOCOUNT ON;
 
     SELECT SavedViewUid, Name, QueryString, SortOrder, IsDefault, CreatedOn, UpdatedOn
-    FROM [HTResourceMapper].[SavedView] WITH(NOLOCK)
+    FROM [ResourceExplorer].[SavedView] WITH(NOLOCK)
     WHERE OwnerId = @OwnerId
     ORDER BY SortOrder, Name;
 END
@@ -519,14 +519,14 @@ END
 ```sql
 -- Delete one of the owner's views. Deleting the default simply leaves the owner with none, which
 -- the grid treats as "fall back to the resume setting".
-CREATE PROCEDURE [HTResourceMapper].[SavedView_Delete]
+CREATE PROCEDURE [ResourceExplorer].[SavedView_Delete]
     @OwnerId VARCHAR(64),
     @SavedViewUid VARCHAR(40)
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    DELETE FROM [HTResourceMapper].[SavedView]
+    DELETE FROM [ResourceExplorer].[SavedView]
     WHERE OwnerId = @OwnerId AND SavedViewUid = @SavedViewUid;
 
     SELECT @@ROWCOUNT AS DeletedCount;
@@ -540,7 +540,7 @@ END
 -- The clear MUST happen before the set: UX_SavedView_Default permits only one IsDefault=1 row per
 -- owner, so doing it the other way round violates the index. Both statements are in one
 -- transaction so a failure cannot leave the owner with no default when they asked for one.
-CREATE PROCEDURE [HTResourceMapper].[SavedView_SetDefault]
+CREATE PROCEDURE [ResourceExplorer].[SavedView_SetDefault]
     @OwnerId VARCHAR(64),
     @SavedViewUid VARCHAR(40) = NULL
 AS
@@ -550,12 +550,12 @@ BEGIN
 
     BEGIN TRANSACTION;
 
-        UPDATE [HTResourceMapper].[SavedView]
+        UPDATE [ResourceExplorer].[SavedView]
         SET IsDefault = 0, UpdatedOn = SYSUTCDATETIME()
         WHERE OwnerId = @OwnerId AND IsDefault = 1;
 
         IF @SavedViewUid IS NOT NULL
-            UPDATE [HTResourceMapper].[SavedView]
+            UPDATE [ResourceExplorer].[SavedView]
             SET IsDefault = 1, UpdatedOn = SYSUTCDATETIME()
             WHERE OwnerId = @OwnerId AND SavedViewUid = @SavedViewUid;
 
@@ -568,16 +568,16 @@ END
 ```sql
 -- Apply a whole new ordering in one round trip. Rows not named in @Order are left alone, and uids
 -- belonging to another owner are ignored by the join rather than erroring.
-CREATE PROCEDURE [HTResourceMapper].[SavedView_Reorder]
+CREATE PROCEDURE [ResourceExplorer].[SavedView_Reorder]
     @OwnerId VARCHAR(64),
-    @Order [HTResourceMapper].[SavedViewOrderList] READONLY
+    @Order [ResourceExplorer].[SavedViewOrderList] READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
 
     UPDATE sv
     SET SortOrder = o.SortOrder, UpdatedOn = SYSUTCDATETIME()
-    FROM [HTResourceMapper].[SavedView] sv
+    FROM [ResourceExplorer].[SavedView] sv
     INNER JOIN @Order o ON o.SavedViewUid = sv.SavedViewUid
     WHERE sv.OwnerId = @OwnerId;
 
@@ -592,12 +592,12 @@ Add a `<Build Include="Stored Procedures\SavedView_*.sql" />` line per file, the
 - [ ] **Step 7: Verify the default switch by hand**
 
 ```bash
-sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceMapper -Q "SET QUOTED_IDENTIFIER ON;
-EXEC HTResourceMapper.SavedView_Upsert 'sv-a','t','A','?n=100';
-EXEC HTResourceMapper.SavedView_Upsert 'sv-b','t','B','?n=100';
-EXEC HTResourceMapper.SavedView_SetDefault 't','sv-a';
-EXEC HTResourceMapper.SavedView_SetDefault 't','sv-b';
-SELECT Name, IsDefault, SortOrder FROM HTResourceMapper.SavedView WHERE OwnerId='t' ORDER BY SortOrder;"
+sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceExplorer -Q "SET QUOTED_IDENTIFIER ON;
+EXEC ResourceExplorer.SavedView_Upsert 'sv-a','t','A','?n=100';
+EXEC ResourceExplorer.SavedView_Upsert 'sv-b','t','B','?n=100';
+EXEC ResourceExplorer.SavedView_SetDefault 't','sv-a';
+EXEC ResourceExplorer.SavedView_SetDefault 't','sv-b';
+SELECT Name, IsDefault, SortOrder FROM ResourceExplorer.SavedView WHERE OwnerId='t' ORDER BY SortOrder;"
 ```
 
 Expected: exactly one row with `IsDefault = 1`, and it is B. `SortOrder` is 0 then 1. Then delete the `OwnerId='t'` rows.
@@ -605,7 +605,7 @@ Expected: exactly one row with `IsDefault = 1`, and it is B. `SortOrder` is 0 th
 - [ ] **Step 8: Commit**
 
 ```bash
-git add Database/HTResourceMapperDb
+git add Database/MacroPoint.Azure.ResourceExplorer.Db
 git commit -m "feat(db): SavedView CRUD stored procedures"
 ```
 
@@ -614,12 +614,12 @@ git commit -m "feat(db): SavedView CRUD stored procedures"
 ### Task 6: Contracts, repository and service
 
 **Files:**
-- Create: `Modules/Common/ResourceMapper.Common.Shared/SavedViews/SavedViewModel.cs`
-- Create: `Modules/Common/ResourceMapper.Common.Shared/SavedViews/Contracts/SaveViewRequest.cs`
-- Create: `Modules/Common/ResourceMapper.Common.Server/SavedViews/Interfaces/ISavedViewRepository.cs`, `Interfaces/ISavedViewService.cs`
-- Create: `Modules/Common/ResourceMapper.Common.Server/SavedViews/SavedViewSqlRepository.cs`, `SavedViewService.cs`
-- Create: `_Tests/Common/Server/ResourceMapper.Common.Server.Tests/SavedViews/SavedViewServiceTests.cs`
-- Modify: `Modules/Common/ResourceMapper.Common.Server/Utils/DependencyRegistration.cs`
+- Create: `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Shared/SavedViews/SavedViewModel.cs`
+- Create: `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Shared/SavedViews/Contracts/SaveViewRequest.cs`
+- Create: `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/SavedViews/Interfaces/ISavedViewRepository.cs`, `Interfaces/ISavedViewService.cs`
+- Create: `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/SavedViews/SavedViewSqlRepository.cs`, `SavedViewService.cs`
+- Create: `_Tests/Common/Server/MacroPoint.Azure.ResourceExplorer.Common.Server.Tests/SavedViews/SavedViewServiceTests.cs`
+- Modify: `Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Utils/DependencyRegistration.cs`
 
 **Interfaces:**
 - Consumes: the procedures from Task 5; `ICurrentIdentity` from Task 1.
@@ -630,7 +630,7 @@ git commit -m "feat(db): SavedView CRUD stored procedures"
 `SavedViewModel.cs`:
 
 ```csharp
-namespace ResourceMapper.Common.Shared.SavedViews
+namespace MacroPoint.Azure.ResourceExplorer.Common.Shared.SavedViews
 {
     /// <summary>One saved grid query, as the UI sees it.</summary>
     public class SavedViewModel
@@ -650,7 +650,7 @@ namespace ResourceMapper.Common.Shared.SavedViews
 `Contracts/SaveViewRequest.cs`:
 
 ```csharp
-namespace ResourceMapper.Common.Shared.SavedViews.Contracts
+namespace MacroPoint.Azure.ResourceExplorer.Common.Shared.SavedViews.Contracts
 {
     /// <summary>
     /// Save or Save As. An empty SavedViewUid means "create"; a populated one means "update that
@@ -667,7 +667,7 @@ namespace ResourceMapper.Common.Shared.SavedViews.Contracts
 
 - [ ] **Step 2: Write the failing service tests**
 
-`_Tests/Common/Server/ResourceMapper.Common.Server.Tests/SavedViews/SavedViewServiceTests.cs`:
+`_Tests/Common/Server/MacroPoint.Azure.ResourceExplorer.Common.Server.Tests/SavedViews/SavedViewServiceTests.cs`:
 
 ```csharp
 // ReSharper disable InconsistentNaming
@@ -676,19 +676,19 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using ResourceMapper.Common.Server.SavedViews;
-using ResourceMapper.Common.Server.SavedViews.Interfaces;
-using ResourceMapper.Common.Shared.SavedViews;
-using ResourceMapper.Common.Shared.SavedViews.Contracts;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.SavedViews;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.SavedViews.Interfaces;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.SavedViews;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.SavedViews.Contracts;
 
-namespace ResourceMapper.Common.Server.Tests.SavedViews
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.SavedViews
 {
     [Trait("Category", "Unit")]
-    [Trait("Category", "ResourceMapper")]
-    [Trait("Category", "ResourceMapper/Common")]
-    [Trait("Category", "ResourceMapper/Common/Server")]
-    [Trait("Category", "ResourceMapper/Common/Server/SavedViews")]
-    [Trait("Category", "ResourceMapper/Common/Server/SavedViews/SavedViewService")]
+    [Trait("Category", "ResourceExplorer")]
+    [Trait("Category", "ResourceExplorer/Common")]
+    [Trait("Category", "ResourceExplorer/Common/Server")]
+    [Trait("Category", "ResourceExplorer/Common/Server/SavedViews")]
+    [Trait("Category", "ResourceExplorer/Common/Server/SavedViews/SavedViewService")]
     public class SavedViewServiceTests
     {
         private readonly Mock<ISavedViewRepository> _repo;
@@ -815,9 +815,9 @@ Expected: FAIL — `SavedViewService` does not exist.
 
 ```csharp
 // ISavedViewRepository.cs
-using ResourceMapper.Common.Shared.SavedViews;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.SavedViews;
 
-namespace ResourceMapper.Common.Server.SavedViews.Interfaces
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.SavedViews.Interfaces
 {
     public interface ISavedViewRepository
     {
@@ -836,11 +836,11 @@ namespace ResourceMapper.Common.Server.SavedViews.Interfaces
 
 ```csharp
 // ISavedViewService.cs
-using HT.Api.Service.Contracts;
-using ResourceMapper.Common.Shared.SavedViews;
-using ResourceMapper.Common.Shared.SavedViews.Contracts;
+using MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.SavedViews;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.SavedViews.Contracts;
 
-namespace ResourceMapper.Common.Server.SavedViews.Interfaces
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.SavedViews.Interfaces
 {
     public interface ISavedViewService
     {
@@ -858,14 +858,14 @@ namespace ResourceMapper.Common.Server.SavedViews.Interfaces
 ```csharp
 public class SavedViewSqlRepository : ISavedViewRepository
 {
-    private const string SavedViewOrderListType = "[HTResourceMapper].[SavedViewOrderList]";
+    private const string SavedViewOrderListType = "[ResourceExplorer].[SavedViewOrderList]";
 
     private readonly IDbConnector _db;
     public SavedViewSqlRepository(IDbConnector db) => _db = db;
 
     public async Task<List<SavedViewModel>> ListAsync(string ownerId, CancellationToken cancellationToken)
     {
-        using var cmd = _db.RO.SprocCommand("[HTResourceMapper].SavedView_ListForOwner")
+        using var cmd = _db.RO.SprocCommand("[ResourceExplorer].SavedView_ListForOwner")
             .AddVarchar("@OwnerId", ownerId);
 
         return await _db.Execute.ExecuteQueryAsync(cmd, dr => new SavedViewModel
@@ -881,7 +881,7 @@ public class SavedViewSqlRepository : ISavedViewRepository
     public async Task<(string Result, string SavedViewUid)> UpsertAsync(
         string ownerId, string savedViewUid, string name, string queryString, CancellationToken cancellationToken)
     {
-        using var cmd = _db.RW.SprocCommand("[HTResourceMapper].SavedView_Upsert")
+        using var cmd = _db.RW.SprocCommand("[ResourceExplorer].SavedView_Upsert")
             .AddVarchar("@SavedViewUid", savedViewUid)
             .AddVarchar("@OwnerId", ownerId)
             .AddNVarchar("@Name", name)
@@ -899,7 +899,7 @@ public class SavedViewSqlRepository : ISavedViewRepository
 
     public async Task<int> DeleteAsync(string ownerId, string savedViewUid, CancellationToken cancellationToken)
     {
-        using var cmd = _db.RW.SprocCommand("[HTResourceMapper].SavedView_Delete")
+        using var cmd = _db.RW.SprocCommand("[ResourceExplorer].SavedView_Delete")
             .AddVarchar("@OwnerId", ownerId)
             .AddVarchar("@SavedViewUid", savedViewUid);
 
@@ -910,7 +910,7 @@ public class SavedViewSqlRepository : ISavedViewRepository
 
     public async Task SetDefaultAsync(string ownerId, string? savedViewUid, CancellationToken cancellationToken)
     {
-        using var cmd = _db.RW.SprocCommand("[HTResourceMapper].SavedView_SetDefault")
+        using var cmd = _db.RW.SprocCommand("[ResourceExplorer].SavedView_SetDefault")
             .AddVarchar("@OwnerId", ownerId)
             .AddVarchar("@SavedViewUid", savedViewUid);   // null clears the default
 
@@ -925,7 +925,7 @@ public class SavedViewSqlRepository : ISavedViewRepository
         for (var i = 0; i < uidsInOrder.Count; i++)
             table.Rows.Add(uidsInOrder[i], i);          // position in the list IS the sort order
 
-        using var cmd = _db.RW.SprocCommand("[HTResourceMapper].SavedView_Reorder")
+        using var cmd = _db.RW.SprocCommand("[ResourceExplorer].SavedView_Reorder")
             .AddVarchar("@OwnerId", ownerId)
             .AddTvp("@Order", SavedViewOrderListType, table);
 
@@ -1015,7 +1015,7 @@ circuit — scripts, another client, or a future front end. The Blazor component
 so the controller is a second caller of the same service, never a layer the UI goes through.
 
 **Files:**
-- Create: `UI/ResourceMapper.UI.Web/Controllers/Api/SavedViewsController.cs`
+- Create: `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Controllers/Api/SavedViewsController.cs`
 
 **Interfaces:**
 - Consumes: `ISavedViewService` (Task 6) and `ICurrentIdentity` (Task 1).
@@ -1033,14 +1033,14 @@ so the controller is a second caller of the same service, never a layer the UI g
 - [ ] **Step 1: Write the controller**
 
 ```csharp
-using HT.Api.Client.Contracts.Models;
+using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Models;
 using Microsoft.AspNetCore.Mvc;
-using ResourceMapper.Common.Server.Identity;
-using ResourceMapper.Common.Server.SavedViews.Interfaces;
-using ResourceMapper.Common.Shared.SavedViews;
-using ResourceMapper.Common.Shared.SavedViews.Contracts;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Identity;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.SavedViews.Interfaces;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.SavedViews;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.SavedViews.Contracts;
 
-namespace ResourceMapper.UI.Web.Controllers.Api;
+namespace MacroPoint.Azure.ResourceExplorer.UI.Web.Controllers.Api;
 
 /// <summary>
 /// CRUD for saved grid views. The owner is resolved server-side from ICurrentIdentity and is
@@ -1117,7 +1117,7 @@ public class SavedViewsController : ApiControllerBase
 
 - [ ] **Step 2: Build**
 
-Stop the app, then `dotnet build UI/ResourceMapper.UI.Web`.
+Stop the app, then `dotnet build UI/MacroPoint.Azure.ResourceExplorer.UI.Web`.
 Expected: `Build succeeded.`
 
 - [ ] **Step 3: Exercise every endpoint against the running app**
@@ -1138,7 +1138,7 @@ succeeds; delete removes it; the final list no longer contains it.
 
 **Deleting a missing uid returns 422, not 404** — that is the pre-existing PL-01 mapping defect
 (`CallStatusCode.NotFound` -> `UnprocessableEntity`), the same one behind the two known failing
-tests in `HT.Api.Service.Contracts`. Not a bug in this controller; do not "fix" it here.
+tests in `MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts`. Not a bug in this controller; do not "fix" it here.
 
 - [ ] **Step 4: Check the validation path returns 400, not 500**
 
@@ -1152,7 +1152,7 @@ Expected: `400`. A 500 means the service threw instead of validating, which is a
 - [ ] **Step 5: Commit**
 
 ```bash
-git add UI/ResourceMapper.UI.Web/Controllers/Api/SavedViewsController.cs
+git add UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Controllers/Api/SavedViewsController.cs
 git commit -m "feat(saved-views): HTTP API for list, save, delete, default and reorder"
 ```
 
@@ -1161,10 +1161,10 @@ git commit -m "feat(saved-views): HTTP API for list, save, delete, default and r
 ### Task 8: The menu
 
 **Files:**
-- Create: `UI/ResourceMapper.UI.Web/Components/Layout/SavedViewsMenu.razor`
-- Create: `UI/ResourceMapper.UI.Web/Components/SavedViews/SaveViewDialog.razor`
-- Modify: `UI/ResourceMapper.UI.Web/Components/Layout/MainLayout.razor`
-- Modify: `UI/ResourceMapper.UI.Web/Components/Pages/Home.razor`
+- Create: `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Layout/SavedViewsMenu.razor`
+- Create: `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/SavedViews/SaveViewDialog.razor`
+- Modify: `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Layout/MainLayout.razor`
+- Modify: `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Pages/Home.razor`
 
 **Interfaces:**
 - Consumes: `ISavedViewService` from Task 6; the submenu structure proven in Task 3.
@@ -1300,7 +1300,7 @@ git commit -m "feat(saved-views): Save, Save As and the view list in the app men
 The riskiest task in this plan. `Home.razor` already gates its startup on `_resumeChecked` so the grid's default initial load cannot overwrite a saved view before the restore runs. Adding a default view makes that a three-way decision.
 
 **Files:**
-- Modify: `UI/ResourceMapper.UI.Web/Components/Pages/Home.razor`
+- Modify: `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Pages/Home.razor`
 
 **Interfaces:**
 - Consumes: `ISavedViewService.ListAsync` from Task 6.
@@ -1374,7 +1374,7 @@ Watch specifically for a default that renders then gets replaced by an unfiltere
 - [ ] **Step 4: Commit**
 
 ```bash
-git add UI/ResourceMapper.UI.Web/Components/Pages/Home.razor
+git add UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Pages/Home.razor
 git commit -m "feat(saved-views): open the default view on a bare URL"
 ```
 
@@ -1383,7 +1383,7 @@ git commit -m "feat(saved-views): open the default view on a bare URL"
 ### Task 10: The manage page
 
 **Files:**
-- Create: `UI/ResourceMapper.UI.Web/Components/Pages/SavedViews.razor`
+- Create: `UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Pages/SavedViews.razor`
 
 **Interfaces:**
 - Consumes: `ISavedViewService` — `ListAsync`, `SaveAsync` (rename), `DeleteAsync`, `SetDefaultAsync`, `ReorderAsync`.
@@ -1417,7 +1417,7 @@ Rename a view, star a different one, reorder two, delete one — then reopen the
 - [ ] **Step 7: Commit**
 
 ```bash
-git add UI/ResourceMapper.UI.Web/Components/Pages/SavedViews.razor
+git add UI/MacroPoint.Azure.ResourceExplorer.UI.Web/Components/Pages/SavedViews.razor
 git commit -m "feat(saved-views): manage page"
 ```
 

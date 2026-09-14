@@ -1,0 +1,47 @@
+<Solution>
+  <Folder Name="/Database/">
+    <Project Path="Database/MacroPoint.Azure.ResourceExplorer.Db/MacroPoint.Azure.ResourceExplorer.Db.sqlproj" Id="3d5ce90e-8f6e-41f1-93f0-f04a394dbb88">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/Libraries/" />
+  <Folder Name="/Libraries/ApiContracts/">
+    <Project Path="Libraries/ApiContracts/MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts/MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.csproj" />
+    <Project Path="Libraries/ApiContracts/MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts/MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/ApiContracts/_Tests/">
+    <Project Path="Libraries/ApiContracts/__Tests/MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Tests/MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Tests.csproj" Id="72111eaa-2191-410a-baad-3ccf59827784" />
+    <Project Path="Libraries/ApiContracts/__Tests/MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.Tests/MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.Tests.csproj" Id="638347df-92c5-4f15-90b5-149fd126467e" />
+  </Folder>
+  <Folder Name="/Libraries/Collections/">
+    <Project Path="Libraries/Collections/MacroPoint.Azure.ResourceExplorer.Collections/MacroPoint.Azure.ResourceExplorer.Collections.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/Configuration/">
+    <Project Path="Libraries/Configuration/MacroPoint.Azure.ResourceExplorer.Configuration.Extensions/MacroPoint.Azure.ResourceExplorer.Configuration.Extensions.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/Logging/">
+    <Project Path="Libraries/Logging/MacroPoint.Azure.ResourceExplorer.Logging.Extensions/MacroPoint.Azure.ResourceExplorer.Logging.Extensions.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/SqlClient/">
+    <Project Path="Libraries/SqlClient/MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions.Abstractions/MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions.Abstractions.csproj" />
+    <Project Path="Libraries/SqlClient/MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions/MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions.csproj" />
+  </Folder>
+  <Folder Name="/Modules/" />
+  <Folder Name="/Modules/Common/">
+    <Project Path="Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/MacroPoint.Azure.ResourceExplorer.Common.Server.csproj" />
+    <Project Path="Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Shared/MacroPoint.Azure.ResourceExplorer.Common.Shared.csproj" />
+  </Folder>
+  <Folder Name="/UI &amp; Hosts/">
+    <Project Path="UI/MacroPoint.Azure.ResourceExplorer.UI.Web/MacroPoint.Azure.ResourceExplorer.UI.Web.csproj" />
+  </Folder>
+  <Folder Name="/_Solution Documents/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/_Tests/">
+    <Project Path="_Tests/Common/Server/MacroPoint.Azure.ResourceExplorer.Common.Server.Tests/MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.csproj" Id="88712550-c467-4d7e-9981-6df973495f58" />
+    <Project Path="_Tests/Common/Shared/MacroPoint.Azure.ResourceExplorer.Common.Shared.Tests/MacroPoint.Azure.ResourceExplorer.Common.Shared.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,7 +1,0 @@
-DELETE HTResourceMapper.ResourceTag
-DELETE HTResourceMapper.ResourceRelationship
-DELETE HTResourceMapper.ResourceTypeTag
-DELETE HTResourceMapper.[Resource]
-DELETE HTResourceMapper.ResourceType
-DELETE HTResourceMapper.TagDefinition
-DELETE HTResourceMapper.TagContentType

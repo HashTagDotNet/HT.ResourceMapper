@@ -27,7 +27,7 @@ resource editor; the explorer links out to it.
 
 ## 2. What this builds on (existing foundation)
 
-- **The data is already a directed graph.** `HTResourceMapper.ResourceRelationship` stores one
+- **The data is already a directed graph.** `ResourceExplorer.ResourceRelationship` stores one
   row per edge (`FromResourceId` = dependent → `ToResourceId` = dependency), unique, with a
   no-self-loop check.
 - **Single-hop reads exist.** `ResourceRelationship_GetForResource` returns a resource's edges
@@ -133,7 +133,7 @@ there is **no transitive traversal** (no recursive CTE). V1 needs neither.
 - **External-link icon → primary URL** — opens the resource's **primary URL-type tag** in a
   **new tab** (the "jump to Azure resource" action). **V1 surfaces the primary URL only**;
   other URL tags are ignored.
-- **Open in Resource Mapper** — opens the resource in the editor/detail view in a **new tab**
+- **Open in Resource Explorer** — opens the resource in the editor/detail view in a **new tab**
   (see §8).
 
 > **Read-model dependency:** the neighbor read currently returns only Key/Name/Type/Domain. To
@@ -152,7 +152,7 @@ Two kinds of action, two homes:
 - **Per-node expand/collapse — inline control on the node** (e.g. a chevron/±). Used constantly,
   so it is visible without a right-click.
 - **Other per-node actions — right-click context menu:** remove node, open external (primary URL),
-  open in Resource Mapper. Keeps nodes visually clean and scales to more actions.
+  open in Resource Explorer. Keeps nodes visually clean and scales to more actions.
 
 **Accepted limitation:** right-click has no clean touch equivalent. V1 is desktop-oriented (an
 internal infrastructure tool); touch is out of scope and revisited only if it matters later.
@@ -203,7 +203,7 @@ internal infrastructure tool); touch is out of scope and revisited only if it ma
 
 ## 8. Editor handoff
 
-- "Open in Resource Mapper" (and the external primary-URL link) **open in a new browser tab**;
+- "Open in Resource Explorer" (and the external primary-URL link) **open in a new browser tab**;
   the diagram tab stays exactly as-is. No save, no prompt, no navigation away — so an arranged
   diagram is never at risk, and "return to diagram" is simply switching back to the untouched tab.
 - **Accepted limitation:** because the editor is a separate tab, edits do **not** live-refresh the

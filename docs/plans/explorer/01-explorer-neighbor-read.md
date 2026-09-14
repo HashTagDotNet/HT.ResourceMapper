@@ -31,7 +31,7 @@ sproc or its models (smaller blast radius; the editor path stays exactly as-is).
 
 ---
 
-## SQL — new sproc (`Database\HTResourceMapperDb\Stored Procedures\`)
+## SQL — new sproc (`Database\MacroPoint.Azure.ResourceExplorer.Db\Stored Procedures\`)
 
 **File:** `Resource_GetForExplorer.sql`
 
@@ -43,20 +43,20 @@ sproc or its models (smaller blast radius; the editor path stays exactly as-is).
 -- tag value, via PrimaryTagDefinitionId) so the canvas can render node content + the external
 -- link without extra calls. Uid-keyed because the canvas never handles internal int ids.
 -- Unknown uid returns an empty set (no 'Self' row) -> the service treats it as NotFound.
-CREATE PROCEDURE [HTResourceMapper].[Resource_GetForExplorer]
+CREATE PROCEDURE [ResourceExplorer].[Resource_GetForExplorer]
     @ResourceUid VARCHAR(40)
 AS
 BEGIN
     SET NOCOUNT ON;
 
     DECLARE @ResourceId INT =
-        (SELECT ResourceId FROM [HTResourceMapper].[Resource] WHERE ResourceUid = @ResourceUid);
+        (SELECT ResourceId FROM [ResourceExplorer].[Resource] WHERE ResourceUid = @ResourceUid);
 
     IF @ResourceId IS NULL
         RETURN;
 
     DECLARE @DomainTagDefId INT =
-        (SELECT TagDefinitionId FROM [HTResourceMapper].[TagDefinition] WHERE IsDomainTag = 1);
+        (SELECT TagDefinitionId FROM [ResourceExplorer].[TagDefinition] WHERE IsDomainTag = 1);
 
     -- Center node
     SELECT
@@ -67,11 +67,11 @@ BEGIN
         rt.TypeName    AS ResourceType,
         dt.TagValue    AS Domain,
         purl.TagValue  AS PrimaryUrl
-    FROM [HTResourceMapper].[Resource] r
-    INNER JOIN [HTResourceMapper].[ResourceType] rt ON rt.ResourceTypeId = r.ResourceTypeId
-    LEFT JOIN [HTResourceMapper].[ResourceTag] dt
+    FROM [ResourceExplorer].[Resource] r
+    INNER JOIN [ResourceExplorer].[ResourceType] rt ON rt.ResourceTypeId = r.ResourceTypeId
+    LEFT JOIN [ResourceExplorer].[ResourceTag] dt
         ON dt.ResourceId = r.ResourceId AND dt.TagDefinitionId = @DomainTagDefId
-    LEFT JOIN [HTResourceMapper].[ResourceTag] purl
+    LEFT JOIN [ResourceExplorer].[ResourceTag] purl
         ON purl.ResourceId = r.ResourceId AND purl.TagDefinitionId = r.PrimaryTagDefinitionId
     WHERE r.ResourceId = @ResourceId
 
@@ -86,12 +86,12 @@ BEGIN
         rt.TypeName    AS ResourceType,
         dt.TagValue    AS Domain,
         purl.TagValue  AS PrimaryUrl
-    FROM [HTResourceMapper].[ResourceRelationship] rel
-    INNER JOIN [HTResourceMapper].[Resource] other ON other.ResourceId = rel.ToResourceId
-    INNER JOIN [HTResourceMapper].[ResourceType] rt ON rt.ResourceTypeId = other.ResourceTypeId
-    LEFT JOIN [HTResourceMapper].[ResourceTag] dt
+    FROM [ResourceExplorer].[ResourceRelationship] rel
+    INNER JOIN [ResourceExplorer].[Resource] other ON other.ResourceId = rel.ToResourceId
+    INNER JOIN [ResourceExplorer].[ResourceType] rt ON rt.ResourceTypeId = other.ResourceTypeId
+    LEFT JOIN [ResourceExplorer].[ResourceTag] dt
         ON dt.ResourceId = other.ResourceId AND dt.TagDefinitionId = @DomainTagDefId
-    LEFT JOIN [HTResourceMapper].[ResourceTag] purl
+    LEFT JOIN [ResourceExplorer].[ResourceTag] purl
         ON purl.ResourceId = other.ResourceId AND purl.TagDefinitionId = other.PrimaryTagDefinitionId
     WHERE rel.FromResourceId = @ResourceId
 
@@ -106,12 +106,12 @@ BEGIN
         rt.TypeName    AS ResourceType,
         dt.TagValue    AS Domain,
         purl.TagValue  AS PrimaryUrl
-    FROM [HTResourceMapper].[ResourceRelationship] rel
-    INNER JOIN [HTResourceMapper].[Resource] other ON other.ResourceId = rel.FromResourceId
-    INNER JOIN [HTResourceMapper].[ResourceType] rt ON rt.ResourceTypeId = other.ResourceTypeId
-    LEFT JOIN [HTResourceMapper].[ResourceTag] dt
+    FROM [ResourceExplorer].[ResourceRelationship] rel
+    INNER JOIN [ResourceExplorer].[Resource] other ON other.ResourceId = rel.FromResourceId
+    INNER JOIN [ResourceExplorer].[ResourceType] rt ON rt.ResourceTypeId = other.ResourceTypeId
+    LEFT JOIN [ResourceExplorer].[ResourceTag] dt
         ON dt.ResourceId = other.ResourceId AND dt.TagDefinitionId = @DomainTagDefId
-    LEFT JOIN [HTResourceMapper].[ResourceTag] purl
+    LEFT JOIN [ResourceExplorer].[ResourceTag] purl
         ON purl.ResourceId = other.ResourceId AND purl.TagDefinitionId = other.PrimaryTagDefinitionId
     WHERE rel.ToResourceId = @ResourceId
 
@@ -120,35 +120,35 @@ END
 ```
 
 **Register it in the project** — add this line, alphabetically, to the `<Build>` `<ItemGroup>` in
-`Database\HTResourceMapperDb\HTResourceMapperDb.sqlproj`:
+`Database\MacroPoint.Azure.ResourceExplorer.Db\MacroPoint.Azure.ResourceExplorer.Db.sqlproj`:
 
 ```xml
 <Build Include="Stored Procedures\Resource_GetForExplorer.sql" />
 ```
 
 - [ ] **Step 1: Write the sproc file** `Resource_GetForExplorer.sql` with the SQL above.
-- [ ] **Step 2: Add the `<Build Include>` line** to `HTResourceMapperDb.sqlproj`.
+- [ ] **Step 2: Add the `<Build Include>` line** to `MacroPoint.Azure.ResourceExplorer.Db.sqlproj`.
 - [ ] **Step 3: Apply the sproc directly to the app DB** via `sqlcmd` (dual-track — the project file keeps `CREATE PROCEDURE`; apply a `CREATE OR ALTER PROCEDURE` variant so it's re-runnable):
 
 ```
-sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceMapper -Q "CREATE OR ALTER PROCEDURE [HTResourceMapper].[Resource_GetForExplorer] @ResourceUid VARCHAR(40) AS BEGIN ... END"
+sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceExplorer -Q "CREATE OR ALTER PROCEDURE [ResourceExplorer].[Resource_GetForExplorer] @ResourceUid VARCHAR(40) AS BEGIN ... END"
 ```
 (Use the exact body from the `.sql` file with the leading verb changed to `CREATE OR ALTER`. `sqlcmd`, not the SQL MCP, per the app-DB note.) A full VS/MSBuild DACPAC publish is **not** required to verify this slice.
 - [ ] **Step 4: Exercise via `sqlcmd`** against a resource that has both dependency directions and a primary link:
 
 ```
-sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceMapper -Q "EXEC [HTResourceMapper].[Resource_GetForExplorer] @ResourceUid='<a-known-uid>'"
+sqlcmd -S "(localdb)\MSSQLLocalDB" -d ResourceExplorer -Q "EXEC [ResourceExplorer].[Resource_GetForExplorer] @ResourceUid='<a-known-uid>'"
 ```
 Expected: one `Self` row (with `PrimaryUrl` populated if that resource has a primary Link tag) plus one row per neighbor, each with `Direction` `DependsOn`/`DependentOn`. An unknown uid returns **no rows**.
 
 ---
 
-## C# — server row model (`Modules\Common\ResourceMapper.Common.Server\Resources\Models\`)
+## C# — server row model (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\Resources\Models\`)
 
 **File:** `ExplorerNodeRow.cs` — flat repo row mirroring the sproc's columns.
 
 ```csharp
-namespace ResourceMapper.Common.Server.Resources.Models
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Models
 {
     /// <summary>
     /// One row from Resource_GetForExplorer. Direction is 'Self' for the center resource, or
@@ -171,15 +171,15 @@ namespace ResourceMapper.Common.Server.Resources.Models
 
 ---
 
-## Shared — client DTOs (`Modules\Common\ResourceMapper.Common.Shared\Explorer\`)
+## Shared — client DTOs (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Shared\Explorer\`)
 
-New feature folder + namespace `ResourceMapper.Common.Shared.Explorer` (parallels
+New feature folder + namespace `MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer` (parallels
 `...Shared.Editor`). These cross the wire to Blazor and are serialized to the canvas.
 
 **File:** `ExplorerNeighborModel.cs`
 
 ```csharp
-namespace ResourceMapper.Common.Shared.Explorer
+namespace MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer
 {
     /// <summary>
     /// A one-hop neighbour of an explorer node. Direction is 'DependsOn' (this node depends on
@@ -203,7 +203,7 @@ namespace ResourceMapper.Common.Shared.Explorer
 ```csharp
 using System.Collections.Generic;
 
-namespace ResourceMapper.Common.Shared.Explorer
+namespace MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer
 {
     /// <summary>
     /// The center resource for an explorer read plus its one-hop neighbours. Returned by
@@ -226,7 +226,7 @@ namespace ResourceMapper.Common.Shared.Explorer
 
 ---
 
-## Repository (`Modules\Common\ResourceMapper.Common.Server\Explorer\`)
+## Repository (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\Explorer\`)
 
 New `Explorer/` folder in the server project. Interface in `Explorer\Interfaces\`.
 
@@ -236,9 +236,9 @@ New `Explorer/` folder in the server project. Interface in `Explorer\Interfaces\
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using ResourceMapper.Common.Server.Resources.Models;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Models;
 
-namespace ResourceMapper.Common.Server.Explorer.Interfaces
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces
 {
     public interface IExplorerRepository
     {
@@ -253,12 +253,12 @@ namespace ResourceMapper.Common.Server.Explorer.Interfaces
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using HT.Microsoft.SqlClient.Extensions;                       // SprocCommand / AddVarchar / ExecuteQueryAsync
-using HT.Microsoft.SqlClient.Extensions.Abstractions.Interfaces; // IDbConnector
-using ResourceMapper.Common.Server.Explorer.Interfaces;
-using ResourceMapper.Common.Server.Resources.Models;
+using MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions;                       // SprocCommand / AddVarchar / ExecuteQueryAsync
+using MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions.Abstractions.Interfaces; // IDbConnector
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Models;
 
-namespace ResourceMapper.Common.Server.Explorer
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer
 {
     public class ExplorerSqlRepository : IExplorerRepository
     {
@@ -271,7 +271,7 @@ namespace ResourceMapper.Common.Server.Explorer
 
         public async Task<List<ExplorerNodeRow>> GetForExplorerAsync(string resourceUid, CancellationToken cancellationToken)
         {
-            using var cmd = _db.RO.SprocCommand("[HTResourceMapper].Resource_GetForExplorer")
+            using var cmd = _db.RO.SprocCommand("[ResourceExplorer].Resource_GetForExplorer")
                 .AddVarchar("@ResourceUid", resourceUid);
 
             return await _db.Execute.ExecuteQueryAsync(cmd, dr => new ExplorerNodeRow
@@ -293,17 +293,17 @@ namespace ResourceMapper.Common.Server.Explorer
 
 ---
 
-## Service (`Modules\Common\ResourceMapper.Common.Server\Explorer\`)
+## Service (`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\Explorer\`)
 
 **File:** `Interfaces\IExplorerService.cs`
 
 ```csharp
 using System.Threading;
 using System.Threading.Tasks;
-using HT.Api.Service.Contracts;
-using ResourceMapper.Common.Shared.Explorer;
+using MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer;
 
-namespace ResourceMapper.Common.Server.Explorer.Interfaces
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces
 {
     public interface IExplorerService
     {
@@ -318,13 +318,13 @@ namespace ResourceMapper.Common.Server.Explorer.Interfaces
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using HT.Api.Client.Contracts.Models;                 // CallStatusCode
-using HT.Api.Service.Contracts;                       // ApiServiceResponse<T>
-using HT.Api.Service.Contracts.BuildersOfT;           // ServiceResponseBuilder<T>
-using ResourceMapper.Common.Server.Explorer.Interfaces;
-using ResourceMapper.Common.Shared.Explorer;
+using MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts.Models;                 // CallStatusCode
+using MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts;                       // ApiServiceResponse<T>
+using MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.BuildersOfT;           // ServiceResponseBuilder<T>
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces;
+using MacroPoint.Azure.ResourceExplorer.Common.Shared.Explorer;
 
-namespace ResourceMapper.Common.Server.Explorer
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer
 {
     public class ExplorerService : IExplorerService
     {
@@ -398,12 +398,12 @@ namespace ResourceMapper.Common.Server.Explorer
 ## Dependency registration
 
 Add the two pairs to `RegisterCommonDependencies` in
-`Modules\Common\ResourceMapper.Common.Server\Utils\DependencyRegistration.cs` (after the resource
+`Modules\Common\MacroPoint.Azure.ResourceExplorer.Common.Server\Utils\DependencyRegistration.cs` (after the resource
 pair), plus the two new `using`s:
 
 ```csharp
-using ResourceMapper.Common.Server.Explorer;
-using ResourceMapper.Common.Server.Explorer.Interfaces;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces;
 ```
 ```csharp
 services.TryAddScoped<IExplorerRepository, ExplorerSqlRepository>();
@@ -414,11 +414,11 @@ services.TryAddScoped<IExplorerService, ExplorerService>();
 
 ---
 
-## Tests (`_Tests\Common\Server\ResourceMapper.Common.Server.Tests\Explorer\`)
+## Tests (`_Tests\Common\Server\MacroPoint.Azure.ResourceExplorer.Common.Server.Tests\Explorer\`)
 
 Unit-test the **service** against a mocked `IExplorerRepository` (repos are never unit-tested
 against a live DB — see the master-list Notes). New folder mirrors the source; namespace
-`ResourceMapper.Common.Server.Tests.Explorer`.
+`MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Explorer`.
 
 **File:** `ExplorerServiceTests.cs`
 
@@ -428,18 +428,18 @@ against a live DB — see the master-list Notes). New folder mirrors the source;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using ResourceMapper.Common.Server.Explorer;
-using ResourceMapper.Common.Server.Explorer.Interfaces;
-using ResourceMapper.Common.Server.Resources.Models;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces;
+using MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Models;
 
-namespace ResourceMapper.Common.Server.Tests.Explorer
+namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Explorer
 {
     [Trait("Category", "Unit")]
-    [Trait("Category", "ResourceMapper")]
-    [Trait("Category", "ResourceMapper/Common")]
-    [Trait("Category", "ResourceMapper/Common/Server")]
-    [Trait("Category", "ResourceMapper/Common/Server/Explorer")]
-    [Trait("Category", "ResourceMapper/Common/Server/Explorer/ExplorerService")]
+    [Trait("Category", "ResourceExplorer")]
+    [Trait("Category", "ResourceExplorer/Common")]
+    [Trait("Category", "ResourceExplorer/Common/Server")]
+    [Trait("Category", "ResourceExplorer/Common/Server/Explorer")]
+    [Trait("Category", "ResourceExplorer/Common/Server/Explorer/ExplorerService")]
     public class ExplorerServiceTests
     {
         private readonly Mock<IExplorerRepository> _repo;
@@ -542,7 +542,7 @@ namespace ResourceMapper.Common.Server.Tests.Explorer
 - [ ] **Step 11: Run the tests — expect FAIL to compile/red first** (types don't exist yet if written test-first; if writing service alongside, expect them to drive the mapping):
 
 ```
-dotnet test --filter "FullyQualifiedName~ResourceMapper.Common.Server.Tests.Explorer.ExplorerServiceTests"
+dotnet test --filter "FullyQualifiedName~MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Explorer.ExplorerServiceTests"
 ```
 
 - [ ] **Step 12: Implement/adjust until green**, then run the full suite once:
@@ -557,7 +557,7 @@ Expected: all green; no changes to editor tests (this slice didn't touch that pa
 
 ## Verification
 
-1. **DB:** build the dacpac (VS/full MSBuild) and publish to `(localdb)\MSSQLLocalDB\ResourceMapper` with `/p:DropObjectsNotInSource=True`.
+1. **DB:** build the dacpac (VS/full MSBuild) and publish to `(localdb)\MSSQLLocalDB\ResourceExplorer` with `/p:DropObjectsNotInSource=True`.
 2. **Sproc, happy path:** `sqlcmd` EXEC against a uid with both directions + a primary link → one `Self` row (PrimaryUrl set) + neighbour rows with correct `Direction`.
 3. **Sproc, edges of data:** a resource with **no** relationships → only the `Self` row; a resource with **no** primary tag → `Self` row with `PrimaryUrl = NULL`; an **unknown** uid → zero rows.
 4. **Build + unit tests:** `dotnet build` then `dotnet test` → all green.
@@ -577,11 +577,11 @@ Expected: all green; no changes to editor tests (this slice didn't touch that pa
 ## Execution notes
 
 Executed via subagent-driven development. **Done** — commit `4129adf` (11 files, 383 insertions),
-4/4 new `ExplorerServiceTests` green; C# solution builds clean (the `HTResourceMapperDb.sqlproj`
+4/4 new `ExplorerServiceTests` green; C# solution builds clean (the `MacroPoint.Azure.ResourceExplorer.Db.sqlproj`
 `MSB4278` under `dotnet build` is the expected old-style-SSDT behavior, not a failure). Task review:
 spec ✅ / code quality approved.
 
-- **DB apply:** the sproc was applied to `(localdb)\MSSQLLocalDB\ResourceMapper` via `sqlcmd`
+- **DB apply:** the sproc was applied to `(localdb)\MSSQLLocalDB\ResourceExplorer` via `sqlcmd`
   (`CREATE OR ALTER`) and the `.sql` + `<Build Include>` added to the project. The local DB had
   **no `ResourceRelationship` rows and no primary-link tags**, so the implementer inserted temporary
   relationship/tag rows to exercise the happy path, verified all three scenarios (neighbors / no
@@ -591,7 +591,7 @@ spec ✅ / code quality approved.
   and `builder.Data.Set(...)` compiled as written.
 - **Minor (deferred to final review):** `catch (System.Exception ex)` fully-qualifies `Exception`
   where the codebase uses `Exception` (cosmetic).
-- **Environment:** a running `ResourceMapper.UI.Web.exe` (under a VS debugger) was locking build
+- **Environment:** a running `MacroPoint.Azure.ResourceExplorer.UI.Web.exe` (under a VS debugger) was locking build
   outputs and was stopped to let the build proceed. Two pre-existing failures in
-  `HT.Api.Service.Contracts.Tests` (`NotFound`→404 mapping, 422 observed) are in an untouched
+  `MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts.Tests` (`NotFound`→404 mapping, 422 observed) are in an untouched
   library and unrelated to this slice.

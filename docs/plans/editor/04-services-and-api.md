@@ -40,9 +40,9 @@ tabs build on the tag/relationship surface stubbed and wired here.
   `ApiControllerBase` controllers wrapping these same services can be added then (they'd just call
   `MapServiceResponseToActionResult(...)`).
 
-## SQL — new / changed sprocs (`Database\HTResourceMapperDb\Stored Procedures\`)
+## SQL — new / changed sprocs (`Database\MacroPoint.Azure.ResourceExplorer.Db\Stored Procedures\`)
 
-Add `<Build>` items to `HTResourceMapperDb.sqlproj` for each new file (old-style project — items
+Add `<Build>` items to `MacroPoint.Azure.ResourceExplorer.Db.sqlproj` for each new file (old-style project — items
 are explicit, no globbing). Declarative SSDT: build the dacpac via VS/full MSBuild, publish via
 SqlPackage **with `/p:DropObjectsNotInSource=True`** (the slice-#2 note — the profile omits it).
 
@@ -162,7 +162,7 @@ two uids directly — no request contract needed for an in-process call.)
 No change — `IResourceService`/`IResourceRepository` are already registered in
 `DependencyRegistration.RegisterCommonDependencies`; the new methods live on existing types.
 
-## Tests (`_Tests\Common\Server\ResourceMapper.Common.Server.Tests\`)
+## Tests (`_Tests\Common\Server\MacroPoint.Azure.ResourceExplorer.Common.Server.Tests\`)
 
 Add `ResourceService` unit tests (xUnit + Moq 4.18.4 + FluentAssertions 7.1.0, `[Trait("Category",
 "Unit")]`, `Method_State_Expected` naming, `because` clauses) with a mocked `IResourceRepository`:
@@ -191,9 +191,9 @@ Add `ResourceService` unit tests (xUnit + Moq 4.18.4 + FluentAssertions 7.1.0, `
 
 ## Verification
 
-1. **DB builds + publishes:** `MSBuild HTResourceMapperDb.sqlproj /t:Rebuild` (VS/full MSBuild) →
+1. **DB builds + publishes:** `MSBuild MacroPoint.Azure.ResourceExplorer.Db.sqlproj /t:Rebuild` (VS/full MSBuild) →
    dacpac, then `sqlpackage /Action:Publish … /p:DropObjectsNotInSource=True` to
-   `(localdb)\MSSQLLocalDB\ResourceMapper`.
+   `(localdb)\MSSQLLocalDB\ResourceExplorer`.
 2. **Exercise the new sprocs via `sqlcmd`** (mirror slice #2's approach): seed a type + a couple
    tag defs; `Resource_Save` (create; update; **type-frozen error** on changed type);
    `ResourceTag_GetForResource` (after inserting tags — keys/contentType/IsPrimary correct);
@@ -218,7 +218,7 @@ Add `ResourceService` unit tests (xUnit + Moq 4.18.4 + FluentAssertions 7.1.0, `
   exercised via `sqlcmd` — create/update/type-frozen-error, `IsPrimary` projection, unique/
   collision/self-exclude, and stable-id-on-reupsert all confirmed. `dotnet build` on the C#
   projects — zero `error CS` (the only build failure anywhere is the pre-existing, documented
-  `HTResourceMapperDb.sqlproj` SSDT limitation under `dotnet build`, unrelated). `dotnet test` —
+  `MacroPoint.Azure.ResourceExplorer.Db.sqlproj` SSDT limitation under `dotnet build`, unrelated). `dotnet test` —
   37 existing + 14 new `ResourceService` tests, 51/51 passing. The in-process smoke test (a
   throwaway xUnit test against the live `(localdb)` DB, deleted before commit) ran the full
   save → detail → uniqueness → inline-tag-create → relationship add/remove → delete flow

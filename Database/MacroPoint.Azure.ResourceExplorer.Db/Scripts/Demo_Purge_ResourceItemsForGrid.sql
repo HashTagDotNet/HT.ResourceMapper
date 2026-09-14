@@ -1,0 +1,7 @@
+DELETE ResourceExplorer.ResourceTag
+DELETE ResourceExplorer.ResourceRelationship
+DELETE ResourceExplorer.ResourceTypeTag
+DELETE ResourceExplorer.[Resource]
+DELETE ResourceExplorer.ResourceType
+DELETE ResourceExplorer.TagDefinition
+DELETE ResourceExplorer.TagContentType

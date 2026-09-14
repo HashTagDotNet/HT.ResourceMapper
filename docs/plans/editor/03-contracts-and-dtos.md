@@ -14,12 +14,12 @@ except one forced compile-fix ripple (below).
 **Layering decision (confirmed this session): "Common.Shared only".** The one working
 end-to-end feature — the home-page grid — deliberately put its transport models in
 `Common.Shared` (`ResourceGridItemModel`, `ResourceGridTagModel`, request/response in a
-`Contracts` subfolder) and **never used** the `HT.ApiContracts/Models/ResourceMapper/` DTO
+`Contracts` subfolder) and **never used** the `MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts/Models/ResourceExplorer/` DTO
 stubs. Those four stubs are **empty (0-byte) and referenced by zero code**. Rather than build a
 parallel, unused DTO hierarchy, slice #3 **mirrors the home-page precedent**: all resource
 transport models live in `Common.Shared`; the empty ApiContracts stubs are **deleted**;
-`HT.ApiContracts` keeps only the envelope (`ApiResponse<T>`, `Message`, `MetaData`,
-`CallStatusCode`) and `HT.Api.Service.Contracts` keeps `ApiServiceResponse<T>` /
+`MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts` keeps only the envelope (`ApiResponse<T>`, `Message`, `MetaData`,
+`CallStatusCode`) and `MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts` keeps `ApiServiceResponse<T>` /
 `ServiceResponseBuilder<T>` — both unchanged.
 
 **Naming/placement convention (matches home-page):** transport read/dictionary shapes use the
@@ -43,14 +43,14 @@ Delete the four empty, unreferenced stub files (they're not listed in any `.cspr
 globbing — so deleting the files is clean; nothing in code or `ApiContractsJsonContext`
 references them):
 
-- `Libraries/ApiContracts/HT.ApiContracts/Models/ResourceMapper/ResourceDto.cs`
+- `Libraries/ApiContracts/MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts/Models/ResourceExplorer/ResourceDto.cs`
 - `…/ResourceTagDto.cs`
 - `…/TagDefinitionDto.cs`
 - `…/TagContentTypeDto.cs`
 
-(The now-empty `Models/ResourceMapper/` folder can be removed too.)
+(The now-empty `Models/ResourceExplorer/` folder can be removed too.)
 
-## New transport models — `Common.Shared/Editor/` (ns `ResourceMapper.Common.Shared.Editor`)
+## New transport models — `Common.Shared/Editor/` (ns `MacroPoint.Azure.ResourceExplorer.Common.Shared.Editor`)
 
 Read / dictionary shapes the service (#4) projects the slice-#2 repo models into. Flat POCOs.
 
@@ -161,7 +161,7 @@ wanted; **don't duplicate** facet DTOs here.
 
 ## Forced compile-fix ripple (the only existing-code change)
 
-`Modules/Common/ResourceMapper.Common.Server/Resources/ResourceService.cs` —
+`Modules/Common/MacroPoint.Azure.ResourceExplorer.Common.Server/Resources/ResourceService.cs` —
 `GetResourceEditorModelAsync` (≈lines 163–170) constructs `ResourceEditorModel { Code=…,
 Notes=… }`. After the rename it must set `Key`, `Name`, `Description`, `ResourceType`, `Domain`
 (all `new()`), `ResourceUid`, and `Mode`. No behavior change beyond the field renames; the
@@ -182,17 +182,17 @@ constructs the editor shape).
 ## Also update (doc accuracy — mirrors the slice-#1 CLAUDE.md fix)
 
 `CLAUDE.md` "API Response Pattern" section currently says
-`HT.Api.Client.Contracts` "Contains resource DTOs (ResourceDto, ResourceTagDto, etc.)". After
-deletion that's inaccurate — update it to state that `HT.ApiContracts` holds only the wire
+`MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts` "Contains resource DTOs (ResourceDto, ResourceTagDto, etc.)". After
+deletion that's inaccurate — update it to state that `MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts` holds only the wire
 **envelope**, and resource transport models live per-feature in `Common.Shared`
 (`…Shared/HomePage`, `…Shared/Editor`), following the home-page precedent.
 
 ## Verification (build-only — this is a types slice)
 
-1. **Compiles:** `dotnet build` the solution (or at least `HT.Api.Client.Contracts`,
-   `HT.Api.Service.Contracts`, `ResourceMapper.Common.Shared`, `ResourceMapper.Common.Server`,
-   and `ResourceMapper.UI.Web`). The only cross-project ripple is the `ResourceService`
-   rename fix; deleting the four empty stubs must leave `HT.Api.Client.Contracts` building
+1. **Compiles:** `dotnet build` the solution (or at least `MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts`,
+   `MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts`, `MacroPoint.Azure.ResourceExplorer.Common.Shared`, `MacroPoint.Azure.ResourceExplorer.Common.Server`,
+   and `MacroPoint.Azure.ResourceExplorer.UI.Web`). The only cross-project ripple is the `ResourceService`
+   rename fix; deleting the four empty stubs must leave `MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts` building
    clean (confirmed: zero references, not in the `.csproj`, not in `ApiContractsJsonContext`).
 2. **Tests:** `dotnet test` the `Common.Server.Tests` project → still green (grep confirms no
    test constructs the old `ResourceEditorModel` shape; re-pin if any editor-shape test surfaces).
@@ -201,15 +201,15 @@ deletion that's inaccurate — update it to state that `HT.ApiContracts` holds o
 
 ## Execution notes
 
-- **All steps completed and verified.** `dotnet build HT.ResourceMapper.slnx` — zero `error CS`/
+- **All steps completed and verified.** `dotnet build MacroPoint.Azure.ResourceExplorer.slnx` — zero `error CS`/
   `error MSB` across the C# projects; the only build error is the pre-existing, documented
-  `HTResourceMapperDb.sqlproj` SSDT failure under `dotnet build` (unrelated — that project builds
+  `MacroPoint.Azure.ResourceExplorer.Db.sqlproj` SSDT failure under `dotnet build` (unrelated — that project builds
   via VS/full MSBuild only, per the CLAUDE.md note added in slice #1).
 - `dotnet test` on `Common.Server.Tests` — **37/37 passed**, no test referenced the old
   `ResourceEditorModel` shape (`Code`/`Notes`/`NewTagName`/`NewTagValue`), so no re-pinning needed.
 - The four empty ApiContracts stubs were confirmed unreferenced (not in any `.csproj` item list —
   SDK-style globbing — and not in `ApiContractsJsonContext`) before deletion; deleting them and
-  the now-empty `Models/ResourceMapper/` folder left `HT.Api.Client.Contracts` building clean.
+  the now-empty `Models/ResourceExplorer/` folder left `MacroPoint.Azure.ResourceExplorer.Api.Client.Contracts` building clean.
 
 Then: move this plan to `docs/plans/editor/03-contracts-and-dtos.md`, flip slice #3 → Done and
 slice #4 → Planning in `00-implementation-plan-list.md`, and commit (schema-consistent contract
