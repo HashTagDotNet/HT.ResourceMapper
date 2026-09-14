@@ -23,3 +23,7 @@ BEGIN
 
     DELETE FROM HTResourceMapper.ResourceType WHERE ResourceTypeId = @TypeId;
 END
+
+-- Saved views created by saved-views.spec.js. Scoped by the E2e name prefix, NOT by owner: with a
+-- single configured owner, deleting by owner would wipe the real saved views too.
+DELETE FROM HTResourceMapper.SavedView WHERE Name LIKE 'E2e%';
