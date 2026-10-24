@@ -75,8 +75,15 @@
     private ActiveFilter? _openRequest;
     private int _openToken;
 
-    // A deep link that already carries filters must not hide them.
-    protected override void OnInitialized() => _advanced = State.Filters.Count > 0;
+    // Any state that carries filters (deep link, Back/Forward) must not hide them.
+    private int _lastFilterCount;
+
+    // Open Advanced when filters arrive (deep link, Back/Forward), but don't fight a manual collapse.
+    protected override void OnParametersSet()
+    {
+        if (State.Filters.Count > 0 && _lastFilterCount == 0) _advanced = true;
+        _lastFilterCount = State.Filters.Count;
+    }
 
     private void ToggleAdvanced() => _advanced = !_advanced;
 
