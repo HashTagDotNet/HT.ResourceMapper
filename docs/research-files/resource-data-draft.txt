@@ -1,0 +1,98 @@
+# Comments start with #. Indentation is the structure.
+defaults
+  tier: non-prod
+
+App Configuration: App Configuration - Visibility
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-92/providers/Microsoft.AppConfiguration/configurationStores/usspi-apc-dt-mplt-07
+
+App Configuration: App Configuration - Proxy & LITE
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/usspi-rsg-dt-mplt-92/providers/Microsoft.AppConfiguration/configurationStores/usspi-apc-dt-mplt-06
+
+App Insights: App Insights - vNext
+  env: localhost, development, integrationtest, pentest
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourcegroups/USSPI-RSG-DT-MPLT-01/providers/microsoft.insights/components/usspi-ain-mplt-dt-server-01
+
+App Insights: App Insights - Proxy & LITE
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/usspi-rsg-dt-mplt-01/providers/microsoft.insights/components/usspi-ain-mplt-visibility-dev-02
+
+App Service: App Service - vNext
+  env: development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/usspi-rsg-dt-mplt-03/providers/Microsoft.Web/sites/usspi-aps-dt-mplt-dev-visibility-macropoint-com
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/usaus-rsg-dt-mplt-03/providers/Microsoft.Web/sites/usaus-aps-dt-mplt-dev-visibility-macropoint-com
+
+App Service: App Service - Proxy
+  env: development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/usspi-rsg-dt-mplt-03/providers/Microsoft.Web/sites/usspi-aps-dt-mplt-dev-vnextproxy-macropoint-com
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/usaus-rsg-dt-mplt-03/providers/Microsoft.Web/sites/usaus-aps-dt-mplt-dev-vnextproxy-macropoint-com
+
+Redis: Azure Redis Cache
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-02/providers/Microsoft.Cache/Redis/usspi-red-dt-mplt-01
+
+Managed Redis: Azure Managed Redis
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-01/providers/Microsoft.Cache/redisEnterprise/usspi-red-dt-mplt-04
+
+Service Bus: Service Bus
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02
+
+Service Fabric: Service Fabric
+  env: development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-33/providers/Microsoft.ServiceFabric/managedclusters/usspi-sfc-dt-mplt-12
+
+Storage Account: Storage Account (Blob)
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-01/providers/Microsoft.Storage/storageAccounts/usspistadtmplt04
+
+# Queues (Service Bus USSPI-SBN-DT-MPLT-02): localhost and develop
+
+Queue: Alert Aggregator Queue
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-lh-alert-aggregator
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-dev-alert-aggregator
+
+Queue: Compliance Manager Queue
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-lh-compliance-manager
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-dev-compliance-manager
+
+Queue: Db Aggregator Queue
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-lh-db-aggregator
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-dev-db-aggregator
+
+Queue: Rule Manager Queue
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-lh-rule-manager
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-dev-rule-manager
+
+Queue: Rule Processor Queue
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-lh-rule-processor
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-dev-rule-processor
+
+Queue: Signal Processor Queue
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-lh-signal-processor
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-dev-signal-processor
+
+Queue: Trigger Aggregator Queue
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-lh-trigger-aggregator
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-dev-trigger-aggregator
+
+Queue: Trigger Ingestor Queue
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-lh-trigger-ingestor
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-27/providers/Microsoft.ServiceBus/namespaces/USSPI-SBN-DT-MPLT-02/queues/macropoint-alerting-dev-trigger-ingestor
+
+# Blob containers: localhost and develop
+
+Blob Container: Alerting Blob Container
+  env: localhost, development
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-01/providers/Microsoft.Storage/storageAccounts/usspistadtmplt04/blobServices/default/containers/macropoint-alerting-lh
+  azure: /subscriptions/1d6dcbc4-27e3-4f74-a34d-89a09505ccd3/resourceGroups/USSPI-RSG-DT-MPLT-01/providers/Microsoft.Storage/storageAccounts/usspistadtmpltservice01/blobServices/default/containers/macropoint-alerting-dev
