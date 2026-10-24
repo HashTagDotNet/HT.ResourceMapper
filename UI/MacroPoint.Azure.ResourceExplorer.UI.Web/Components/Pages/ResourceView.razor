@@ -8,6 +8,7 @@
 @inject IResourceService ResourceService
 @inject GlobalConfig Config
 @inject NavigationManager Navigation
+@inject ILogger<ResourceView> Logger
 
 @* Read-only resource view (HardReview-Simplify §3 steps 3–6, §5 gaps 3 and 5): Azure ids first,
    then Depends On / Used By expanded hop by hop, other tags collapsed. Editing stays in the editor. *@
@@ -82,7 +83,7 @@ else if (_detail is not null)
                                 <tr>
                                     <td class="rm-view-tagkey">@(tag.DisplayName ?? tag.TagDefinitionKey)</td>
                                     <td>
-                                        @if (tag.ContentType == "Link")
+                                        @if (string.Equals(tag.ContentType, "Link", StringComparison.OrdinalIgnoreCase))
                                         {
                                             <MudLink Href="@tag.Value" Target="_blank">@tag.Value</MudLink>
                                         }
@@ -157,6 +158,7 @@ else if (_detail is not null)
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Could not load resource view for {ResourceUid}", ResourceUid);
             _detail = null;
             _loadError = $"Could not load: {ex.Message}";
         }
@@ -198,6 +200,8 @@ else if (_detail is not null)
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Could not load {Direction} hop {OtherResourceUid} for {ResourceUid}",
+                node.Direction, node.Rel.OtherResourceUid, ResourceUid);
             node.Expanded = false;
             node.Error = $"Could not load the next hop: {ex.Message}";
         }
