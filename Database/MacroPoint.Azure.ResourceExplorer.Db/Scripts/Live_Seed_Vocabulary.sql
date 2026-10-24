@@ -114,7 +114,8 @@ WHEN MATCHED THEN
         ,target.[TagContentTypeId] = ct.[TagContentTypeId]
         ,target.[AllowCustomValue] = CAST(v.[AllowCustomValue] AS BIT)
         ,target.[IsMultiValued]    = CAST(v.[IsMultiValued] AS BIT)
-        ,target.[AllowedValues]    = v.[AllowedValues]
+        -- The domain tag's list is seeded only on insert: DomainValue_Add owns it afterwards.
+        ,target.[AllowedValues]    = CASE WHEN v.[IsDomainTag] = 1 THEN target.[AllowedValues] ELSE v.[AllowedValues] END
         ,target.[RequirementLevel] = v.[RequirementLevel]
         ,target.[IsDomainTag]      = CAST(v.[IsDomainTag] AS BIT)
         ,target.[IsSystemTag]      = CAST(v.[IsSystemTag] AS BIT)

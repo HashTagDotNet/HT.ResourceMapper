@@ -36,7 +36,7 @@ WHEN MATCHED THEN
         ,target.[TagContentTypeId] = source.[TagContentTypeId]
         ,target.[AllowCustomValue] = source.[AllowCustomValue]
         ,target.[IsMultiValued]    = source.[IsMultiValued]
-        ,target.[AllowedValues]    = source.[AllowedValues]
+        -- AllowedValues is seeded only on insert: DomainValue_Add owns the list afterwards.
         ,target.[RequirementLevel] = source.[RequirementLevel]
         ,target.[IsDomainTag]      = source.[IsDomainTag]
         ,target.[IsSystemTag]      = source.[IsSystemTag]
