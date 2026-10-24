@@ -21,11 +21,12 @@ BEGIN
         IF EXISTS (
             SELECT 1
             FROM [ResourceExplorer].[Resource] r
-            INNER JOIN [ResourceExplorer].[ResourceTag] rt
+            LEFT JOIN [ResourceExplorer].[ResourceTag] rt
                 ON rt.ResourceId = r.ResourceId AND rt.TagDefinitionId = @DomainTagDefId
             WHERE r.ResourceTypeId = @ResourceTypeId
               AND r.ResourceKey = @ResourceKey
-              AND rt.TagValue = @Domain
+              -- NULL is a value: a NULL @Domain collides with domain-less resources.
+              AND (rt.TagValue = @Domain OR (rt.TagValue IS NULL AND @Domain IS NULL))
               AND (@ExcludeResourceUid IS NULL OR r.ResourceUid <> @ExcludeResourceUid)
         )
             SET @IsUnique = 0;

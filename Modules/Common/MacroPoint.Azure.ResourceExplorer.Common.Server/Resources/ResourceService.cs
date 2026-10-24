@@ -309,6 +309,15 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
                     }
                 }
 
+                var tagDictionary = await _repo.GetAllTagDefinitionsAsync(cancellationToken);
+                var domainDef = tagDictionary.FirstOrDefault(d => d.IsDomainTag);
+                if (domainDef is not null && string.Equals(domainDef.RequirementLevel, "Error", StringComparison.Ordinal)
+                    && string.IsNullOrWhiteSpace(request.Domain))
+                {
+                    builder.Validation.AddValidation("request.Domain", $"'{domainDef.DisplayName ?? domainDef.TagDefinitionKey}' is required");
+                    return builder.BuildResponse();
+                }
+
                 var isUnique = await _repo.CheckResourceUniqueAsync(request.ResourceTypeId, request.ResourceKey, request.Domain, request.ResourceUid, cancellationToken);
                 if (!isUnique)
                 {
@@ -316,11 +325,10 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
                     return builder.BuildResponse();
                 }
 
-                var tagDictionary = await _repo.GetAllTagDefinitionsAsync(cancellationToken);
                 // Domain is dropped here at the source (not just at the sproc) — a domain-keyed
                 // entry in request.Tags, if the client ever sent one, is never validated, written,
                 // or eligible as primary.
-                var domainDefId = tagDictionary.FirstOrDefault(d => d.IsDomainTag)?.TagDefinitionId;
+                var domainDefId = domainDef?.TagDefinitionId;
                 var nonEmptyTags = (request.Tags ?? new List<SaveTagValue>())
                     .Where(t => !string.IsNullOrWhiteSpace(t.Value))
                     .Where(t => domainDefId is null || t.TagDefinitionId != domainDefId)
@@ -334,34 +342,28 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
                 var effectivePrimaryId = ResolveEffectivePrimary(request.PrimaryTagDefinitionId, nonEmptyTags, tagDictionary);
 
                 // Relationships: validate + resolve BEFORE any write (self-loop / not-found /
-                // same-domain — RD2/RD4/RD5/RD14). Create has no resourceId yet, so the actual
-                // edge writes are deferred to after Resource_Save below.
+                // same-domain — RD2/RD4/RD5/RD14).
                 var effectiveDomain = isEdit ? existing!.Domain : request.Domain;
                 var (relationshipsValid, resolvedDependsOn, resolvedDependentOn) =
                     await ValidateAndResolveRelationshipsAsync(builder, request, effectiveDomain, cancellationToken);
                 if (!relationshipsValid)
                     return builder.BuildResponse();
 
-                var (result, resourceId) = await _repo.SaveResourceAsync(
+                // One transaction: resource, non-domain tags and both edge directions (full-set
+                // replace per direction). Domain is excluded from the tags here and in the sproc.
+                var (result, _) = await _repo.SaveResourceWithTagsAndEdgesAsync(
                     request.ResourceUid, request.ResourceTypeId, request.ResourceKey, request.ResourceName,
-                    request.Description, request.Domain, effectivePrimaryId, cancellationToken);
+                    request.Description, request.Domain, effectivePrimaryId,
+                    nonEmptyTags.Select(t => (t.TagDefinitionKey, t.Value!)).ToList(),
+                    resolvedDependsOn.Select(d => d.Id).ToList(),
+                    resolvedDependentOn.Select(d => d.Id).ToList(),
+                    cancellationToken);
 
                 if (string.Equals(result, "error", StringComparison.Ordinal))
                 {
                     builder.Validation.AddValidation("request.ResourceTypeId", "Resource type or Domain cannot be changed after save");
                     return builder.BuildResponse();
                 }
-
-                // RD4 (non-atomic): Resource_Save then SetResourceTagsAsync are two sprocs, no
-                // shared transaction — matches the import path. Domain is excluded here (the
-                // client already excludes it; ResourceTag_SetForResource also skips it —
-                // double-safe).
-                await _repo.SetResourceTagsAsync(resourceId,
-                    nonEmptyTags.Select(t => (t.TagDefinitionKey, t.Value!)).ToList(), cancellationToken);
-
-                // RD8 (non-atomic): reconcile relationship edges after the resource + tags are
-                // written, using the resourceId that (in Create mode) only exists post-save.
-                await ReconcileRelationshipsAsync(resourceId, resolvedDependsOn, resolvedDependentOn, cancellationToken);
 
                 var saved = await _repo.GetResourceByUidAsync(request.ResourceUid, cancellationToken);
                 builder.Data.Set(new SaveResourceResponse
@@ -1662,7 +1664,7 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
         /// <summary>
         /// Validates + resolves every desired relationship uid BEFORE any write: rejects a
         /// self-loop, an unknown uid, or a cross-domain target. Returns the resolved (uid, id)
-        /// pairs per direction so ReconcileRelationshipsAsync doesn't need to re-resolve them.
+        /// pairs per direction for the transactional save.
         /// </summary>
         private async Task<(bool IsValid, List<(string Uid, int Id)> DependsOn, List<(string Uid, int Id)> DependentOn)>
             ValidateAndResolveRelationshipsAsync(
@@ -1717,44 +1719,6 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
             }
 
             return (isValid, dependsOnResolved, dependentOnResolved);
-        }
-
-        /// <summary>
-        /// Full-set-replace per direction (RD3), scoped so each direction only touches its own
-        /// edges (RD1). DependentOn adds/removes write the FAR side — editing "what depends on
-        /// me" mutates the other resource's out-edge (RD7).
-        /// </summary>
-        private async Task ReconcileRelationshipsAsync(
-            int resourceId,
-            List<(string Uid, int Id)> desiredDependsOn,
-            List<(string Uid, int Id)> desiredDependentOn,
-            CancellationToken cancellationToken)
-        {
-            var currentEdges = await _repo.GetRelationshipsForResourceAsync(resourceId, cancellationToken);
-
-            var currentDependsOnIds = currentEdges
-                .Where(e => string.Equals(e.Direction, "DependsOn", StringComparison.Ordinal))
-                .Select(e => e.OtherResourceId)
-                .ToHashSet();
-            var currentDependentOnIds = currentEdges
-                .Where(e => string.Equals(e.Direction, "DependentOn", StringComparison.Ordinal))
-                .Select(e => e.OtherResourceId)
-                .ToHashSet();
-
-            var desiredDependsOnIds = desiredDependsOn.Select(d => d.Id).ToHashSet();
-            var desiredDependentOnIds = desiredDependentOn.Select(d => d.Id).ToHashSet();
-
-            // DependsOn: out-edges (from=this, to=target).
-            foreach (var targetId in desiredDependsOnIds.Except(currentDependsOnIds))
-                await _repo.AddRelationshipAsync(resourceId, targetId, cancellationToken);
-            foreach (var targetId in currentDependsOnIds.Except(desiredDependsOnIds))
-                await _repo.RemoveRelationshipAsync(resourceId, targetId, cancellationToken);
-
-            // DependentOn: in-edges (from=target, to=this) — the system writes the far side.
-            foreach (var targetId in desiredDependentOnIds.Except(currentDependentOnIds))
-                await _repo.AddRelationshipAsync(targetId, resourceId, cancellationToken);
-            foreach (var targetId in currentDependentOnIds.Except(desiredDependentOnIds))
-                await _repo.RemoveRelationshipAsync(targetId, resourceId, cancellationToken);
         }
 
         private async Task<(bool IsValid, int FromId, int ToId)> ValidateRelationshipEndpointsAsync(

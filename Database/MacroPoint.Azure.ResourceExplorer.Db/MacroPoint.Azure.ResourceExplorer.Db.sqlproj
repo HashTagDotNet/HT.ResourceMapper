@@ -92,6 +92,7 @@
     <Build Include="Stored Procedures\Resource_GetFilterValues.sql" />
     <Build Include="Stored Procedures\Resource_GetItems.sql" />
     <Build Include="Stored Procedures\Resource_Save.sql" />
+    <Build Include="Stored Procedures\Resource_SaveWithTagsAndEdges.sql" />
     <Build Include="Stored Procedures\Resource_SearchForPicker.sql" />
     <Build Include="Stored Procedures\Resource_Upsert.sql" />
     <Build Include="Stored Procedures\SavedView_Upsert.sql" />
@@ -116,6 +117,7 @@
     <Build Include="Tables\SavedView.sql" />
     <Build Include="Tables\TagDefinition.sql" />
     <Build Include="User Defined Types\ResourceFilterList.sql" />
+    <Build Include="User Defined Types\ResourceIdList.sql" />
     <Build Include="User Defined Types\SavedViewOrderList.sql" />
     <Build Include="User Defined Types\TagKeyValueList.sql" />
   </ItemGroup>

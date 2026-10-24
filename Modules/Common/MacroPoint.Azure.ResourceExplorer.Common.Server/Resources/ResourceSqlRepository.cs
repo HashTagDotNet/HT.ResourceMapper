@@ -17,6 +17,7 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
     {
         private const string ResourceFilterListType = "[ResourceExplorer].[ResourceFilterList]";
         private const string TagKeyValueListType = "[ResourceExplorer].[TagKeyValueList]";
+        private const string ResourceIdListType = "[ResourceExplorer].[ResourceIdList]";
         private const string ResourceTypeTagListType = "[ResourceExplorer].[ResourceTypeTagList]";
 
         private readonly IDbConnector _db;
@@ -297,11 +298,21 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
             await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
         }
 
-        public async Task<(string Result, int ResourceId)> SaveResourceAsync(string resourceUid, int resourceTypeId,
+        public async Task<(string Result, int ResourceId)> SaveResourceWithTagsAndEdgesAsync(string resourceUid, int resourceTypeId,
             string resourceKey, string resourceName, string? description, string? domain,
-            int? primaryTagDefinitionId, CancellationToken cancellationToken)
+            int? primaryTagDefinitionId, IReadOnlyList<(string TagKey, string TagValue)> tags,
+            IReadOnlyList<int> dependsOnIds, IReadOnlyList<int> dependentOnIds, CancellationToken cancellationToken)
         {
-            using var cmd = _db.RW.SprocCommand("[ResourceExplorer].Resource_Save")
+            using var tagTable = new DataTable();
+            tagTable.Columns.Add("TagDefinitionKey", typeof(string));
+            tagTable.Columns.Add("TagValue", typeof(string));
+            foreach (var (tagKey, tagValue) in tags)
+                tagTable.Rows.Add(tagKey, (object?)tagValue ?? DBNull.Value);
+
+            using var dependsOnTable = ToResourceIdTable(dependsOnIds);
+            using var dependentOnTable = ToResourceIdTable(dependentOnIds);
+
+            using var cmd = _db.RW.SprocCommand("[ResourceExplorer].Resource_SaveWithTagsAndEdges")
                 .AddVarchar("@ResourceUid", resourceUid)
                 .AddInteger("@ResourceTypeId", resourceTypeId)
                 .AddNVarchar("@ResourceKey", resourceKey)
@@ -309,11 +320,23 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
                 .AddNVarchar("@Description", description)
                 .AddNVarchar("@Domain", domain)
                 .AddInteger("@PrimaryTagDefinitionId", primaryTagDefinitionId)
+                .AddTvp("@Tags", TagKeyValueListType, tagTable)
+                .AddTvp("@DependsOnIds", ResourceIdListType, dependsOnTable)
+                .AddTvp("@DependentOnIds", ResourceIdListType, dependentOnTable)
                 .AddInteger("@ResourceId", 0, ParameterDirection.Output)
                 .AddVarchar("@Result", null, 10, ParameterDirection.Output);
 
             await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
             return (cmd.ReadString("@Result") ?? "error", cmd.ReadInt("@ResourceId"));
+        }
+
+        private static DataTable ToResourceIdTable(IReadOnlyList<int> resourceIds)
+        {
+            var table = new DataTable();
+            table.Columns.Add("ResourceId", typeof(int));
+            foreach (var id in resourceIds)
+                table.Rows.Add(id);
+            return table;
         }
 
         public async Task<List<ResourceTagRead>> GetTagsForResourceAsync(int resourceId, CancellationToken cancellationToken)
@@ -634,22 +657,6 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
 
             await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
             return cmd.ReadString("@Result") ?? "error";
-        }
-
-        public async Task SetResourceTagsAsync(int resourceId, IReadOnlyList<(string TagKey, string TagValue)> tags,
-            CancellationToken cancellationToken)
-        {
-            using var table = new DataTable();
-            table.Columns.Add("TagDefinitionKey", typeof(string));
-            table.Columns.Add("TagValue", typeof(string));
-            foreach (var (tagKey, tagValue) in tags)
-                table.Rows.Add(tagKey, (object?)tagValue ?? DBNull.Value);
-
-            using var cmd = _db.RW.SprocCommand("[ResourceExplorer].ResourceTag_SetForResource")
-                .AddInteger("@ResourceId", resourceId)
-                .AddTvp("@Tags", TagKeyValueListType, table);
-
-            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
         }
 
         public async Task<(List<ResourcePickerItem> Items, int TotalCount)> SearchResourcesForPickerAsync(

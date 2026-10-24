@@ -89,12 +89,14 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Interfaces
         // Deletes the resource and cascades its relationship edges (both directions) and tags.
         Task DeleteResourceAsync(int resourceId, CancellationToken cancellationToken);
 
-        // Editor create/update, keyed by the immutable ResourceUid (not (type+key) — the editor
-        // allows Key rename). Result is 'created' | 'updated' | 'error' (Type or Domain changed
-        // post-save).
-        Task<(string Result, int ResourceId)> SaveResourceAsync(string resourceUid, int resourceTypeId,
+        // Editor create/update in one transaction: the resource (keyed by the immutable ResourceUid),
+        // its non-domain tags (full replace) and both edge directions (full-set replace per
+        // direction; dependentOnIds are written on the far side). Result is 'created' | 'updated' |
+        // 'error' (Type or Domain changed post-save; nothing is written).
+        Task<(string Result, int ResourceId)> SaveResourceWithTagsAndEdgesAsync(string resourceUid, int resourceTypeId,
             string resourceKey, string resourceName, string? description, string? domain,
-            int? primaryTagDefinitionId, CancellationToken cancellationToken);
+            int? primaryTagDefinitionId, IReadOnlyList<(string TagKey, string TagValue)> tags,
+            IReadOnlyList<int> dependsOnIds, IReadOnlyList<int> dependentOnIds, CancellationToken cancellationToken);
 
         // Every applied tag value for the resource, joined to its definition.
         Task<List<ResourceTagRead>> GetTagsForResourceAsync(int resourceId, CancellationToken cancellationToken);
@@ -187,11 +189,6 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Interfaces
         /// <summary>Replaces one resource type's entry-point template. Returns 'ok' or 'error'.</summary>
         Task<string> SetEntryPointTemplatesAsync(int resourceTypeId,
             IReadOnlyList<EntryPointTagTemplateModel> tags, CancellationToken cancellationToken);
-
-        // Replaces all non-domain applied tags for the resource (delete-all-then-reinsert via
-        // ResourceTag_SetForResource — domain-safe; a domain-keyed pair is ignored by the sproc).
-        Task SetResourceTagsAsync(int resourceId, IReadOnlyList<(string TagKey, string TagValue)> tags,
-            CancellationToken cancellationToken);
 
         // Same-domain resource search backing the Dependencies / Dependent On tabs' picker.
         Task<(List<ResourcePickerItem> Items, int TotalCount)> SearchResourcesForPickerAsync(
