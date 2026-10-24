@@ -27,6 +27,11 @@ else if (_detail is not null)
     <div class="rm-view">
         <PageHeader Title="@_detail.ResourceName" Parents="@ParentCrumbs" Description="@_detail.Description">
             <Actions>
+                @if (!string.IsNullOrWhiteSpace(_portalUrl))
+                {
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.OpenInNew" Class="mr-2"
+                               Href="@_portalUrl" Target="_blank" data-testid="open-in-portal">Open In Portal</MudButton>
+                }
                 <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Edit"
                            Href="@($"/resources/{_detail.ResourceUid}?mode=edit")">Edit</MudButton>
             </Actions>
@@ -40,10 +45,14 @@ else if (_detail is not null)
         </div>
 
         <MudPaper Outlined="true" Class="pa-4 mb-4" data-testid="azure-ids">
-            <MudText Typo="Typo.subtitle2">Azure Resource Ids</MudText>
+            <div class="d-flex align-center">
+                <MudText Typo="Typo.subtitle2" Class="flex-grow-1">Azure Resource Ids</MudText>
+                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Edit"
+                           Href="@($"/resources/{_detail.ResourceUid}?mode=edit")" data-testid="edit-azure-ids">Edit</MudButton>
+            </div>
             @if (_azureIds.Count == 0)
             {
-                <MudText Typo="Typo.body2" Class="rm-section-desc">No Azure Resource Id Recorded.</MudText>
+                <MudText Typo="Typo.body2" Class="rm-section-desc">No Azure ids yet</MudText>
             }
             @foreach (var id in _azureIds)
             {
@@ -106,9 +115,11 @@ else if (_detail is not null)
     [Parameter] public string ResourceUid { get; set; } = string.Empty;
 
     private const string AzureResourceIdKey = "AzureResourceId";
+    private const string PortalUrlKey = "PortalUrl";
     private static readonly (string Text, string Href)[] ParentCrumbs = [("Resources", "/")];
 
     private ResourceDetailModel? _detail;
+    private string? _portalUrl;
     private bool _loading = true;
     private string? _loadError;
     private List<(string Value, AzureIdAge Age)> _azureIds = new();
@@ -151,6 +162,7 @@ else if (_detail is not null)
                     Config.AzureIds.LegacySubscriptionIds, Config.AzureIds.LegacyNamePrefixes)))
                 .ToList();
             _otherTags = _detail.Tags.Where(t => t.TagDefinitionKey != AzureResourceIdKey).ToList();
+            _portalUrl = _detail.Tags.FirstOrDefault(t => t.TagDefinitionKey == PortalUrlKey && !string.IsNullOrWhiteSpace(t.Value))?.Value;
 
             var root = new HashSet<string>(StringComparer.Ordinal) { _detail.ResourceUid };
             _dependsOn = BuildNodes(_detail.Relationships.Where(r => r.Direction == "DependsOn"), "DependsOn", root);

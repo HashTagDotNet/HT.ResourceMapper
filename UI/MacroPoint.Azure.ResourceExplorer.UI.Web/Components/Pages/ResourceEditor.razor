@@ -182,6 +182,7 @@ else if (_model is not null && _response is not null)
             if (response.IsSuccess() && response.ApiResponse.Data is not null)
             {
                 _response = response.ApiResponse.Data;
+                EnsureAzureRow();
             }
             else
             {
@@ -261,7 +262,20 @@ else if (_model is not null && _response is not null)
 
         // A value the user typed into a pre-seeded row before switching type is lost — accepted, RD6.
         EditorSave.SeedTagsForType(_model, _response, resourceTypeId);
+        EnsureAzureRow();
         StateHasChanged();
+    }
+
+    /// <summary>Azure Resource Id is a first-class field on the General tab whatever the type's template
+    /// says, so the row always exists (same approach as QuickAddForm).</summary>
+    private void EnsureAzureRow()
+    {
+        if (_model!.Tags.Any(t => !t.IsRemoved && t.Definition.TagDefinitionKey == GeneralTab.AzureResourceIdKey)) return;
+        var definition = _response!.TagDictionary.FirstOrDefault(d => d.TagDefinitionKey == GeneralTab.AzureResourceIdKey);
+        if (definition is null) return;
+        var row = EditorSave.PreSeededRow(definition, false);
+        row.IsPreSeeded = false;
+        _model.Tags.Add(row);
     }
 
     private void OnResourceDomainChanged()

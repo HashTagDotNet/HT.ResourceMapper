@@ -89,7 +89,19 @@
                         .Where(t => string.Equals(t.ContentType, "Link", StringComparison.OrdinalIgnoreCase))
                         .ToList() ?? new List<ResourceGridTagModel>();
                 }
+                @{
+                    var portalUrl = context.Item.Tags?
+                        .FirstOrDefault(t => t.TagKey == PortalUrlKey && !string.IsNullOrWhiteSpace(t.TagValue))?.TagValue;
+                }
                 <div class="rm-actions">
+                    @if (portalUrl is not null)
+                    {
+                        <MudTooltip Text="Open in portal">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Cloud" Size="Size.Small"
+                                           Href="@portalUrl" Target="_blank"
+                                           aria-label="Open in portal" data-testid="open-in-portal" />
+                        </MudTooltip>
+                    }
                     @* PL-07: this was the one row action of four with no tooltip, in both its states.
                        Disabled state — a MudTooltip cannot fire on a disabled button (Mud sets
                        pointer-events: none), so the explanation goes on a wrapper span whose native
@@ -307,6 +319,7 @@
     }
 
     private const string AzureResourceIdKey = "AzureResourceId";
+    private const string PortalUrlKey = "PortalUrl";
 
     private List<(string Value, AzureIdAge Age)> AzureIdsOf(ResourceGridItemModel item) =>
         item.Tags

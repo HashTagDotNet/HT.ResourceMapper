@@ -123,6 +123,24 @@
     </FormRow>
 </div>
 
+@if (AzureRow is { } azureRow)
+{
+    <div class="rm-section">
+        <div class="rm-section-heading">Azure Resource Ids</div>
+        <div class="rm-section-desc">Where this resource lives in Azure.</div>
+
+        <FormRow Label="Azure Resource Id"
+                 Info="Multi-valued. Paste the full ARM id; add the new one next to the old during cutover.">
+            <TagValueEditor Row="azureRow" ReadOnly="ReadOnly" OnChanged="OnFieldChanged" />
+            @foreach (var msg in azureRow.RowMessages)
+            {
+                <MudAlert Severity="@(msg.Level == EditorFieldLevel.Error ? Severity.Error : Severity.Warning)"
+                          Variant="Variant.Outlined" Dense="true" Class="mt-1">@msg.Message</MudAlert>
+            }
+        </FormRow>
+    </div>
+}
+
 @if (Model.IsPersisted)
 {
     <MudText Typo="Typo.caption" Color="Color.Secondary">
@@ -157,6 +175,11 @@
     /// <summary>Fired (Create mode only, via the Domain select) so the parent can clear dependency
     /// rows that were validated same-domain against the old domain (RD6).</summary>
     [Parameter] public EventCallback OnResourceDomainChanged { get; set; }
+
+    internal const string AzureResourceIdKey = "AzureResourceId";
+
+    private TagRowEditor? AzureRow =>
+        Model.Tags.FirstOrDefault(t => !t.IsRemoved && t.Definition.TagDefinitionKey == AzureResourceIdKey);
 
     private bool _keyManuallyEdited;
 

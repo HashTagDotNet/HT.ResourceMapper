@@ -6,7 +6,7 @@
 {
     @* PL-33: names the field from the domain tag's DisplayName rather than hardcoding "Subscription",
        so this message cannot drift from the label on the General tab it points at. *@
-    <MudText Typo="Typo.caption" Color="Color.Secondary">Choose a @DomainLabel on the General tab first.</MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary">Choose a @DomainLabel@(PointToGeneralTab ? " on the General tab" : "") first.</MudText>
 }
 else
 {
@@ -31,6 +31,9 @@ else
 
     /// <summary>User-facing name of the domain field, for the "choose one first" prompt (PL-33).</summary>
     [Parameter] public string DomainLabel { get; set; } = "Domain";
+
+    /// <summary>False where the domain select is on the same page (quick add), so the prompt does not name a tab.</summary>
+    [Parameter] public bool PointToGeneralTab { get; set; } = true;
 
     [Parameter] public string? ExcludeResourceUid { get; set; }
     [Parameter] public List<string> ExcludedUids { get; set; } = new();
