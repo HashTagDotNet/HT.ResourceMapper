@@ -311,13 +311,14 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
         }
 
         /// <summary>One dependency edge validated as resolvable, ready to write once its endpoints exist.</summary>
-        private sealed record PendingDependency(ImportResourceItem Source, string TargetKey, string TargetType, string? Domain);
+        private sealed record PendingDependency(ImportResourceItem Source, string? SourceDomain, string TargetKey, string TargetType, string? TargetDomain);
 
         /// <summary>
         /// Resolves each resource's Dependencies[] (flat keys) against the combined identity set
-        /// (existing DB rows ∪ payload resources), scoped to the dependent's own effective domain
-        /// (OQ1 default). Exactly one (domain+key) match required; zero → unresolved, more than
-        /// one (same key, different types) → ambiguous. Self-references are rejected outright.
+        /// (existing DB rows ∪ payload resources). A key is looked up in the dependent's own
+        /// effective domain first; when that domain has no such key the lookup widens to every
+        /// domain, so edges may cross domains. Exactly one (domain+type) match required; zero →
+        /// unresolved, more than one → ambiguous. Self-references are rejected outright.
         /// Runs entirely before any write.
         /// </summary>
         private static List<PendingDependency> ValidateAndResolveDependencies(
@@ -329,20 +330,21 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
             var resources = request.Resources ?? new List<ImportResourceItem>();
             var pending = new List<PendingDependency>();
 
-            // (domain,key) -> distinct type names seen, across existing rows AND payload resources.
-            var typeIndex = new Dictionary<(string Domain, string Key), List<string>>();
+            // key -> distinct (domain,type) pairs seen, across existing rows AND payload resources.
+            var typeIndex = new Dictionary<string, List<(string Domain, string Type)>>();
 
             void Index(string? d, string? type, string? key)
             {
                 if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(type)) return;
-                var idxKey = (NormKey(d), NormKey(key));
+                var idxKey = NormKey(key);
                 if (!typeIndex.TryGetValue(idxKey, out var list))
                 {
-                    list = new List<string>();
+                    list = new List<(string Domain, string Type)>();
                     typeIndex[idxKey] = list;
                 }
-                if (!list.Contains(type, StringComparer.OrdinalIgnoreCase))
-                    list.Add(type);
+                var entry = (NormKey(d), type);
+                if (!list.Any(x => x.Domain == entry.Item1 && string.Equals(x.Type, type, StringComparison.OrdinalIgnoreCase)))
+                    list.Add(entry);
             }
 
             foreach (var id in existingIdentities)
@@ -365,22 +367,24 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
                         continue;
                     }
 
-                    var idxKey = (NormKey(effectiveDomain), NormKey(depKey));
-                    if (!typeIndex.TryGetValue(idxKey, out var matchedTypes) || matchedTypes.Count == 0)
+                    if (!typeIndex.TryGetValue(NormKey(depKey), out var candidates) || candidates.Count == 0)
                     {
                         errors.Add(Err("resources", r.Key, "dependencies",
-                            $"Dependency '{depKey}' could not be resolved in domain '{effectiveDomain}'"));
+                            $"Dependency '{depKey}' could not be resolved"));
                         continue;
                     }
 
-                    if (matchedTypes.Count > 1)
+                    var sameDomain = candidates.Where(c => c.Domain == NormKey(effectiveDomain)).ToList();
+                    var matched = sameDomain.Count > 0 ? sameDomain : candidates;
+
+                    if (matched.Count > 1)
                     {
                         errors.Add(Err("resources", r.Key, "dependencies",
-                            $"Dependency '{depKey}' is ambiguous in domain '{effectiveDomain}' — matches types: {string.Join(", ", matchedTypes)}"));
+                            $"Dependency '{depKey}' is ambiguous — matches: {string.Join(", ", matched.Select(m => $"{m.Domain}/{m.Type}"))}"));
                         continue;
                     }
 
-                    pending.Add(new PendingDependency(r, depKey.Trim(), matchedTypes[0], effectiveDomain));
+                    pending.Add(new PendingDependency(r, effectiveDomain, depKey.Trim(), matched[0].Type, matched[0].Domain));
                 }
             }
 
@@ -449,6 +453,7 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
                 }
 
                 await _importRepo.SetResourceTagsAsync(resourceId, NormalizeTags(r.Tags, domain.Key), ct);
+                await _importRepo.SetPrimaryFromTemplateAsync(resourceId, ct);
             }
 
             // Dependency edges are written only after every resource in this run has a resolved
@@ -456,12 +461,12 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
             // is idempotent, so a re-import never removes an edge dropped from a later Dependencies[].
             foreach (var dep in pendingDependencies)
             {
-                if (skippedSourceKeys.Contains((NormKey(dep.Domain), NormKey(dep.Source.Key))))
+                if (skippedSourceKeys.Contains((NormKey(dep.SourceDomain), NormKey(dep.Source.Key))))
                     continue;
 
-                if (!resolvedIds.TryGetValue((NormKey(dep.Domain), NormKey(dep.Source.Key), NormKey(dep.Source.Type)), out var fromId))
+                if (!resolvedIds.TryGetValue((NormKey(dep.SourceDomain), NormKey(dep.Source.Key), NormKey(dep.Source.Type)), out var fromId))
                     continue;
-                if (!resolvedIds.TryGetValue((NormKey(dep.Domain), NormKey(dep.TargetKey), NormKey(dep.TargetType)), out var toId))
+                if (!resolvedIds.TryGetValue((NormKey(dep.TargetDomain), NormKey(dep.TargetKey), NormKey(dep.TargetType)), out var toId))
                     continue;
 
                 await _resourceRepo.AddRelationshipAsync(fromId, toId, ct);

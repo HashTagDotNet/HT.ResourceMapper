@@ -342,10 +342,9 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
                 var effectivePrimaryId = ResolveEffectivePrimary(request.PrimaryTagDefinitionId, nonEmptyTags, tagDictionary);
 
                 // Relationships: validate + resolve BEFORE any write (self-loop / not-found /
-                // same-domain — RD2/RD4/RD5/RD14).
-                var effectiveDomain = isEdit ? existing!.Domain : request.Domain;
+                // unknown uid; edges may cross domains — RD2/RD5).
                 var (relationshipsValid, resolvedDependsOn, resolvedDependentOn) =
-                    await ValidateAndResolveRelationshipsAsync(builder, request, effectiveDomain, cancellationToken);
+                    await ValidateAndResolveRelationshipsAsync(builder, request, cancellationToken);
                 if (!relationshipsValid)
                     return builder.BuildResponse();
 
@@ -1663,14 +1662,13 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
 
         /// <summary>
         /// Validates + resolves every desired relationship uid BEFORE any write: rejects a
-        /// self-loop, an unknown uid, or a cross-domain target. Returns the resolved (uid, id)
+        /// self-loop or an unknown uid. Edges may cross domains. Returns the resolved (uid, id)
         /// pairs per direction for the transactional save.
         /// </summary>
         private async Task<(bool IsValid, List<(string Uid, int Id)> DependsOn, List<(string Uid, int Id)> DependentOn)>
             ValidateAndResolveRelationshipsAsync(
                 ServiceResponseBuilder<SaveResourceResponse> builder,
                 SaveResourceRequest request,
-                string? effectiveDomain,
                 CancellationToken cancellationToken)
         {
             var isValid = true;
@@ -1698,18 +1696,6 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
                     if (other is null)
                     {
                         builder.Validation.AddValidation(propertyKey, $"Resource '{uid}' was not found");
-                        isValid = false;
-                        continue;
-                    }
-
-                    // Both-null domains are equal (the "Unused" state, design §6); a
-                    // domain-having side never matches a domain-less side, and vice-versa.
-                    var sameDomain = string.IsNullOrEmpty(effectiveDomain)
-                        ? string.IsNullOrEmpty(other.Domain)
-                        : string.Equals(effectiveDomain, other.Domain, StringComparison.Ordinal);
-                    if (!sameDomain)
-                    {
-                        builder.Validation.AddValidation(propertyKey, $"'{other.ResourceName}' is not in the same domain");
                         isValid = false;
                         continue;
                     }

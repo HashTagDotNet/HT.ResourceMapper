@@ -754,13 +754,14 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Resources
             saves.Single().DependsOnIds.Should().BeEmpty("because the edge direction must not be reversed");
         }
         [Fact]
-        public async Task SaveResourceAsync_CrossDomainDependsOnTarget_ReturnsValidationErrorAndDoesNotCallRepo()
+        public async Task SaveResourceAsync_CrossDomainDependsOnTarget_IsAcceptedAndSavesTheEdge()
         {
             var uid = Guid.NewGuid().ToString();
-            _repo.Setup(r => r.CheckResourceUniqueAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(true);
+            var saves = SetupHappySaveStubs(uid, resourceId: 10, domain: "non-prod");
             _repo.Setup(r => r.GetResourceByUidAsync("uid-cross", It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new ResourceDetail { ResourceId = 501, ResourceUid = "uid-cross", ResourceName = "Cross", Domain = "prod" });
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceRelationshipItem>());
 
             var request = new SaveResourceRequest
             {
@@ -771,10 +772,9 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Resources
 
             var response = await _sut.SaveResourceAsync(request, CancellationToken.None);
 
-            response.IsSuccess().Should().BeFalse("because the target is in a different domain (RD4)");
-            VerifySaveRepoNeverCalled();
+            response.IsSuccess().Should().BeTrue("because relationships may cross domains");
+            saves.Single().DependsOnIds.Should().Equal(new[] { 501 }, "because the cross-domain edge is saved like any other");
         }
-
         [Fact]
         public async Task SaveResourceAsync_SelfReferentialDependsOnUid_ReturnsValidationErrorAndDoesNotCallRepo()
         {

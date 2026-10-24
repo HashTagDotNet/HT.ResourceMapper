@@ -38,5 +38,9 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Interfaces
         /// <summary>Replaces all tags for the resource with the supplied (key, value) pairs.</summary>
         Task SetResourceTagsAsync(int resourceId, IReadOnlyList<(string TagKey, string TagValue)> tags,
             CancellationToken cancellationToken);
+
+        /// <summary>Seeds the resource's primary link from its type's default-primary template tag,
+        /// when it has none yet and carries a value for that tag.</summary>
+        Task SetPrimaryFromTemplateAsync(int resourceId, CancellationToken cancellationToken);
     }
 }

@@ -126,5 +126,13 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
 
             await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
         }
+
+        public async Task SetPrimaryFromTemplateAsync(int resourceId, CancellationToken cancellationToken)
+        {
+            using var cmd = _db.RW.SprocCommand("[ResourceExplorer].Resource_SetPrimaryFromTemplate")
+                .AddInteger("@ResourceId", resourceId);
+
+            await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
+        }
     }
 }

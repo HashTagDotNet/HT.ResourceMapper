@@ -521,6 +521,113 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Resources
                 "because skip-means-skip extends to a skipped resource's out-edges");
         }
 
+        [Fact]
+        public async Task ImportAsync_DependencyInOtherDomain_ResolvesAndWritesEdge()
+        {
+            _importRepo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition> { DomainTagDef(allowedValues: new[] { "prod", "shared" }) });
+            _importRepo.Setup(r => r.UpsertResourceAsync("vnext", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), "shared", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("created", 100));
+            _importRepo.Setup(r => r.UpsertResourceAsync("app-prod", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), "prod", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("created", 200));
+
+            var app = Resource("vnext", "vNext");
+            app.Tags = new Dictionary<string, JsonElement> { ["Domain"] = Str("shared") };
+            app.Dependencies = new List<string> { "app-prod" };
+            var site = Resource("app-prod", "App Prod");
+            site.Tags = new Dictionary<string, JsonElement> { ["Domain"] = Str("prod") };
+
+            var response = await _sut.ImportAsync(ValidRequest(app, site), CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because dependencies may cross domains");
+            _resourceRepo.Verify(r => r.AddRelationshipAsync(100, 200, It.IsAny<CancellationToken>()), Times.Once,
+                "because the shared application depends on the prod site");
+        }
+
+        [Fact]
+        public async Task ImportAsync_DependencyKeyInTwoOtherDomains_IsAmbiguous()
+        {
+            _importRepo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition> { DomainTagDef(allowedValues: new[] { "prod", "non-prod", "shared" }) });
+
+            var app = Resource("vnext", "vNext");
+            app.Tags = new Dictionary<string, JsonElement> { ["Domain"] = Str("shared") };
+            app.Dependencies = new List<string> { "site" };
+            var prod = Resource("site", "Site");
+            prod.Tags = new Dictionary<string, JsonElement> { ["Domain"] = Str("prod") };
+            var nonProd = Resource("site", "Site");
+            nonProd.Tags = new Dictionary<string, JsonElement> { ["Domain"] = Str("non-prod") };
+
+            var response = await _sut.ImportAsync(ValidRequest(app, prod, nonProd), CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because the key matches in two domains and none is the dependent's own");
+            ErrorsOf(response).Should().Contain(e => e.Field == "dependencies" && e.Key == "vnext", "because the ambiguity is reported against the dependent");
+        }
+
+        [Fact]
+        public async Task ImportAsync_SameKeyInOwnAndOtherDomain_PrefersOwnDomain()
+        {
+            _importRepo.Setup(r => r.GetAllTagDefinitionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TagDefinition> { DomainTagDef(allowedValues: new[] { "prod", "non-prod" }) });
+            _importRepo.Setup(r => r.UpsertResourceAsync("app", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), "prod", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("created", 100));
+            _importRepo.Setup(r => r.UpsertResourceAsync("db", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), "prod", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("created", 200));
+            _importRepo.Setup(r => r.UpsertResourceAsync("db", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), "non-prod", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("created", 300));
+
+            var app = Resource("app", "App");
+            app.Tags = new Dictionary<string, JsonElement> { ["Domain"] = Str("prod") };
+            app.Dependencies = new List<string> { "db" };
+            var dbProd = Resource("db", "Db");
+            dbProd.Tags = new Dictionary<string, JsonElement> { ["Domain"] = Str("prod") };
+            var dbNonProd = Resource("db", "Db");
+            dbNonProd.Tags = new Dictionary<string, JsonElement> { ["Domain"] = Str("non-prod") };
+
+            var response = await _sut.ImportAsync(ValidRequest(app, dbProd, dbNonProd), CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the dependent's own domain has exactly one match");
+            _resourceRepo.Verify(r => r.AddRelationshipAsync(100, 200, It.IsAny<CancellationToken>()), Times.Once,
+                "because the same-domain target wins over the same key elsewhere");
+        }
+
+        #endregion
+
+        #region primary link
+
+        [Fact]
+        public async Task ImportAsync_WrittenResource_SeedsPrimaryFromTemplate()
+        {
+            _importRepo.Setup(r => r.UpsertResourceAsync("res-new", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("created", 42));
+
+            var response = await _sut.ImportAsync(ValidRequest(Resource("res-new", "New")), CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the request is valid");
+            _importRepo.Verify(r => r.SetPrimaryFromTemplateAsync(42, It.IsAny<CancellationToken>()), Times.Once,
+                "because import seeds the primary link from the type template after the tags are written");
+        }
+
+        [Fact]
+        public async Task ImportAsync_SkippedResource_DoesNotSeedPrimary()
+        {
+            _importRepo.Setup(r => r.UpsertResourceAsync("res-old", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("skipped", 42));
+            var request = ValidRequest(Resource("res-old", "Old"));
+            request.Policy.OnConflict = "skip";
+
+            await _sut.ImportAsync(request, CancellationToken.None);
+
+            _importRepo.Verify(r => r.SetPrimaryFromTemplateAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never,
+                "because skip-means-skip extends to the primary link");
+        }
         #endregion
 
         #region write phase

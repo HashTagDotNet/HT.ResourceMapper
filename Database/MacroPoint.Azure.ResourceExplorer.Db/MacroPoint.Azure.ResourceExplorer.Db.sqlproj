@@ -93,6 +93,7 @@
     <Build Include="Stored Procedures\Resource_GetItems.sql" />
     <Build Include="Stored Procedures\Resource_Save.sql" />
     <Build Include="Stored Procedures\Resource_SaveWithTagsAndEdges.sql" />
+    <Build Include="Stored Procedures\Resource_SetPrimaryFromTemplate.sql" />
     <Build Include="Stored Procedures\Resource_SearchForPicker.sql" />
     <Build Include="Stored Procedures\Resource_Upsert.sql" />
     <Build Include="Stored Procedures\SavedView_Upsert.sql" />
