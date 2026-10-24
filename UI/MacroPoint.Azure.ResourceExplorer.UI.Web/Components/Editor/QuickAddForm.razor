@@ -8,6 +8,7 @@
 @inject GlobalConfig Config
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject ILogger<QuickAddForm> Logger
 
 @* Quick add (HardReview-Simplify §3 "Quick entry", mockups/quick-add.html): one form for a new
    resource — Type, Name, Azure Resource Id(s), the type template's first two tags, Depends On.
@@ -346,9 +347,10 @@ else
                 _model.IdentityPreview.UniquenessMessage = response.ApiResponse.Data.Message;
             }
         }
-        catch
+        catch (Exception ex)
         {
             // Non-critical — the server re-validates on Save regardless.
+            Logger.LogWarning(ex, "Uniqueness check failed for {ResourceUid}", _model!.ResourceUid);
         }
     }
 
