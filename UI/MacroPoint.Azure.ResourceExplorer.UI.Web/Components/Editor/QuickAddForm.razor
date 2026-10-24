@@ -65,6 +65,14 @@ else
             </FormRow>
         }
 
+        @if (PortalRow is { } portalRow)
+        {
+            <FormRow Label="Portal" Info="The Azure portal link for this resource.">
+                <TagValueEditor Row="portalRow" OnChanged="StateHasChanged" />
+                @RowMessages(portalRow)
+            </FormRow>
+        }
+
         @{
             var keyRows = KeyRows();
         }
@@ -247,12 +255,15 @@ else
     private TagRowEditor? AzureRow =>
         _model?.Tags.FirstOrDefault(t => !t.IsRemoved && t.Definition.TagDefinitionKey == AzureResourceIdKey);
 
+    private TagRowEditor? PortalRow =>
+        _model?.Tags.FirstOrDefault(t => !t.IsRemoved && t.Definition.TagDefinitionKey == GeneralTab.PortalUrlKey);
+
     /// <summary>The type template's first two tags (in template order), then any required tag not
     /// already among them — a required tag hidden under More Options would make Save fail on a field
     /// the user cannot see.</summary>
     private List<TagRowEditor> KeyRows()
     {
-        var rows = _model!.Tags.Where(t => !t.IsRemoved && t != AzureRow).ToList();
+        var rows = _model!.Tags.Where(t => !t.IsRemoved && t != AzureRow && t != PortalRow).ToList();
         var firstTwo = _response!.EntryPointTemplates
             .Where(t => t.ResourceTypeId == _model.ResourceTypeId)
             .Select(t => rows.FirstOrDefault(r => r.TagDefinitionId == t.TagDefinitionId))
@@ -263,14 +274,20 @@ else
     }
 
     private List<TagRowEditor> OtherRows(List<TagRowEditor> keyRows) =>
-        _model!.Tags.Where(t => !t.IsRemoved && t != AzureRow && !keyRows.Contains(t)).ToList();
+        _model!.Tags.Where(t => !t.IsRemoved && t != AzureRow && t != PortalRow && !keyRows.Contains(t)).ToList();
 
     /// <summary>Azure Resource Id is a first-class field whatever the type's template says. Not
     /// pre-seeded, so a type change keeps the ids already pasted.</summary>
     private void EnsureAzureRow()
     {
-        if (AzureRow is not null) return;
-        var definition = _response!.TagDictionary.FirstOrDefault(d => d.TagDefinitionKey == AzureResourceIdKey);
+        EnsureRow(AzureRow, AzureResourceIdKey);
+        EnsureRow(PortalRow, GeneralTab.PortalUrlKey);
+    }
+
+    private void EnsureRow(TagRowEditor? existing, string tagDefinitionKey)
+    {
+        if (existing is not null) return;
+        var definition = _response!.TagDictionary.FirstOrDefault(d => d.TagDefinitionKey == tagDefinitionKey);
         if (definition is null) return;
         var row = EditorSave.PreSeededRow(definition, false);
         row.IsPreSeeded = false;

@@ -270,8 +270,14 @@ else if (_model is not null && _response is not null)
     /// says, so the row always exists (same approach as QuickAddForm).</summary>
     private void EnsureAzureRow()
     {
-        if (_model!.Tags.Any(t => !t.IsRemoved && t.Definition.TagDefinitionKey == GeneralTab.AzureResourceIdKey)) return;
-        var definition = _response!.TagDictionary.FirstOrDefault(d => d.TagDefinitionKey == GeneralTab.AzureResourceIdKey);
+        EnsureRow(GeneralTab.AzureResourceIdKey);
+        EnsureRow(GeneralTab.PortalUrlKey);
+    }
+
+    private void EnsureRow(string tagDefinitionKey)
+    {
+        if (_model!.Tags.Any(t => !t.IsRemoved && t.Definition.TagDefinitionKey == tagDefinitionKey)) return;
+        var definition = _response!.TagDictionary.FirstOrDefault(d => d.TagDefinitionKey == tagDefinitionKey);
         if (definition is null) return;
         var row = EditorSave.PreSeededRow(definition, false);
         row.IsPreSeeded = false;

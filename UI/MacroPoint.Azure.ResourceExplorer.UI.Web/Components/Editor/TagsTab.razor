@@ -98,9 +98,11 @@
 
     private int _addTagKey;
 
-    // Azure Resource Id lives on the General tab, so it is not listed here too.
+    // Azure Resource Id and Portal live on the General tab, so they are not listed here too.
     private List<TagRowEditor> VisibleRows() =>
-        Model.Tags.Where(t => !t.IsRemoved && t.Definition.TagDefinitionKey != GeneralTab.AzureResourceIdKey).ToList();
+        Model.Tags.Where(t => !t.IsRemoved
+                              && t.Definition.TagDefinitionKey != GeneralTab.AzureResourceIdKey
+                              && t.Definition.TagDefinitionKey != GeneralTab.PortalUrlKey).ToList();
 
     /// <summary>True when at least one definition is still addable, i.e. the add-existing search
     /// has something to offer. Evaluated at render time so the control disappears as soon as the
