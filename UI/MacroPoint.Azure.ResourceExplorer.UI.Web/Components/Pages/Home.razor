@@ -469,8 +469,16 @@
         // Browser Back/Forward (or an external link): adopt the state and reload without re-navigating.
         _state = incoming;
         _lastQuery = incoming.ToQueryString();
-        if (_grid is not null)
-            await InvokeAsync(() => _grid.ReloadServerData());
+        try
+        {
+            if (_grid is not null)
+                await InvokeAsync(() => _grid.ReloadServerData());
+        }
+        catch
+        {
+            _loadError = "Unable to load resources — the database may not be available yet.";
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private static string MapSortColumn(string? sortBy) => sortBy switch
