@@ -22,7 +22,7 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Utils
             services.TryAddSingleton<IDbConnector>(services =>
             {
                 var cfg = services.GetRequiredService<GlobalConfig>();
-                return new DbConnector(cfg.ConnectionStrings.DatabaseReadWrite,cfg.ConnectionStrings.DatabaseReadWrite);
+                return new DbConnector(cfg.ConnectionStrings.DatabaseReadWrite,cfg.ConnectionStrings.DatabaseReadOnly);
             });
 
             services.TryAddScoped<IResourceRepository,ResourceSqlRepository>();
