@@ -874,3 +874,12 @@ html, body {
 .rm-view-type { color: var(--mud-palette-text-secondary); font-size: .75rem; }
 .rm-view-cycle { font-size: .625rem; color: #7C3AED; background: #F5F3FF; border: 1px solid #DDD6FE; border-radius: 4px; padding: 1px 6px; }
 .rm-view-tagkey { width: 32%; color: var(--mud-palette-text-secondary); }
+
+/* Home grid Azure Id column (Beta slice 7): one chip per AzureResourceId value; the chip whose
+   value matched the search is highlighted. */
+.rm-azid-cell { min-width: 18rem; }
+.rm-azid-list { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.rm-azid { display: inline-flex; align-items: center; gap: 6px; font-family: Consolas, "Cascadia Mono", monospace; font-size: .72rem; background: #F1F5F9; border-radius: 4px; padding: 1px 6px; }
+.rm-azid-hit { background: #FEF08A; outline: 1px solid #FACC15; }
+.rm-azid .rm-copy { opacity: 0; }
+.rm-azid:hover .rm-copy, .rm-azid:focus-within .rm-copy { opacity: 1; }

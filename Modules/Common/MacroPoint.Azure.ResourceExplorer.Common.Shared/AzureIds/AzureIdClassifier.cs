@@ -41,6 +41,24 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Shared.AzureIds
             return hasLegacyPrefix ? AzureIdAge.Old : AzureIdAge.New;
         }
 
+        /// <summary>
+        /// Short display form of an ARM id: the resource names of the last two type/name pairs after
+        /// <c>providers/{namespace}</c> (e.g. <c>usspi-sql-01/PingByPhone</c>). A value that is not an
+        /// ARM id is returned unchanged.
+        /// </summary>
+        public static string ShortName(string azureId)
+        {
+            var segments = azureId.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var providers = Array.FindLastIndex(segments, s => string.Equals(s, "providers", StringComparison.OrdinalIgnoreCase));
+            if (providers < 0)
+                return azureId;
+
+            var names = new List<string>();
+            for (var i = providers + 3; i < segments.Length; i += 2)
+                names.Add(segments[i]);
+            return names.Count == 0 ? azureId : string.Join('/', names.TakeLast(2));
+        }
+
         private static string? SegmentAfter(string[] segments, string marker)
         {
             for (var i = 0; i < segments.Length - 1; i++)

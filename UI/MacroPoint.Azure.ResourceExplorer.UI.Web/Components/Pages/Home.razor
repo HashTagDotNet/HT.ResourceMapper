@@ -1,7 +1,9 @@
 @page "/"
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Routing
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.Config
 @using MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Interfaces
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.AzureIds
 @using MacroPoint.Azure.ResourceExplorer.Common.Server.SavedViews
 @using MacroPoint.Azure.ResourceExplorer.Common.Shared.SavedViews
 @using MacroPoint.Azure.ResourceExplorer.Common.Shared.HomePage.Contracts
@@ -9,6 +11,7 @@
 @using MacroPoint.Azure.ResourceExplorer.UI.Web.Components.Home
 @implements IDisposable
 @inject IResourceService ResourceService
+@inject GlobalConfig Config
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
@@ -20,7 +23,12 @@
 @* §7: every route gets the shell treatment. The grid had no page title at all — the only thing
    naming it was the browser tab. *@
 <PageHeader Title="Resources" IsHome="true"
-            Description="Every catalogued resource, across every subscription." />
+            Description="Find a resource by name or by Azure resource id, then see what it points at and what depends on it.">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add"
+                   Href="/resources">Add Resource</MudButton>
+    </Actions>
+</PageHeader>
 
 <ResourceFilterBar State="_state" TagKeys="_tagKeys" Total="_total" Shown="@(_items?.Count ?? 0)"
                    FacetLoader="LoadFacet" OnReload="HandleReload" />
@@ -49,43 +57,26 @@
                 <span class="rm-desc" title="@context.Item.Description">@context.Item.Description</span>
             </CellTemplate>
         </PropertyColumn>
-        @* PL-12(b): size-to-content so an empty Tags column stops reserving width from Description. *@
-        <TemplateColumn Title="Tags" Sortable="false" CellClass="rm-tags-cell" HeaderClass="rm-tags-cell">
+        <TemplateColumn Title="Azure Id" Sortable="false" CellClass="rm-azid-cell">
             <CellTemplate>
-                @if (context.Item.Tags is null || context.Item.Tags.Count == 0)
+                @{ var azureIds = AzureIdsOf(context.Item); }
+                @if (azureIds.Count == 0)
                 {
                     <MudText Typo="Typo.body2" Color="Color.Secondary">—</MudText>
                 }
                 else
                 {
-                    @* Grouped by tag, not by value: a multi-valued tag prints its label once and
-                       lists its values, instead of repeating "App Insights Filter:" four times.
-                       GroupBy preserves first-appearance order, so the sproc's tag ordering
-                       still decides the sequence. Link tags stay one chip per value - each is
-                       separately clickable and copyable. *@
-                    <div class="d-flex flex-wrap rm-tags">
-                        @foreach (var tagGroup in context.Item.Tags.GroupBy(t => t.TagDisplayName))
+                    <div class="rm-azid-list" data-testid="azure-id-chips">
+                        @foreach (var id in azureIds)
                         {
-                            @if (string.Equals(tagGroup.First().ContentType, "Link", StringComparison.OrdinalIgnoreCase))
-                            {
-                                @foreach (var tag in tagGroup)
-                                {
-                                    <span class="rm-tag">
-                                        <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" Class="rm-tagicon" />
-                                        <MudLink Href="@tag.TagValue" Target="_blank" Typo="Typo.body2">@tag.TagDisplayName</MudLink>
-                                        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
-                                                       Class="rm-copy" aria-label="Copy link"
-                                                       OnClick="@(() => CopyAsync(tag.TagValue))" />
-                                    </span>
-                                }
-                            }
-                            else
-                            {
-                                <span class="rm-tagtext">
-                                    <span class="rm-tagkey">@tagGroup.Key:</span>
-                                    @string.Join(", ", tagGroup.Select(t => t.TagValue))
-                                </span>
-                            }
+                            var hit = IsSearchHit(id.Value);
+                            <span class="rm-azid @(hit ? "rm-azid-hit" : "")" title="@id.Value" data-hit="@(hit ? "true" : "false")">
+                                <span class="rm-view-badge @(id.Age == AzureIdAge.Old ? "rm-view-badge-old" : "rm-view-badge-new")">@id.Age</span>
+                                <span class="rm-azid-seg">@AzureIdClassifier.ShortName(id.Value)</span>
+                                <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small"
+                                               Class="rm-copy" aria-label="Copy Azure Id"
+                                               OnClick="@(() => CopyAsync(id.Value))" />
+                            </span>
                         }
                     </div>
                 }
@@ -315,6 +306,19 @@
         return response.IsSuccess() ? response.ApiResponse.Data : null;
     }
 
+    private const string AzureResourceIdKey = "AzureResourceId";
+
+    private List<(string Value, AzureIdAge Age)> AzureIdsOf(ResourceGridItemModel item) =>
+        item.Tags
+            .Where(t => t.TagKey == AzureResourceIdKey && !string.IsNullOrWhiteSpace(t.TagValue))
+            .Select(t => (t.TagValue, AzureIdClassifier.Classify(t.TagValue,
+                Config.AzureIds.LegacySubscriptionIds, Config.AzureIds.LegacyNamePrefixes)))
+            .ToList();
+
+    private bool IsSearchHit(string value) =>
+        !string.IsNullOrWhiteSpace(_state.SearchFor)
+        && value.Contains(_state.SearchFor.Trim(), StringComparison.OrdinalIgnoreCase);
+
     private async Task HandleReload(bool pushHistory)
     {
         _pushNext = pushHistory;
@@ -324,6 +328,11 @@
 
     private void UpdateUrl(bool push)
     {
+        // A grid reload can finish after the user has clicked a link off this page. Navigation.Uri is
+        // then already the target, and writing the query onto it would append ?n=…&s=… to that page.
+        if (_disposed || new Uri(Navigation.Uri).AbsolutePath != "/")
+            return;
+
         _lastQuery = _state.ToQueryString();
         var path = new Uri(Navigation.Uri).AbsolutePath;
         Navigation.NavigateTo(path + _lastQuery, forceLoad: false, replace: !push);
@@ -381,8 +390,11 @@
         await HandleReload(pushHistory: false);
         StateHasChanged();
     }
+    private bool _disposed;
+
     public void Dispose()
     {
+        _disposed = true;
         Navigation.LocationChanged -= OnLocationChanged;
         GridView.OpenRequested -= ApplySavedViewAsync;
         GridView.GridDetached();

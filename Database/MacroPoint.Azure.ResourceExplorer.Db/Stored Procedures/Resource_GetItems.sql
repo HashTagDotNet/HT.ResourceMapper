@@ -209,10 +209,11 @@ BEGIN
         -- @TagLimit counts TAGS, not tag values. DENSE_RANK over the tag key means a four-value
         -- tag occupies one slot instead of four, so one verbose tag can no longer push every
         -- other tag off the row (which is exactly what a multi-valued catalog used to do).
+        -- AzureResourceId always ranks first so the cap never drops the Azure Id column.
         SELECT *,
                DENSE_RANK() OVER (
                    PARTITION BY ResourceUid
-                   ORDER BY Priority, TagKey
+                   ORDER BY CASE WHEN TagKey = ''AzureResourceId'' THEN 0 ELSE 1 END, Priority, TagKey
                ) as TagRank
         FROM TagsWithPriority
     )

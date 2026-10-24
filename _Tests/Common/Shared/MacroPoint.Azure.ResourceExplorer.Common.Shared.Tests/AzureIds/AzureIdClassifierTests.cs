@@ -89,5 +89,27 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Shared.Tests.AzureIds
             AzureIdClassifier.Classify("usspi-aps-pd-visibility", Subs, Prefixes)
                 .Should().Be(AzureIdAge.Old, "because a bare name is judged by its own prefix");
         }
+
+        [Fact]
+        public void ShortName_NestedArmId_ReturnsLastTwoResourceNames()
+        {
+            var id = $"/subscriptions/{NewSub}/resourceGroups/rg-app/providers/Microsoft.Sql/servers/sql-01/databases/PingByPhone";
+
+            AzureIdClassifier.ShortName(id).Should().Be("sql-01/PingByPhone", "because the chip shows the parent and own resource names");
+        }
+
+        [Fact]
+        public void ShortName_TopLevelArmId_ReturnsResourceName()
+        {
+            var id = $"/subscriptions/{NewSub}/resourceGroups/rg-app/providers/Microsoft.Web/sites/app1";
+
+            AzureIdClassifier.ShortName(id).Should().Be("app1", "because a top-level resource has one name");
+        }
+
+        [Fact]
+        public void ShortName_NotAnArmId_ReturnsValueUnchanged()
+        {
+            AzureIdClassifier.ShortName("usspi-aps-pd-visibility").Should().Be("usspi-aps-pd-visibility", "because there is no providers segment to shorten");
+        }
     }
 }
