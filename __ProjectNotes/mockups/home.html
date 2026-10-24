@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resources — Mockup</title>
+<style>
+  :root {
+    --primary:#2563EB; --primary-bg:#EFF6FF; --text:#1E293B; --text2:#64748B; --divider:#E2E8F0;
+    --bg:#F8FAFC; --surface:#FFFFFF; --old:#B45309; --old-bg:#FFFBEB; --new:#047857; --new-bg:#ECFDF5;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:13px/1.45 Inter, "Segoe UI", Roboto, system-ui, sans-serif; color:var(--text); background:var(--bg); }
+  .note { background:#FEF9C3; border-bottom:1px solid #FDE047; padding:10px 32px; font-size:12px; color:#713F12; }
+  .note b { color:#422006; }
+  .appbar { height:48px; background:var(--surface); border-bottom:1px solid var(--divider); display:flex; align-items:center; padding:0 16px; gap:12px; }
+  .appbar .title { font-weight:600; letter-spacing:.2px; }
+  .appbar .spacer { flex:1; }
+  .iconbtn { width:32px; height:32px; border:0; background:transparent; border-radius:50%; color:var(--text2); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+  .iconbtn:hover { background:#F1F5F9; }
+  .page { padding:16px 32px 32px; }
+  h1 { font-size:20px; font-weight:600; margin:8px 0 2px; }
+  .desc { color:var(--text2); font-size:12px; margin-bottom:16px; }
+  .toolbar { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  .search { flex:0 1 560px; display:flex; align-items:center; gap:8px; height:40px; border:1px solid #CBD5E1; border-radius:8px; background:var(--surface); padding:0 12px; }
+  .search:focus-within { border-color:var(--primary); box-shadow:0 0 0 1px var(--primary); }
+  .search input { flex:1; border:0; outline:0; font:inherit; font-size:13px; color:var(--text); background:transparent; }
+  .search svg { width:18px; height:18px; fill:var(--text2); }
+  .btn { height:34px; border-radius:8px; padding:0 14px; font:inherit; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.3px; cursor:pointer; border:1px solid var(--divider); background:var(--surface); color:var(--text); display:inline-flex; align-items:center; gap:6px; }
+  .btn.primary { background:var(--primary); border-color:var(--primary); color:#fff; box-shadow:0 1px 2px rgba(37,99,235,.3); }
+  .btn.text { border-color:transparent; color:var(--primary); background:transparent; }
+  .count { color:var(--text2); font-size:11px; margin-left:auto; }
+  .advanced { display:none; border:1px dashed #CBD5E1; border-radius:8px; padding:10px 12px; margin-bottom:12px; background:var(--surface); color:var(--text2); font-size:12px; }
+  .advanced.open { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .chip { display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 10px; border-radius:13px; border:1px solid var(--divider); background:#F1F5F9; font-size:12px; color:var(--text); }
+  .chip.add { background:var(--surface); color:var(--primary); border-color:#BFDBFE; }
+  table { width:100%; border-collapse:separate; border-spacing:0; background:var(--surface); border:1px solid var(--divider); border-radius:8px; overflow:hidden; }
+  th { text-align:left; font-size:12px; font-weight:600; color:var(--text2); padding:10px 12px; border-bottom:1px solid var(--divider); background:#FAFBFC; }
+  td { padding:9px 12px; border-bottom:1px solid var(--divider); vertical-align:top; }
+  tr:last-child td { border-bottom:0; }
+  tr:hover td { background:#F8FAFC; }
+  a.res { color:var(--text); font-weight:600; text-decoration:none; }
+  a.res:hover { color:var(--primary); text-decoration:underline; }
+  .type { color:var(--text2); }
+  .ids { display:flex; flex-direction:column; gap:4px; }
+  .arm { display:inline-flex; align-items:center; gap:6px; font-family:Consolas, "Cascadia Mono", monospace; font-size:11.5px; color:var(--text); }
+  .arm .seg { background:#F1F5F9; border-radius:4px; padding:1px 6px; }
+  .arm .seg.hit { background:#FEF08A; outline:1px solid #FACC15; }
+  .badge { font-size:10px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; padding:1px 6px; border-radius:4px; }
+  .badge.old { color:var(--old); background:var(--old-bg); border:1px solid #FCD34D; }
+  .badge.new { color:var(--new); background:var(--new-bg); border:1px solid #6EE7B7; }
+  .uses { color:var(--text2); white-space:nowrap; }
+  .uses b { color:var(--text); }
+  .actions { white-space:nowrap; text-align:right; }
+  .actions .iconbtn { width:28px; height:28px; }
+  .actions svg { width:16px; height:16px; fill:currentColor; }
+  .muted { color:var(--text2); }
+  .hint { margin-top:10px; font-size:11px; color:var(--text2); }
+  kbd { font:inherit; font-size:11px; border:1px solid #CBD5E1; border-bottom-width:2px; border-radius:4px; padding:0 5px; background:#fff; }
+</style>
+</head>
+<body>
+
+<div class="note">
+  <b>What Changed vs Today</b> — replaces <code>Home.razor</code> + <code>ResourceFilterBar.razor</code>.
+  One search box (same <code>Resource_GetItems</code> search: name, key, description and every tag value, so an ARM id or
+  <code>usspi*</code> name lands here). New <b>Azure Id</b> column shows the <code>AzureResourceId</code> values with an
+  Old/New badge and highlights the value that matched. <b>+ Add Resource</b> is a header button instead of a hamburger item.
+  Add filter / Active filters / Display count / Saved Views are folded under <b>Advanced</b>. The Tags column, the Explore
+  (graph) row action and the per-row links menu are gone; the primary link stays as one icon. Name is the link to the
+  resource view.
+</div>
+
+<div class="appbar">
+  <button class="iconbtn" aria-label="Menu">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="#64748B"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+  </button>
+  <span class="title">MacroPoint Azure Resource Explorer</span>
+  <span class="spacer"></span>
+</div>
+
+<div class="page">
+  <h1>Resources</h1>
+  <div class="desc">Find a resource by name or by Azure resource id, then see what it points at and what depends on it.</div>
+
+  <div class="toolbar">
+    <div class="search">
+      <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 9.5 16a6.5 6.5 0 0 0 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14"/></svg>
+      <input value="PingByPhone" aria-label="Search names and Azure ids" placeholder="Search by name or Azure resource id…">
+      <span class="muted" style="font-size:11px">Esc clears</span>
+    </div>
+    <button class="btn text" onclick="document.getElementById('adv').classList.toggle('open')">Advanced ▾</button>
+    <span class="count">Showing 3 of 3</span>
+    <button class="btn primary">+ Add Resource</button>
+  </div>
+
+  <div class="advanced" id="adv">
+    <span>Filters:</span>
+    <span class="chip">Type: Database ✕</span>
+    <span class="chip add">+ Add filter</span>
+    <span style="flex:1"></span>
+    <span>Display count <select><option>50</option><option selected>100</option><option>500</option></select></span>
+    <span>Saved Views ▾</span>
+  </div>
+
+  <table aria-label="Resources">
+    <thead>
+      <tr>
+        <th style="width:22%">Name</th>
+        <th style="width:12%">Type</th>
+        <th>Azure Id</th>
+        <th style="width:11%">Used By</th>
+        <th style="width:7%"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="res" href="resource.html">PingByPhone</a><div class="muted">Primary MacroPoint database</div></td>
+        <td class="type">SQL Database</td>
+        <td>
+          <div class="ids">
+            <span class="arm"><span class="badge old">Old</span><span class="seg">usspi-sql-mplt-pd-01</span>/<span class="seg hit">PingByPhone</span></span>
+            <span class="arm"><span class="badge new">New</span><span class="seg">sql-mplt-prod-eus2-01</span>/<span class="seg hit">PingByPhone</span></span>
+          </div>
+        </td>
+        <td class="uses"><b>4</b> direct · <b>9</b> total</td>
+        <td class="actions">
+          <button class="iconbtn" title="Open in Azure portal"><svg viewBox="0 0 24 24"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3zm5 16H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg></button>
+          <button class="iconbtn" title="Copy link"><svg viewBox="0 0 24 24"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m0 16H8V7h11z"/></svg></button>
+        </td>
+      </tr>
+      <tr>
+        <td><a class="res" href="#">PingByPhone Reporting</a><div class="muted">Read replica for reports</div></td>
+        <td class="type">SQL Database</td>
+        <td>
+          <div class="ids">
+            <span class="arm"><span class="badge old">Old</span><span class="seg">usspi-sql-mplt-pd-01</span>/<span class="seg hit">PingByPhone</span>-rpt</span>
+          </div>
+        </td>
+        <td class="uses"><b>1</b> direct · <b>1</b> total</td>
+        <td class="actions">
+          <button class="iconbtn" title="Open in Azure portal"><svg viewBox="0 0 24 24"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3zm5 16H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg></button>
+          <button class="iconbtn" title="Copy link"><svg viewBox="0 0 24 24"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m0 16H8V7h11z"/></svg></button>
+        </td>
+      </tr>
+      <tr>
+        <td><a class="res" href="#">PingByPhone SQL Server</a><div class="muted">Logical server hosting the databases</div></td>
+        <td class="type">SQL Server</td>
+        <td>
+          <div class="ids">
+            <span class="arm"><span class="badge old">Old</span><span class="seg">usspi-rg-mplt-pd-01</span>/<span class="seg">usspi-sql-mplt-pd-01</span></span>
+            <span class="arm"><span class="badge new">New</span><span class="seg">rg-mplt-prod-eastus2</span>/<span class="seg">sql-mplt-prod-eus2-01</span></span>
+          </div>
+        </td>
+        <td class="uses"><b>2</b> direct · <b>11</b> total</td>
+        <td class="actions">
+          <button class="iconbtn" title="Open in Azure portal"><svg viewBox="0 0 24 24"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3zm5 16H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg></button>
+          <button class="iconbtn" title="Copy link"><svg viewBox="0 0 24 24"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m0 16H8V7h11z"/></svg></button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="hint">
+    Azure Id shows the last two id segments; hover for the full id, click to copy. The highlighted segment is what matched
+    the search. Try pasting <kbd>/subscriptions/…/providers/Microsoft.Sql/servers/usspi-sql-mplt-pd-01/databases/PingByPhone</kbd>
+    or just <kbd>eus2</kbd>.
+  </div>
+</div>
+</body>
+</html>

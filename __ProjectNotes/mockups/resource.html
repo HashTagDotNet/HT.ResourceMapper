@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PingByPhone — Mockup</title>
+<style>
+  :root {
+    --primary:#2563EB; --text:#1E293B; --text2:#64748B; --divider:#E2E8F0; --bg:#F8FAFC; --surface:#FFFFFF;
+    --old:#B45309; --old-bg:#FFFBEB; --new:#047857; --new-bg:#ECFDF5;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:13px/1.45 Inter, "Segoe UI", Roboto, system-ui, sans-serif; color:var(--text); background:var(--bg); }
+  .note { background:#FEF9C3; border-bottom:1px solid #FDE047; padding:10px 32px; font-size:12px; color:#713F12; }
+  .note b { color:#422006; }
+  .appbar { height:48px; background:var(--surface); border-bottom:1px solid var(--divider); display:flex; align-items:center; padding:0 16px; gap:12px; }
+  .appbar .title { font-weight:600; }
+  .page { padding:12px 32px 40px; max-width:1100px; }
+  .crumbs { font-size:12px; color:var(--text2); margin-bottom:6px; }
+  .crumbs a { color:var(--text2); text-decoration:none; }
+  .crumbs a:hover { color:var(--primary); }
+  .head { display:flex; align-items:center; gap:12px; margin-bottom:4px; }
+  h1 { font-size:22px; font-weight:600; margin:0; }
+  .type { color:var(--text2); font-size:12px; }
+  .pill { font-size:11px; color:var(--text2); border:1px solid var(--divider); border-radius:12px; padding:1px 8px; background:var(--surface); }
+  .spacer { flex:1; }
+  .btn { height:34px; border-radius:8px; padding:0 14px; font:inherit; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.3px; cursor:pointer; border:1px solid var(--divider); background:var(--surface); color:var(--text); display:inline-flex; align-items:center; gap:6px; }
+  .btn.text { border-color:transparent; color:var(--primary); background:transparent; }
+  .desc { color:var(--text2); margin-bottom:16px; }
+  .card { background:var(--surface); border:1px solid var(--divider); border-radius:8px; padding:14px 16px; margin-bottom:14px; }
+  .card h2 { font-size:13px; font-weight:600; margin:0 0 2px; }
+  .card .sub { font-size:12px; color:var(--text2); margin-bottom:10px; }
+  .idrow { display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--divider); }
+  .idrow:first-of-type { border-top:0; }
+  .badge { font-size:10px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; padding:2px 7px; border-radius:4px; white-space:nowrap; }
+  .badge.old { color:var(--old); background:var(--old-bg); border:1px solid #FCD34D; }
+  .badge.new { color:var(--new); background:var(--new-bg); border:1px solid #6EE7B7; }
+  .arm { font-family:Consolas, "Cascadia Mono", monospace; font-size:12px; word-break:break-all; flex:1; }
+  .arm .dim { color:var(--text2); }
+  .iconbtn { width:28px; height:28px; border:0; background:transparent; border-radius:50%; color:var(--text2); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+  .iconbtn:hover { background:#F1F5F9; color:var(--primary); }
+  .iconbtn svg { width:16px; height:16px; fill:currentColor; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:900px) { .two { grid-template-columns:1fr; } }
+  ul.tree, ul.tree ul { list-style:none; margin:0; padding:0; }
+  ul.tree ul { margin-left:22px; border-left:1px dashed #CBD5E1; padding-left:10px; }
+  .row { display:flex; align-items:center; gap:8px; padding:6px 4px; border-radius:6px; }
+  .row:hover { background:#F8FAFC; }
+  .tw { width:20px; height:20px; border:0; background:transparent; cursor:pointer; color:var(--text2); font-size:11px; display:inline-flex; align-items:center; justify-content:center; border-radius:4px; }
+  .tw:hover { background:#E2E8F0; }
+  .tw.leaf { visibility:hidden; }
+  .row a { color:var(--text); font-weight:600; text-decoration:none; }
+  .row a:hover { color:var(--primary); text-decoration:underline; }
+  .row .t { color:var(--text2); font-size:12px; }
+  .row .n { margin-left:auto; color:var(--text2); font-size:11px; white-space:nowrap; }
+  .row .seen { font-size:10px; color:#7C3AED; background:#F5F3FF; border:1px solid #DDD6FE; border-radius:4px; padding:1px 6px; }
+  .closed > ul { display:none; }
+  .summary { font-size:12px; color:var(--text2); margin-top:8px; display:flex; gap:12px; align-items:center; }
+  details { border-top:1px solid var(--divider); margin-top:4px; }
+  summary { cursor:pointer; padding:10px 0 6px; font-weight:600; color:var(--text2); font-size:12px; list-style:none; }
+  summary::before { content:"▸ "; }
+  details[open] summary::before { content:"▾ "; }
+  table.kv { width:100%; border-collapse:collapse; font-size:12px; }
+  table.kv td { padding:6px 4px; border-top:1px solid var(--divider); vertical-align:top; }
+  table.kv td:first-child { width:32%; color:var(--text2); }
+  table.kv a { color:var(--primary); }
+  .meta { font-size:11px; color:var(--text2); margin-top:10px; }
+</style>
+</head>
+<body>
+
+<div class="note">
+  <b>What Changed vs Today</b> — replaces <code>ResourceEditor.razor</code> in View mode (tabs General · Tags · Dependencies ·
+  Dependent On · Review, wizard footer). One scrolling page, no tabs: <b>Azure Resource Ids</b> first (the multi-valued
+  <code>AzureResourceId</code> tag, Old/New badge per value, copy, open in portal), then <b>Depends On</b> and <b>Used By</b> as
+  linked rows with an expand chevron that loads the next hop in place (transitive, cycle-safe — a repeated node is marked
+  "shown above"). Everything else (other tags, identity, key, tier, timestamps) is collapsed under <b>More</b>. Edit opens the
+  quick-add form pre-filled. The Review tab, Previous/Next footer and the graph "Explore" action are gone.
+</div>
+
+<div class="appbar">
+  <span class="title">MacroPoint Azure Resource Explorer</span>
+</div>
+
+<div class="page">
+  <div class="crumbs"><a href="home.html">Resources</a> › PingByPhone</div>
+  <div class="head">
+    <h1>PingByPhone</h1>
+    <span class="pill">SQL Database</span>
+    <span class="pill">Tier: prod</span>
+    <span class="spacer"></span>
+    <button class="btn text">Copy Link</button>
+    <button class="btn">Edit</button>
+  </div>
+  <div class="desc">Primary MacroPoint database. Every vNext and LITE service reads it; LITE billing writes it nightly.</div>
+
+  <div class="card">
+    <h2>Azure Resource Ids</h2>
+    <div class="sub">One logical resource, two physical ids during the cutover. Old = legacy <code>usspi*</code> subscription.</div>
+    <div class="idrow">
+      <span class="badge old">Old</span>
+      <span class="arm"><span class="dim">/subscriptions/4f1c…9a2e/resourceGroups/</span>usspi-rg-mplt-pd-01<span class="dim">/providers/Microsoft.Sql/servers/</span>usspi-sql-mplt-pd-01<span class="dim">/databases/</span>PingByPhone</span>
+      <button class="iconbtn" title="Copy id"><svg viewBox="0 0 24 24"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m0 16H8V7h11z"/></svg></button>
+      <button class="iconbtn" title="Open in Azure portal"><svg viewBox="0 0 24 24"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3zm5 16H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg></button>
+    </div>
+    <div class="idrow">
+      <span class="badge new">New</span>
+      <span class="arm"><span class="dim">/subscriptions/b7d2…13c0/resourceGroups/</span>rg-mplt-prod-eastus2<span class="dim">/providers/Microsoft.Sql/servers/</span>sql-mplt-prod-eus2-01<span class="dim">/databases/</span>PingByPhone</span>
+      <button class="iconbtn" title="Copy id"><svg viewBox="0 0 24 24"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m0 16H8V7h11z"/></svg></button>
+      <button class="iconbtn" title="Open in Azure portal"><svg viewBox="0 0 24 24"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3zm5 16H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg></button>
+    </div>
+  </div>
+
+  <div class="two">
+    <div class="card">
+      <h2>Depends On</h2>
+      <div class="sub">What this resource needs. Expand a row to see what <em>it</em> needs.</div>
+      <ul class="tree">
+        <li class="closed">
+          <div class="row"><button class="tw" onclick="this.closest('li').classList.toggle('closed')">▸</button><a href="#">PingByPhone SQL Server</a><span class="t">SQL Server</span><span class="n">1 more</span></div>
+          <ul>
+            <li><div class="row"><button class="tw leaf">·</button><a href="#">usspi-kv-mplt-pd-01</a><span class="t">Key Vault</span></div></li>
+          </ul>
+        </li>
+      </ul>
+      <div class="summary">1 direct · 2 total <button class="btn text" style="height:26px">Expand All</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Used By</h2>
+      <div class="sub">What breaks if this goes away. Expand a row to follow the impact outward.</div>
+      <ul class="tree">
+        <li>
+          <div class="row"><button class="tw" onclick="this.closest('li').classList.toggle('closed')">▾</button><a href="#">vNext Web Server</a><span class="t">Application · shared</span><span class="n">2 more</span></div>
+          <ul>
+            <li><div class="row"><button class="tw leaf">·</button><a href="#">Alerting UI</a><span class="t">Application</span></div></li>
+            <li><div class="row"><button class="tw leaf">·</button><a href="#">Fraud Detection</a><span class="t">Application</span></div></li>
+          </ul>
+        </li>
+        <li>
+          <div class="row"><button class="tw" onclick="this.closest('li').classList.toggle('closed')">▾</button><a href="#">vNext Proxy</a><span class="t">Application · shared</span><span class="n">1 more</span></div>
+          <ul>
+            <li><div class="row"><button class="tw leaf">·</button><a href="#">vNext Web Server</a><span class="t">Application</span><span class="seen">shown above</span></div></li>
+          </ul>
+        </li>
+        <li class="closed">
+          <div class="row"><button class="tw" onclick="this.closest('li').classList.toggle('closed')">▸</button><a href="#">Alert Processor</a><span class="t">Service Fabric App · prod</span><span class="n">3 more</span></div>
+          <ul>
+            <li><div class="row"><button class="tw leaf">·</button><a href="#">Alert Dispatcher</a><span class="t">Service Fabric App</span></div></li>
+            <li><div class="row"><button class="tw leaf">·</button><a href="#">Trigger Ingestor</a><span class="t">Service Fabric App</span></div></li>
+            <li><div class="row"><button class="tw leaf">·</button><a href="#">Alerting UI</a><span class="t">Application</span><span class="seen">shown above</span></div></li>
+          </ul>
+        </li>
+        <li><div class="row"><button class="tw leaf">·</button><a href="#">LITE Billing Job</a><span class="t">WebJob · prod</span></div></li>
+      </ul>
+      <div class="summary">4 direct · 9 total <button class="btn text" style="height:26px">Expand All</button> <button class="btn text" style="height:26px">Copy List</button></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>More — tags, identity and history</summary>
+      <table class="kv">
+        <tr><td>Portal</td><td><a href="#">https://portal.azure.com/#@…/resource/…/PingByPhone</a> ★ primary link</td></tr>
+        <tr><td>Subscription</td><td>DSG-ProdPreprod</td></tr>
+        <tr><td>Environment</td><td>production, preprod</td></tr>
+        <tr><td>Resource Group</td><td>usspi-rg-mplt-pd-01 → rg-mplt-prod-eastus2</td></tr>
+        <tr><td>Database Application Name</td><td>vnext(prod), lite(prod), ti(prod)</td></tr>
+        <tr><td>System</td><td>Visibility</td></tr>
+        <tr><td>Identity</td><td>prod / SQL Database / pingbyphone</td></tr>
+        <tr><td>Key</td><td>pingbyphone</td></tr>
+        <tr><td>Created · Updated</td><td>2026-09-02 14:11 · 2026-10-21 09:40</td></tr>
+      </table>
+      <div class="meta">Delete is under Edit. Deleting warns with the Used By list above.</div>
+    </details>
+  </div>
+</div>
+</body>
+</html>
