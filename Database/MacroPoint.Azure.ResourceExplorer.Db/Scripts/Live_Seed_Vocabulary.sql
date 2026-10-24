@@ -85,7 +85,7 @@ USING (VALUES
     ,('Subscription',       'Subscription',               'Text', 0, 0, '["DSG-DevTestMSDN","DSG-ProdPreprod"]',                                 'Optional',  0, 0,  20)
     ,('Environment',        'Environment',                'Text', 0, 1, '["localhost","development","pentest","preprod","preview","production"]','Optional',  0, 0,  30)
     ,('ResourceGroup',      'Resource Group',             'Text', 1, 0, NULL,                                                                    'Optional',  0, 0,  40)
-    ,('AzureResourceId',    'Azure Resource Id',          'Text', 1, 1, NULL,                                                                    'Optional',  0, 1,  15)
+    ,('AzureResourceId',    'Azure Resource Id',          'Text', 1, 1, NULL,                                                                    'Optional',  0, 0,  15)
     ,('System',             'System',                     'Text', 0, 0, '["Visibility","Alerting","LITE"]',                                      'Optional',  0, 0,  50)
     ,('PortalUrl',          'Portal',                     'Link', 1, 0, NULL,                                                                    'Suggested', 0, 0,  60)
     ,('ExplorerUrl',        'Service Fabric Explorer',    'Link', 1, 0, NULL,                                                                    'Optional',  0, 0,  70)

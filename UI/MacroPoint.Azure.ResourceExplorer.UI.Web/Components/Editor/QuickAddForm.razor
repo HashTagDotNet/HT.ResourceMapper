@@ -59,7 +59,7 @@ else
         {
             <FormRow Label="@RowLabel(azureRow)"
                      Info="Multi-valued. Paste the full ARM id; add the new one next to the old during cutover.">
-                <TagValueEditor Row="azureRow" AllowSystemTag="true" OnChanged="StateHasChanged" />
+                <TagValueEditor Row="azureRow" OnChanged="StateHasChanged" />
                 @RowMessages(azureRow)
             </FormRow>
         }

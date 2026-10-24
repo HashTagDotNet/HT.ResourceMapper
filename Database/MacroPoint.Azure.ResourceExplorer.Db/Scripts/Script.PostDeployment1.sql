@@ -63,7 +63,7 @@ USING (SELECT
        ,[IsMultiValued]    = CAST(1 AS BIT)
        ,[RequirementLevel] = 'Optional'
        ,[IsDomainTag]      = CAST(0 AS BIT)
-       ,[IsSystemTag]      = CAST(1 AS BIT)
+       ,[IsSystemTag]      = CAST(0 AS BIT)   -- values are user-entered
        ,[DisplayOrder]     = 15
       ) AS source
     ON target.[TagDefinitionKey] = source.[TagDefinitionKey]
