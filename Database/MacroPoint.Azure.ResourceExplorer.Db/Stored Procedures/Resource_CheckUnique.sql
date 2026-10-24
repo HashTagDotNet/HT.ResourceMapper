@@ -3,6 +3,7 @@
 -- ResourceTag, not a Resource column) — so two resources sharing (Type + Key) in DIFFERENT
 -- domains are correctly reported as unique, not a collision. Falls back to (Type + Key) when no
 -- domain tag is defined. @ExcludeResourceUid excludes the resource being edited.
+-- No NOLOCK on purpose: the uniqueness check must read committed data.
 CREATE PROCEDURE [ResourceExplorer].[Resource_CheckUnique]
     @ResourceTypeId       INT,
     @ResourceKey          NVARCHAR(250),
