@@ -253,6 +253,40 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
             }
         }
 
+        public async Task<ApiServiceResponse<List<ResourceRelationshipModel>>> GetRelationshipHopAsync(string resourceUid, string direction, CancellationToken cancellationToken = default)
+        {
+            var builder = new ServiceResponseBuilder<List<ResourceRelationshipModel>>();
+            try
+            {
+                if (string.IsNullOrWhiteSpace(resourceUid))
+                    builder.Validation.AddValidation("resourceUid", "Resource UID is required");
+                if (direction is not ("DependsOn" or "DependentOn"))
+                    builder.Validation.AddValidation("direction", "Must be DependsOn or DependentOn");
+                if (!builder.IsOk)
+                    return builder.BuildResponse();
+
+                var detail = await _repo.GetResourceByUidAsync(resourceUid, cancellationToken);
+                if (detail == null)
+                {
+                    builder.Errors.AddError(CallStatusCode.NotFound, "Resource Not Found",
+                        $"Resource with UID '{resourceUid}' was not found.", "resourceUid");
+                    return builder.BuildResponse();
+                }
+
+                var relationships = await _repo.GetRelationshipsForResourceAsync(detail.ResourceId, cancellationToken);
+                builder.Data.Set(relationships
+                    .Where(r => r.Direction == direction)
+                    .Select(ToRelationshipModel)
+                    .ToList());
+                return builder.BuildResponse();
+            }
+            catch (Exception ex)
+            {
+                builder.Errors.AddError(CallStatusCode.InternalError, "An unexpected error occurred.", ex.Message, "InternalError");
+                return builder.BuildResponse();
+            }
+        }
+
         public async Task<ApiServiceResponse<SaveResourceResponse>> SaveResourceAsync(SaveResourceRequest request, CancellationToken cancellationToken = default)
         {
             var builder = new ServiceResponseBuilder<SaveResourceResponse>();
@@ -1431,16 +1465,7 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
                 IsPrimary = t.IsPrimary
             }).ToList();
 
-            var relationshipModels = relationships.Select(r => new ResourceRelationshipModel
-            {
-                RelationshipId = r.RelationshipId,
-                Direction = r.Direction,
-                OtherResourceUid = r.OtherResourceUid,
-                OtherResourceKey = r.OtherResourceKey,
-                OtherResourceName = r.OtherResourceName,
-                OtherResourceType = r.OtherResourceType,
-                OtherDomain = r.OtherDomain
-            }).ToList();
+            var relationshipModels = relationships.Select(ToRelationshipModel).ToList();
 
             var primaryLinkUrl = tagModels.FirstOrDefault(t => t.IsPrimary)?.Value;
 
@@ -1463,6 +1488,17 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
                 UpdatedOn = detail.UpdatedOn
             };
         }
+
+        private static ResourceRelationshipModel ToRelationshipModel(ResourceRelationshipItem r) => new()
+        {
+            RelationshipId = r.RelationshipId,
+            Direction = r.Direction,
+            OtherResourceUid = r.OtherResourceUid,
+            OtherResourceKey = r.OtherResourceKey,
+            OtherResourceName = r.OtherResourceName,
+            OtherResourceType = r.OtherResourceType,
+            OtherDomain = r.OtherDomain
+        };
 
         private static bool ValidateTagsForSave(ServiceResponseBuilder<SaveResourceResponse> builder,
             List<SaveTagValue> nonEmptyTags, List<TagDefinition> tagDictionary)

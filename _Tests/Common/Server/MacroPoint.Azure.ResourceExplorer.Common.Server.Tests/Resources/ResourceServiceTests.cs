@@ -428,6 +428,50 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Resources
 
         #endregion
 
+        #region GetRelationshipHopAsync
+
+        [Fact]
+        public async Task GetRelationshipHopAsync_UnknownDirection_ReturnsValidationAndSkipsRepo()
+        {
+            var response = await _sut.GetRelationshipHopAsync("uid-10", "Sideways", CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because only DependsOn and DependentOn are directions");
+            _repo.Verify(r => r.GetResourceByUidAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never,
+                "because an invalid request must not reach the repository");
+        }
+
+        [Fact]
+        public async Task GetRelationshipHopAsync_ResourceNotFound_ReturnsNotFound()
+        {
+            _repo.Setup(r => r.GetResourceByUidAsync("missing-uid", It.IsAny<CancellationToken>()))
+                .ReturnsAsync((ResourceDetail?)null);
+
+            var response = await _sut.GetRelationshipHopAsync("missing-uid", "DependentOn", CancellationToken.None);
+
+            response.IsSuccess().Should().BeFalse("because a resource that doesn't exist has no neighbours to read");
+        }
+
+        [Fact]
+        public async Task GetRelationshipHopAsync_DependentOn_ReturnsOnlyInEdges()
+        {
+            _repo.Setup(r => r.GetResourceByUidAsync("uid-10", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ResourceDetail { ResourceId = 10, ResourceUid = "uid-10" });
+            _repo.Setup(r => r.GetRelationshipsForResourceAsync(10, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ResourceRelationshipItem>
+                {
+                    new() { RelationshipId = 1, Direction = "DependsOn", OtherResourceUid = "uid-20", OtherResourceName = "Redis" },
+                    new() { RelationshipId = 2, Direction = "DependentOn", OtherResourceUid = "uid-30", OtherResourceName = "Web" }
+                });
+
+            var response = await _sut.GetRelationshipHopAsync("uid-10", "DependentOn", CancellationToken.None);
+
+            response.IsSuccess().Should().BeTrue("because the resource exists");
+            response.ApiResponse.Data!.Should().ContainSingle("because only the in-edge is a DependentOn neighbour")
+                .Which.OtherResourceUid.Should().Be("uid-30", "because the in-edge's other end is the dependent");
+        }
+
+        #endregion
+
         #region SaveResourceAsync
 
         [Fact]

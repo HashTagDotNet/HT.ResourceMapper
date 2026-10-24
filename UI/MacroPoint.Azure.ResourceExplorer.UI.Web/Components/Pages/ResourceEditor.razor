@@ -101,6 +101,10 @@ else if (_model is not null && _response is not null)
     [SupplyParameterFromQuery(Name = "n")]
     public int? NestedLevel { get; set; }
 
+    /// <summary>?mode=edit opens an existing resource straight in Edit (the resource view's Edit button).</summary>
+    [SupplyParameterFromQuery(Name = "mode")]
+    public string? StartMode { get; set; }
+
     private OpenEditorResponse? _response;
     private ResourceEditorModel? _model => _response?.EditorModel;
     private string _mode = "Create";
@@ -307,7 +311,8 @@ else if (_model is not null && _response is not null)
         try
         {
             var isNew = string.IsNullOrWhiteSpace(ResourceUid);
-            _mode = isNew ? "Create" : "View";
+            _mode = isNew ? "Create"
+                : string.Equals(StartMode, "edit", StringComparison.OrdinalIgnoreCase) ? "Edit" : "View";
 
             var request = new OpenEditorRequest { Mode = isNew ? "Create" : "Edit", ResourceUid = ResourceUid };
             var response = await ResourceService.GetResourceEditorModelAsync(request, CancellationToken.None);

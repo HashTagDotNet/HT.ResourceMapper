@@ -61,3 +61,34 @@ IF NOT EXISTS (SELECT 1 FROM ResourceExplorer.ResourceTag WHERE ResourceId = @Ca
 
 IF NOT EXISTS (SELECT 1 FROM ResourceExplorer.ResourceTag WHERE ResourceId = @CandProdId AND TagDefinitionId = @DomainTagDefId)
     INSERT INTO ResourceExplorer.ResourceTag (ResourceId, TagDefinitionId, TagValue) VALUES (@CandProdId, @DomainTagDefId, 'prod');
+
+-- Resource view chain (resource-view.spec.js): mid depends on root, top depends on mid, and root
+-- depends on top so the trees contain a cycle. Root carries two AzureResourceId values: one in a
+-- legacy (usspi-) resource group, one not. AzureResourceId is the shared seeded definition (lookup only).
+DECLARE @AzureIdDefId INT = (SELECT TagDefinitionId FROM ResourceExplorer.TagDefinition WHERE TagDefinitionKey = 'AzureResourceId');
+
+IF NOT EXISTS (SELECT 1 FROM ResourceExplorer.Resource WHERE ResourceUid = 'e2e-view-root')
+    INSERT INTO ResourceExplorer.Resource (ResourceUid, ResourceKey, ResourceTypeId, ResourceName)
+    VALUES ('e2e-view-root', 'e2e-view-root', @TypeId, 'E2E View Root');
+IF NOT EXISTS (SELECT 1 FROM ResourceExplorer.Resource WHERE ResourceUid = 'e2e-view-mid')
+    INSERT INTO ResourceExplorer.Resource (ResourceUid, ResourceKey, ResourceTypeId, ResourceName)
+    VALUES ('e2e-view-mid', 'e2e-view-mid', @TypeId, 'E2E View Mid');
+IF NOT EXISTS (SELECT 1 FROM ResourceExplorer.Resource WHERE ResourceUid = 'e2e-view-top')
+    INSERT INTO ResourceExplorer.Resource (ResourceUid, ResourceKey, ResourceTypeId, ResourceName)
+    VALUES ('e2e-view-top', 'e2e-view-top', @TypeId, 'E2E View Top');
+
+DECLARE @ViewRootId INT = (SELECT ResourceId FROM ResourceExplorer.Resource WHERE ResourceUid = 'e2e-view-root');
+DECLARE @ViewMidId INT = (SELECT ResourceId FROM ResourceExplorer.Resource WHERE ResourceUid = 'e2e-view-mid');
+DECLARE @ViewTopId INT = (SELECT ResourceId FROM ResourceExplorer.Resource WHERE ResourceUid = 'e2e-view-top');
+
+IF NOT EXISTS (SELECT 1 FROM ResourceExplorer.ResourceTag WHERE ResourceId = @ViewRootId AND TagDefinitionId = @AzureIdDefId)
+    INSERT INTO ResourceExplorer.ResourceTag (ResourceId, TagDefinitionId, TagValue) VALUES
+        (@ViewRootId, @AzureIdDefId, '/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/usspi-rg-e2e-01/providers/Microsoft.Sql/servers/usspi-sql-e2e-01/databases/E2eViewRoot'),
+        (@ViewRootId, @AzureIdDefId, '/subscriptions/00000000-0000-0000-0000-000000000002/resourceGroups/rg-e2e-eastus2/providers/Microsoft.Sql/servers/sql-e2e-eus2-01/databases/E2eViewRoot');
+
+IF NOT EXISTS (SELECT 1 FROM ResourceExplorer.ResourceRelationship WHERE FromResourceId = @ViewMidId AND ToResourceId = @ViewRootId)
+    INSERT INTO ResourceExplorer.ResourceRelationship (FromResourceId, ToResourceId) VALUES (@ViewMidId, @ViewRootId);
+IF NOT EXISTS (SELECT 1 FROM ResourceExplorer.ResourceRelationship WHERE FromResourceId = @ViewTopId AND ToResourceId = @ViewMidId)
+    INSERT INTO ResourceExplorer.ResourceRelationship (FromResourceId, ToResourceId) VALUES (@ViewTopId, @ViewMidId);
+IF NOT EXISTS (SELECT 1 FROM ResourceExplorer.ResourceRelationship WHERE FromResourceId = @ViewRootId AND ToResourceId = @ViewTopId)
+    INSERT INTO ResourceExplorer.ResourceRelationship (FromResourceId, ToResourceId) VALUES (@ViewRootId, @ViewTopId);

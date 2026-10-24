@@ -1,0 +1,256 @@
+@page "/resources/{ResourceUid}/view"
+@using MacroPoint.Azure.ResourceExplorer.Api.Service.Contracts
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.Config
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Interfaces
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.AzureIds
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.Editor
+@using MacroPoint.Azure.ResourceExplorer.UI.Web.Components.Editor
+@inject IResourceService ResourceService
+@inject GlobalConfig Config
+@inject NavigationManager Navigation
+
+@* Read-only resource view (HardReview-Simplify §3 steps 3–6, §5 gaps 3 and 5): Azure ids first,
+   then Depends On / Used By expanded hop by hop, other tags collapsed. Editing stays in the editor. *@
+<PageTitle>@(_detail?.ResourceName ?? "Resource") — MacroPoint Azure Resource Explorer</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+else if (_loadError is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-3">@_loadError</MudAlert>
+}
+else if (_detail is not null)
+{
+    <div class="rm-view">
+        <PageHeader Title="@_detail.ResourceName" Parents="@ParentCrumbs" Description="@_detail.Description">
+            <Actions>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Edit"
+                           Href="@($"/resources/{_detail.ResourceUid}?mode=edit")">Edit</MudButton>
+            </Actions>
+        </PageHeader>
+        <div class="rm-view-pills mb-3">
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@_detail.ResourceTypeName</MudChip>
+            @if (!string.IsNullOrWhiteSpace(_detail.Domain))
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@_detail.Domain</MudChip>
+            }
+        </div>
+
+        <MudPaper Outlined="true" Class="pa-4 mb-4" data-testid="azure-ids">
+            <MudText Typo="Typo.subtitle2">Azure Resource Ids</MudText>
+            @if (_azureIds.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Class="rm-section-desc">No Azure Resource Id Recorded.</MudText>
+            }
+            @foreach (var id in _azureIds)
+            {
+                <div class="rm-view-idrow">
+                    <span class="rm-view-badge @(id.Age == AzureIdAge.Old ? "rm-view-badge-old" : "rm-view-badge-new")">@id.Age</span>
+                    <span class="rm-view-arm">@id.Value</span>
+                    <CopyValueButton Value="@id.Value" Label="Azure Resource Id" />
+                </div>
+            }
+        </MudPaper>
+
+        <div class="rm-view-two mb-4">
+            <MudPaper Outlined="true" Class="pa-4" data-testid="depends-on">
+                <MudText Typo="Typo.subtitle2">Depends On</MudText>
+                <MudText Typo="Typo.body2" Class="rm-section-desc mb-2">What this resource needs.</MudText>
+                @RenderTree(_dependsOn)
+            </MudPaper>
+            <MudPaper Outlined="true" Class="pa-4" data-testid="used-by">
+                <MudText Typo="Typo.subtitle2">Used By</MudText>
+                <MudText Typo="Typo.body2" Class="rm-section-desc mb-2">What breaks if this goes away.</MudText>
+                @RenderTree(_usedBy)
+            </MudPaper>
+        </div>
+
+        <MudExpansionPanels Outlined="true" Elevation="0">
+            <MudExpansionPanel Text="More Tags">
+                @if (_otherTags.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="rm-section-desc">No Other Tags.</MudText>
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true" Elevation="0">
+                        <tbody>
+                            @foreach (var tag in _otherTags)
+                            {
+                                <tr>
+                                    <td class="rm-view-tagkey">@(tag.DisplayName ?? tag.TagDefinitionKey)</td>
+                                    <td>
+                                        @if (tag.ContentType == "Link")
+                                        {
+                                            <MudLink Href="@tag.Value" Target="_blank">@tag.Value</MudLink>
+                                        }
+                                        else
+                                        {
+                                            @tag.Value
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    </div>
+}
+
+@code {
+    [Parameter] public string ResourceUid { get; set; } = string.Empty;
+
+    private const string AzureResourceIdKey = "AzureResourceId";
+    private static readonly (string Text, string Href)[] ParentCrumbs = [("Resources", "/")];
+
+    private ResourceDetailModel? _detail;
+    private bool _loading = true;
+    private string? _loadError;
+    private List<(string Value, AzureIdAge Age)> _azureIds = new();
+    private List<ResourceTagModel> _otherTags = new();
+    private List<HopNode> _dependsOn = new();
+    private List<HopNode> _usedBy = new();
+
+    /// <summary>One row of a Depends On / Used By tree. Children load on first expand.
+    /// Ancestors holds every uid above this row in its branch, the viewed resource included.</summary>
+    private sealed class HopNode
+    {
+        public required ResourceRelationshipModel Rel { get; init; }
+        public required string Direction { get; init; }
+        public required HashSet<string> Ancestors { get; init; }
+        public bool IsCycle => Ancestors.Contains(Rel.OtherResourceUid);
+        public List<HopNode>? Children { get; set; }
+        public bool Expanded { get; set; }
+        public bool Loading { get; set; }
+        public string? Error { get; set; }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _loadError = null;
+        try
+        {
+            var response = await ResourceService.GetResourceDetailAsync(ResourceUid, CancellationToken.None);
+            if (!response.IsSuccess() || response.ApiResponse.Data is null)
+            {
+                _detail = null;
+                _loadError = "Resource not found.";
+                return;
+            }
+
+            _detail = response.ApiResponse.Data;
+            _azureIds = _detail.Tags
+                .Where(t => t.TagDefinitionKey == AzureResourceIdKey && !string.IsNullOrWhiteSpace(t.Value))
+                .Select(t => (t.Value!, AzureIdClassifier.Classify(t.Value,
+                    Config.AzureIds.LegacySubscriptionIds, Config.AzureIds.LegacyNamePrefixes)))
+                .ToList();
+            _otherTags = _detail.Tags.Where(t => t.TagDefinitionKey != AzureResourceIdKey).ToList();
+
+            var root = new HashSet<string>(StringComparer.Ordinal) { _detail.ResourceUid };
+            _dependsOn = BuildNodes(_detail.Relationships.Where(r => r.Direction == "DependsOn"), "DependsOn", root);
+            _usedBy = BuildNodes(_detail.Relationships.Where(r => r.Direction == "DependentOn"), "DependentOn", root);
+        }
+        catch (Exception ex)
+        {
+            _detail = null;
+            _loadError = $"Could not load: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static List<HopNode> BuildNodes(IEnumerable<ResourceRelationshipModel> rels, string direction, HashSet<string> ancestors) =>
+        rels.Select(r => new HopNode { Rel = r, Direction = direction, Ancestors = ancestors }).ToList();
+
+    private async Task ToggleAsync(HopNode node)
+    {
+        if (node.Expanded)
+        {
+            node.Expanded = false;
+            return;
+        }
+
+        node.Expanded = true;
+        if (node.Children is not null) return;
+
+        node.Loading = true;
+        node.Error = null;
+        try
+        {
+            var response = await ResourceService.GetRelationshipHopAsync(node.Rel.OtherResourceUid, node.Direction, CancellationToken.None);
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+            {
+                var branch = new HashSet<string>(node.Ancestors, StringComparer.Ordinal) { node.Rel.OtherResourceUid };
+                node.Children = BuildNodes(response.ApiResponse.Data, node.Direction, branch);
+            }
+            else
+            {
+                node.Expanded = false;
+                node.Error = "Could not load the next hop.";
+            }
+        }
+        catch (Exception ex)
+        {
+            node.Expanded = false;
+            node.Error = $"Could not load the next hop: {ex.Message}";
+        }
+        finally
+        {
+            node.Loading = false;
+        }
+    }
+
+    private RenderFragment RenderTree(List<HopNode> nodes) => __builder =>
+    {
+        if (nodes.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="rm-section-desc">None.</MudText>
+            return;
+        }
+        <ul class="rm-view-tree">
+            @foreach (var node in nodes)
+            {
+                <li>
+                    <div class="rm-view-row" data-uid="@node.Rel.OtherResourceUid">
+                        @if (node.IsCycle)
+                        {
+                            <span class="rm-view-twspacer"></span>
+                        }
+                        else
+                        {
+                            <MudIconButton Size="Size.Small" Class="rm-view-tw"
+                                           aria-label="@($"Expand {node.Rel.OtherResourceName}")"
+                                           Icon="@(node.Expanded ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)"
+                                           OnClick="@(() => ToggleAsync(node))" />
+                        }
+                        <MudLink Href="@($"/resources/{node.Rel.OtherResourceUid}/view")" Class="rm-view-link">@node.Rel.OtherResourceName</MudLink>
+                        <span class="rm-view-type">@node.Rel.OtherResourceType</span>
+                        @if (node.IsCycle)
+                        {
+                            <span class="rm-view-cycle">(cycle)</span>
+                        }
+                    </div>
+                    @if (node.Loading)
+                    {
+                        <MudProgressLinear Indeterminate="true" Size="Size.Small" />
+                    }
+                    @if (node.Error is not null)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Error">@node.Error</MudText>
+                    }
+                    @if (node.Expanded && node.Children is not null)
+                    {
+                        <div class="rm-view-sub">@RenderTree(node.Children)</div>
+                    }
+                </li>
+            }
+        </ul>
+    };
+}

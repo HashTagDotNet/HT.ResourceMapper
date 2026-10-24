@@ -35,7 +35,11 @@
              FixedHeader="true" Height="100%" Class="rm-grid"
              Style="border:1px solid var(--mud-palette-divider);border-radius:8px;">
     <Columns>
-        <PropertyColumn Property="x => x.ResourceName" Title="Name" InitialDirection="SortDirection.Ascending" />
+        <PropertyColumn Property="x => x.ResourceName" Title="Name" InitialDirection="SortDirection.Ascending">
+            <CellTemplate>
+                <MudLink Href="@($"{DetailRoute}/{context.Item.ResourceUid}/view")" Class="rm-name-link">@context.Item.ResourceName</MudLink>
+            </CellTemplate>
+        </PropertyColumn>
         <PropertyColumn Property="x => x.ResourceType" Title="Type" />
         @* PL-12(a): the raw text wrapped to 5–6 lines and tripled row height. The cell template clamps
            it to a couple of lines (see .rm-desc) and carries the full text in `title`, so nothing is

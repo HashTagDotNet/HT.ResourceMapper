@@ -853,3 +853,24 @@ html, body {
     flex-wrap: wrap;
     gap: .25rem 0;
 }
+
+/* Resource view (ResourceView.razor): Azure ids first, hop-by-hop dependency trees. */
+.rm-view { max-width: 1100px; }
+.rm-view-pills { display: flex; gap: .25rem; }
+.rm-view-idrow { display: flex; align-items: center; gap: .625rem; padding: .5rem 0; border-top: 1px solid var(--mud-palette-divider); }
+.rm-view-idrow:first-of-type { border-top: 0; }
+.rm-view-idrow:hover .rm-copybtn, .rm-view-idrow:focus-within .rm-copybtn { opacity: 1; }
+.rm-view-arm { flex: 1; font-family: Consolas, "Cascadia Mono", monospace; font-size: .75rem; word-break: break-all; }
+.rm-view-badge { font-size: .625rem; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+.rm-view-badge-old { color: #B45309; background: #FFFBEB; border: 1px solid #FCD34D; }
+.rm-view-badge-new { color: #047857; background: #ECFDF5; border: 1px solid #6EE7B7; }
+.rm-view-two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 900px) { .rm-view-two { grid-template-columns: 1fr; } }
+.rm-view-tree { list-style: none; margin: 0; padding: 0; }
+.rm-view-sub { margin-left: 1.375rem; border-left: 1px dashed var(--mud-palette-lines-default); padding-left: .625rem; }
+.rm-view-row { display: flex; align-items: center; gap: .5rem; padding: .125rem .25rem; }
+.rm-view-twspacer { display: inline-block; width: 30px; }
+.rm-view-link { font-weight: 600; }
+.rm-view-type { color: var(--mud-palette-text-secondary); font-size: .75rem; }
+.rm-view-cycle { font-size: .625rem; color: #7C3AED; background: #F5F3FF; border: 1px solid #DDD6FE; border-radius: 4px; padding: 1px 6px; }
+.rm-view-tagkey { width: 32%; color: var(--mud-palette-text-secondary); }

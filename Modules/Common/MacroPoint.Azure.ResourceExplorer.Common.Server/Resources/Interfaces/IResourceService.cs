@@ -29,6 +29,10 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Interfaces
         /// <summary>Details/view read shape for a single resource by its immutable uid.</summary>
         Task<ApiServiceResponse<ResourceDetailModel>> GetResourceDetailAsync(string resourceUid, CancellationToken cancellationToken = default);
 
+        /// <summary>One hop: the direct neighbours of a resource in one direction ("DependsOn" or
+        /// "DependentOn"). The resource view expands its trees with this, a hop at a time.</summary>
+        Task<ApiServiceResponse<List<ResourceRelationshipModel>>> GetRelationshipHopAsync(string resourceUid, string direction, CancellationToken cancellationToken = default);
+
         /// <summary>Creates or updates a resource's General-tab fields + primary link (uid-keyed).</summary>
         Task<ApiServiceResponse<SaveResourceResponse>> SaveResourceAsync(SaveResourceRequest request, CancellationToken cancellationToken = default);
 

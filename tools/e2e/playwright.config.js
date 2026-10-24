@@ -41,6 +41,8 @@ module.exports = defineConfig({
       DOTNET_ENVIRONMENT: 'localhost',
       ASPNETCORE_ENVIRONMENT: 'localhost',
       ASPNETCORE_URLS: BASE_URL,
+      // resource-view.spec.js: the seeded usspi- Azure id must classify as Old.
+      MacroPoint__Azure__ResourceExplorer__AzureIds__LegacyNamePrefixes: 'usspi-',
     },
   },
 });
