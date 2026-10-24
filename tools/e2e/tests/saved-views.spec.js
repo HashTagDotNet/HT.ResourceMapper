@@ -63,7 +63,8 @@ async function purgeE2eViews(page) {
   }, API);
 }
 
-test.describe('Saved Views (slice #12)', () => {
+// Saved Views menu entry hidden from the default UI (Beta slice 4); the page and API remain.
+test.describe.skip('Saved Views (slice #12)', () => {
   test.afterEach(async ({ page }) => {
     await page.goto('/');
     await purgeE2eViews(page);

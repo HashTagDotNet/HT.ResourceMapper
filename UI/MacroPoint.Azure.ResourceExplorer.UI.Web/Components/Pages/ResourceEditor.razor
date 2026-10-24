@@ -67,17 +67,6 @@ else if (_model is not null && _response is not null)
                                 ReadOnly="@(_mode == "View")" OnFieldChanged="OnGeneralFieldChanged"
                                 OnCreateNewRequested="InitiateNestedCreate" />
             </MudTabPanel>
-            <MudTabPanel Text="Dependent On">
-                <DependencyTab Rows="_model.DependentOn" Direction="DependentOn"
-                                HelpText="What depends on this resource."
-                                Domain="@_model.Domain.EditedValue" DomainLabel="@DomainLabel"
-                                ExcludeResourceUid="@_model.ResourceUid"
-                                ReadOnly="@(_mode == "View")" OnFieldChanged="OnGeneralFieldChanged"
-                                OnCreateNewRequested="InitiateNestedCreate" />
-            </MudTabPanel>
-            <MudTabPanel Text="Review">
-                <ReviewTab Model="_model" DomainLabel="@DomainLabel" />
-            </MudTabPanel>
             @* History tab: scaffolded per design §12, not built — commented out until audit/versioning lands.
             <MudTabPanel Text="History">
                 <HistoryTab Model="_model" />
@@ -85,13 +74,7 @@ else if (_model is not null && _response is not null)
             *@
         </MudTabs>
 
-        @* §5 footer. Wizard nav (PL-15) reads "Next : <destination>" so the button names where it
-           goes rather than making you guess. Previous is disabled on the first tab, Next on the
-           last. The primary action stays reachable from every tab.
-           Known trade, accepted in §5: Azure's bar belongs to a create wizard, while this editor is
-           mostly used to edit, where bottom-right Save is the stronger convention. Kept for
-           consistency with the reference. In View mode the nav still shows — paging through a
-           record you are reading is just as useful as through one you are filling in. *@
+        @* §5 footer: the primary action stays reachable from every tab. *@
         <div class="rm-shell-foot">
             @if (_mode != "View")
             {
@@ -99,10 +82,6 @@ else if (_model is not null && _response is not null)
                     @(_saving ? "Saving…" : "Save")
                 </MudButton>
             }
-            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.ChevronLeft"
-                       Disabled="@(_activeTab <= 0)" OnClick="GoPreviousTab">@PreviousTabLabel</MudButton>
-            <MudButton Variant="Variant.Outlined" EndIcon="@Icons.Material.Outlined.ChevronRight"
-                       Disabled="@(_activeTab >= TabNames.Length - 1)" OnClick="GoNextTab">@NextTabLabel</MudButton>
             <MudSpacer />
             @if (_mode != "View")
             {
@@ -131,34 +110,8 @@ else if (_model is not null && _response is not null)
     private bool _deleting;
     private bool _domainLocked;
 
-    // --- §5 shell: tab strip driven programmatically so the footer can page through it (PL-15) ---
-
-    /// <summary>Must stay in the same order as the MudTabPanels above — the footer indexes into it.</summary>
-    private static readonly string[] TabNames = ["General", "Tags", "Dependencies", "Dependent On", "Review"];
-
+    // §5 shell: tab strip bound to _activeTab so a record change or nested return can reset/restore it.
     private int _activeTab;
-
-    /// <summary>
-    /// PL-15: name the destination rather than leaving the direction to be guessed at. Both
-    /// directions, not just Next — §5 specified naming only on Next, but an unlabelled Previous
-    /// beside a labelled Next reads as an oversight, and you need the name just as much going back.
-    /// Falls back to the bare word at each end, where the button is disabled anyway.
-    /// </summary>
-    private string NextTabLabel =>
-        _activeTab >= TabNames.Length - 1 ? "Next" : $"Next : {TabNames[_activeTab + 1]}";
-
-    private string PreviousTabLabel =>
-        _activeTab <= 0 ? "Previous" : $"Previous : {TabNames[_activeTab - 1]}";
-
-    private void GoPreviousTab()
-    {
-        if (_activeTab > 0) _activeTab--;
-    }
-
-    private void GoNextTab()
-    {
-        if (_activeTab < TabNames.Length - 1) _activeTab++;
-    }
 
     /// <summary>
     /// PL-08 via §5: a breadcrumb is a more natural route back to the grid than a menu item. Home

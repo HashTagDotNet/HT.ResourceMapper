@@ -26,7 +26,8 @@ async function fillPickerAndPick(page, text, optionText) {
   await page.getByRole('option', { name: optionText }).click();
 }
 
-test.describe('Delete action + confirm dialog (slice #9)', () => {
+// Dependent On authoring tab is hidden (Beta slice 4), so this spec cannot create the in-edge it deletes.
+test.describe.skip('Delete action + confirm dialog (slice #9)', () => {
   test('a subject with a dependent: dialog lists it, Cancel does not delete, confirmed delete cascades the edge', async ({ page }) => {
     const consoleErrors = [];
     page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });

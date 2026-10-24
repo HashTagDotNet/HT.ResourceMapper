@@ -45,7 +45,7 @@
                         {
                             @* PL-35: the star carried no explanation at all — Steve designed it and
                                could not recall what it meant. Same wording as the Tags tab's star. *@
-                            <MudTooltip Text="@PrimaryLinkTooltip">
+                            <MudTooltip Text="@TagsTab.PrimaryLinkTooltip">
                                 <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small"
                                          Color="Color.Inherit" Class="ml-1 rm-primary-star" />
                             </MudTooltip>
@@ -143,13 +143,6 @@ else
     /// This tab hardcoded "Domain" while General showed "Subscription" for the same field (PL-33).
     /// </summary>
     [Parameter] public string DomainLabel { get; set; } = "Domain";
-
-    /// <summary>
-    /// Shared with the Tags tab's star so the same symbol never carries two different explanations.
-    /// Names the concept AND what it does — "Primary link" alone was the wording that PL-35 records
-    /// as unmemorable even to its author.
-    /// </summary>
-    internal const string PrimaryLinkTooltip = "Primary link — the resource's click-through link";
 
     /// <summary>
     /// One label/value/copy row. Renders an em dash for a blank value and, via CopyValueButton,

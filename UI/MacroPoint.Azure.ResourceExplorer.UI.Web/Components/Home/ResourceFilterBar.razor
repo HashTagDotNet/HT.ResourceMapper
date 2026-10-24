@@ -8,6 +8,8 @@
                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="rm-search" Style="max-width:320px;"
                   aria-label="Filter for any field" />
 
+    @if (_advanced)
+    {
     @* @key is (Column, TagKey) — the pair that uniquely identifies a filter — and NOT the ActiveFilter
        object, which has value-based equality: keying on the object made its key change every time the
        user altered a selection, remounting the chip mid-edit. *@
@@ -23,6 +25,7 @@
 
     <ActiveFiltersMenu State="State" OnEdit="RequestOpen" OnRemove="RemoveFilter"
                        OnClearAll="ClearAll" OnClearSearch="ClearSearch" />
+    }
 
     @* Right-aligned group: ml-auto pushes it flush to the grid's right edge. *@
     <div class="d-flex align-center ml-auto" style="gap:12px;">
@@ -37,6 +40,12 @@
             }
         </MudText>
 
+        <MudButton Variant="@(_advanced ? Variant.Filled : Variant.Outlined)" Size="Size.Small"
+                   StartIcon="@Icons.Material.Outlined.Tune" OnClick="ToggleAdvanced"
+                   aria-pressed="@(_advanced ? "true" : "false")">Advanced</MudButton>
+
+        @if (_advanced)
+        {
         <MudSelect T="int" Value="State.DisplayCount" ValueChanged="OnDisplayCountChanged" Dense="true"
                    Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:120px;"
                    Label="Display count">
@@ -44,6 +53,7 @@
             <MudSelectItem Value="100">100</MudSelectItem>
             <MudSelectItem Value="500">500</MudSelectItem>
         </MudSelect>
+        }
     </div>
 </div>
 
@@ -56,12 +66,19 @@
     /// <summary>Invoked to reload the grid. Argument = push a browser-history entry (true) vs replace (false).</summary>
     [Parameter] public EventCallback<bool> OnReload { get; set; }
 
+    // Filters, Active filters and Display count live behind this toggle; the default view is the search box.
+    private bool _advanced;
     private ActiveFilter? _newFilter;
 
     // Which chip has been asked to open its editor, and a monotonic token so the same chip can be
     // asked more than once (a bool would only ever fire on the first request).
     private ActiveFilter? _openRequest;
     private int _openToken;
+
+    // A deep link that already carries filters must not hide them.
+    protected override void OnInitialized() => _advanced = State.Filters.Count > 0;
+
+    private void ToggleAdvanced() => _advanced = !_advanced;
 
     private static string FilterKey(ActiveFilter f) => f.Column + "|" + (f.TagKey ?? "");
 

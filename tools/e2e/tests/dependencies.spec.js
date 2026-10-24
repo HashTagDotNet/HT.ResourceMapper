@@ -1,4 +1,5 @@
-// Slice #8 regression: same-domain picker + both-direction relationship reconciliation.
+// Slice #8 regression: same-domain picker + relationship reconciliation. The Dependent On authoring tab is
+// hidden (Beta slice 4), so only the DependsOn direction is driven here.
 // Relies on the fixture seeded by ../global-setup.js (../sql/seed.sql):
 //   - ResourceType 'E2eDepType'
 //   - Picker candidates: e2e-candidate-1, e2e-candidate-2 (non-prod), e2e-candidate-prod (prod)
@@ -18,8 +19,8 @@ async function fillPickerAndPick(page, text, optionText) {
   await page.getByRole('option', { name: optionText }).click();
 }
 
-test.describe('Dependencies / Dependent On tabs (slice #8)', () => {
-  test('same-domain picker excludes cross-domain candidates; both directions reconcile, round-trip, and the far-side write is visible from the target', async ({ page }) => {
+test.describe('Dependencies tab (slice #8; Dependent On tab hidden in Beta slice 4)', () => {
+  test('same-domain picker excludes cross-domain candidates; the DependsOn edge round-trips and can be removed', async ({ page }) => {
     const consoleErrors = [];
     page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
     page.on('pageerror', err => consoleErrors.push('pageerror: ' + err.message));
@@ -49,11 +50,6 @@ test.describe('Dependencies / Dependent On tabs (slice #8)', () => {
     await page.getByRole('option', { name: /E2E Candidate One/ }).click();
     await expect(page.locator('.rm-dep-row', { hasText: 'E2E Candidate One' })).toBeVisible();
 
-    // 3. Dependent On tab — add candidate two.
-    await page.getByRole('tab', { name: 'Dependent On' }).click();
-    await fillPickerAndPick(page, 'E2E Candidate Two', /E2E Candidate Two/);
-    await expect(page.locator('.rm-dep-row', { hasText: 'E2E Candidate Two' })).toBeVisible();
-
     // 4. Save. PL-52: 'Owning Team' is a required tag since PL-45, so Save refuses without it.
     await fillRequiredTags(page);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -65,15 +61,6 @@ test.describe('Dependencies / Dependent On tabs (slice #8)', () => {
     await page.reload({ waitUntil: 'networkidle' });
     await page.getByRole('tab', { name: 'Dependencies' }).click();
     await expect(page.getByText('E2E Candidate One')).toBeVisible();
-    await page.getByRole('tab', { name: 'Dependent On' }).click();
-    await expect(page.getByText('E2E Candidate Two')).toBeVisible();
-
-    // 6. Open candidate two's OWN editor — the DependentOn edge must show as ITS out-edge
-    //    (RD7: editing the in-edge side writes the far side of the edge).
-    await page.goto('/resources/e2e-candidate-2', { waitUntil: 'networkidle' });
-    await page.getByRole('tab', { name: 'Dependencies' }).click();
-    await expect(page.getByText('E2E Subject')).toBeVisible();
-
     // 7. Back to the subject — remove the DependsOn edge, save, confirm it's gone.
     await page.goto(subjectUrl, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
@@ -87,10 +74,6 @@ test.describe('Dependencies / Dependent On tabs (slice #8)', () => {
     await page.getByRole('tab', { name: 'Dependencies' }).click();
     await expect(page.getByText('E2E Candidate One')).toHaveCount(0,
       'the removed DependsOn edge must not reappear after reload');
-    // DependentOn (candidate two) must be untouched by removing the DependsOn edge (RD1).
-    await page.getByRole('tab', { name: 'Dependent On' }).click();
-    await expect(page.getByText('E2E Candidate Two')).toBeVisible();
-
     const meaningfulErrors = consoleErrors.filter(e => !IGNORED_CONSOLE_PATTERNS.some(rx => rx.test(e)));
     expect(meaningfulErrors, `Unexpected console errors: ${JSON.stringify(meaningfulErrors)}`).toHaveLength(0);
   });

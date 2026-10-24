@@ -1,11 +1,8 @@
-﻿@page "/"
+@page "/"
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Routing
 @using MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Interfaces
-@using MacroPoint.Azure.ResourceExplorer.Common.Server.Settings.Interfaces
-@using MacroPoint.Azure.ResourceExplorer.Common.Server.Identity
 @using MacroPoint.Azure.ResourceExplorer.Common.Server.SavedViews
-@using MacroPoint.Azure.ResourceExplorer.Common.Server.SavedViews.Interfaces
 @using MacroPoint.Azure.ResourceExplorer.Common.Shared.SavedViews
 @using MacroPoint.Azure.ResourceExplorer.Common.Shared.HomePage.Contracts
 @using MacroPoint.Azure.ResourceExplorer.Common.Shared.HomePage.Filtering
@@ -15,9 +12,6 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
-@inject IClientSettingsService ClientSettings
-@inject ISavedViewService SavedViewService
-@inject ICurrentIdentity Identity
 @inject GridViewContext GridView
 
 <PageTitle>Resources — MacroPoint Azure Resource Explorer</PageTitle>
@@ -185,14 +179,6 @@
     private string _urlOrderBy = "ResourceName";
     private string _urlOrderDirection = "Asc";
 
-    // Server-backed "resume where you left off" (per-client setting). Persistence is gated until the
-    // first-render resume check has run, so the grid's default initial load can't clobber a saved view.
-    private const string GridViewSettingKey = "home.gridView";
-    private string _ownerId = string.Empty;
-    /// <summary>Set during startup; suppresses the now-unreadable resume write.</summary>
-    private bool _hasDefaultView;
-    private bool _resumeChecked;
-
     protected override async Task OnInitializedAsync()
     {
         // Restore state from the URL (safe on both prerender and interactive passes).
@@ -225,51 +211,9 @@
         if (!firstRender || _grid is null)
             return;
 
-        // Resume: when the URL carries no state of its own, restore the last-saved view from the
-        // server-side per-client setting. An explicit / deep-linked URL (any query string) always
-        // wins over the saved setting.
-        _ownerId = Identity.OwnerId;
-
-        var restored = false;
-        if (string.IsNullOrEmpty(new Uri(Navigation.Uri).Query))
-        {
-            // 1. An explicit URL already won by reaching this branch at all.
-            // 2. The owner's starred saved view, if there is one.
-            restored = await TryRestoreDefaultViewAsync();
-
-            // 3. Otherwise the resume setting, unchanged.
-            string? saved = null;
-            if (!restored)
-            {
-                try
-                {
-                    var settingResp = await ClientSettings.GetAsync(_ownerId, GridViewSettingKey);
-                    saved = settingResp.IsSuccess() ? settingResp.ApiResponse.Data?.Value : null;
-                }
-                catch { /* settings unavailable — fall back to the default view */ }
-            }
-
-            if (!restored && !string.IsNullOrWhiteSpace(saved))
-            {
-                var savedState = ResourceFilterState.FromQueryString(saved!);
-                var savedQuery = savedState.ToQueryString();
-                // Only resume if it represents something other than the default view.
-                if (!string.Equals(savedQuery, new ResourceFilterState().ToQueryString(), StringComparison.Ordinal))
-                {
-                    _state = savedState;
-                    _urlOrderBy = savedState.OrderBy;
-                    _urlOrderDirection = savedState.OrderDirection;
-                    _lastQuery = savedQuery; // set before NavigateTo so the self-echo guard ignores it
-                    Navigation.NavigateTo(new Uri(Navigation.Uri).AbsolutePath + savedQuery, forceLoad: false, replace: true);
-                    restored = true;
-                }
-            }
-        }
-
-        // Reflect the (possibly restored) sort on the grid. The Name column declares
-        // InitialDirection=Ascending, so a default sort already shows "Name ↑". For any other sort,
-        // SetSortAsync moves the indicator AND re-queries — which also applies restored filters /
-        // search / display-count. If the sort is default but other state was restored, reload explicitly.
+        // Reflect the URL's sort on the grid. The Name column declares InitialDirection=Ascending, so a
+        // default sort already shows "Name ↑". For any other sort, SetSortAsync moves the indicator AND
+        // re-queries — which also applies the URL's filters / search / display-count.
         var field = MapStateSortField(_urlOrderBy);
         var desc = string.Equals(_urlOrderDirection, "Desc", StringComparison.OrdinalIgnoreCase);
 
@@ -283,18 +227,6 @@
             };
             await _grid.SetSortAsync(field, desc ? SortDirection.Descending : SortDirection.Ascending, selector);
         }
-        else if (restored)
-        {
-            await _grid.ReloadServerData();
-        }
-
-        // Restore happened after the first render, so the filter bar rendered empty. Re-render the
-        // page so ResourceFilterBar redraws its chips from the now-restored _state.
-        if (restored)
-            StateHasChanged();
-
-        // From here on, URL writes are safe to persist (resume decision has been made).
-        _resumeChecked = true;
     }
 
     private static string MapStateSortField(string orderBy) => orderBy switch
@@ -395,69 +327,6 @@
         // Tell the Saved Views menu what Save would write. It lives in the layout's hamburger and
         // cannot see this page's state any other way.
         GridView.SetCurrentQuery(_lastQuery);
-
-        // Persist the current view so a later visit with a bare URL resumes here. Gated on
-        // _resumeChecked so the grid's default initial load can't overwrite a saved view before
-        // we've had the chance to restore it.
-        if (_resumeChecked)
-            _ = PersistViewAsync(_lastQuery);
-    }
-
-    /// <summary>
-    /// Loads the owner's starred saved view, if any. Returns true when it took over the grid.
-    /// <para>
-    /// Ordering matters and is easy to get wrong: _lastQuery is assigned BEFORE NavigateTo so
-    /// OnLocationChanged recognises the navigation as self-inflicted and does not reload, and
-    /// replace:true keeps the bare URL out of the back stack so Back does not bounce. Both are
-    /// copied from the resume branch below, which had to solve the same problem.
-    /// </para>
-    /// </summary>
-    private async Task<bool> TryRestoreDefaultViewAsync()
-    {
-        SavedViewModel? defaultView = null;
-        try
-        {
-            var response = await SavedViewService.ListAsync(_ownerId, CancellationToken.None);
-            defaultView = response.IsSuccess()
-                ? response.ApiResponse.Data?.FirstOrDefault(v => v.IsDefault)
-                : null;
-        }
-        catch
-        {
-            // Saved views unavailable — fall through to the resume setting rather than failing the page.
-            return false;
-        }
-
-        _hasDefaultView = defaultView is not null;
-
-        if (defaultView is null || string.IsNullOrWhiteSpace(defaultView.QueryString))
-            return false;
-
-        var state = ResourceFilterState.FromQueryString(defaultView.QueryString);
-        _state = state;
-        _urlOrderBy = state.OrderBy;
-        _urlOrderDirection = state.OrderDirection;
-        _lastQuery = state.ToQueryString();
-
-        Navigation.NavigateTo(new Uri(Navigation.Uri).AbsolutePath + _lastQuery,
-                              forceLoad: false, replace: true);
-
-        GridView.SetCurrentQuery(_lastQuery);
-        // Record it as open using the NORMALISED query, so Save is not enabled on arrival.
-        GridView.SetOpenView(defaultView.SavedViewUid, defaultView.Name, _lastQuery);
-        return true;
-    }
-
-    private async Task PersistViewAsync(string query)
-    {
-        if (string.IsNullOrEmpty(_ownerId)) return;
-
-        // With a starred view set, the resume slot is unreachable on startup - writing it on every
-        // navigation would be a write nothing ever reads.
-        if (_hasDefaultView) return;
-
-        try { await ClientSettings.SetAsync(_ownerId, GridViewSettingKey, query); }
-        catch { /* settings unavailable — best-effort persistence */ }
     }
 
     private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
@@ -489,9 +358,8 @@
     };
 
     /// <summary>
-    /// Loads a saved view's query. Mirrors what the resume path does: assign _lastQuery BEFORE
-    /// navigating so OnLocationChanged treats it as self-inflicted, and replace rather than push so
-    /// Back does not bounce between the previous query and this one.
+    /// Loads a saved view's query. Assign _lastQuery BEFORE navigating so OnLocationChanged treats it
+    /// as self-inflicted, and replace rather than push so Back does not bounce between queries.
     /// </summary>
     private async Task ApplySavedViewAsync(SavedViewModel view)
     {
@@ -504,14 +372,11 @@
         Navigation.NavigateTo(new Uri(Navigation.Uri).AbsolutePath + _lastQuery,
                               forceLoad: false, replace: true);
         GridView.SetCurrentQuery(_lastQuery);
-        // Record it as open using the NORMALISED query: comparing against the raw stored string
-        // would make Save look enabled the moment the view was opened.
         GridView.SetOpenView(view.SavedViewUid, view.Name, _lastQuery);
 
         await HandleReload(pushHistory: false);
         StateHasChanged();
     }
-
     public void Dispose()
     {
         Navigation.LocationChanged -= OnLocationChanged;
