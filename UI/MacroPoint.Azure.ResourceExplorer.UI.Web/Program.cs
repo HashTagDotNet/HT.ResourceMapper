@@ -1,7 +1,6 @@
 using MacroPoint.Azure.ResourceExplorer.Configuration.Extensions;
 using MudBlazor.Services;
 using MacroPoint.Azure.ResourceExplorer.Common.Server.Utils;
-using MacroPoint.Azure.ResourceExplorer.Common.Shared.Editor;
 using MacroPoint.Azure.ResourceExplorer.UI.Web.Components;
 using Serilog;
 
@@ -56,11 +55,6 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddMudServices();
-
-// Circuit-scoped nested-editor nav stack (slice #9) — per-circuit so it survives route changes
-// within a connection but is cleared on refresh/reconnect (design: "refresh mid-stack loses the
-// in-progress stack").
-builder.Services.AddScoped<EditorNavStack>();
 
 // API controllers (e.g. POST /api/resources/import for external/Bruno use; the UI calls services in-process).
 builder.Services.AddControllers();

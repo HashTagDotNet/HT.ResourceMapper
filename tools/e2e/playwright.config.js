@@ -43,6 +43,8 @@ module.exports = defineConfig({
       ASPNETCORE_URLS: BASE_URL,
       // resource-view.spec.js: the seeded usspi- Azure id must classify as Old.
       MacroPoint__Azure__ResourceExplorer__AzureIds__LegacyNamePrefixes: 'usspi-',
+      // quick-add.spec.js: the quick form takes this domain without showing the select.
+      MacroPoint__Azure__ResourceExplorer__DefaultDomain: 'non-prod',
     },
   },
 });

@@ -122,7 +122,11 @@ else
             ? Row.Definition.TagDefinitionKey
             : Row.Definition.DisplayName!;
 
-    private bool ReadOnlyEffective => ReadOnly || !Row.IsEditable;
+    /// <summary>Lets a system tag take values: quick add's Azure Resource Id is a system-managed
+    /// definition whose values the user still enters.</summary>
+    [Parameter] public bool AllowSystemTag { get; set; }
+
+    private bool ReadOnlyEffective => ReadOnly || (!Row.IsEditable && !AllowSystemTag);
 
     /// <summary>Names the multi-value affordance for what it is once the row already holds a
     /// value — "Add value…" alone read as the row's only input, so the ability to hold several

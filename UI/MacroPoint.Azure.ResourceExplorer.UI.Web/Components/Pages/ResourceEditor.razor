@@ -11,7 +11,6 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-@inject EditorNavStack Stack
 
 <PageTitle>@PageTitleText — MacroPoint Azure Resource Explorer</PageTitle>
 
@@ -50,10 +49,9 @@ else if (_model is not null && _response is not null)
             <MudTabPanel Text="General">
                 <GeneralTab Model="_model" ResourceTypes="_response.ResourceTypes" DomainAllowedValues="_response.DomainAllowedValues"
                             HasDomainTag="@HasDomainTag"
-                            DomainLabel="@DomainLabel" ReadOnly="@(_mode == "View")" DomainLocked="_domainLocked"
+                            DomainLabel="@DomainLabel" ReadOnly="@(_mode == "View")"
                             OnFieldChanged="OnGeneralFieldChanged" OnCheckUniqueness="CheckUniquenessAsync"
-                            OnResourceTypeChanged="OnResourceTypeChanged" OnResourceDomainChanged="OnResourceDomainChanged"
-                            OnAddResourceRequested="InitiateSiblingCreate" />
+                            OnResourceTypeChanged="OnResourceTypeChanged" OnResourceDomainChanged="OnResourceDomainChanged" />
             </MudTabPanel>
             <MudTabPanel Text="Tags">
                 <TagsTab Model="_model" TagDictionary="_response.TagDictionary" ReadOnly="@(_mode == "View")"
@@ -64,8 +62,7 @@ else if (_model is not null && _response is not null)
                                 HelpText="What this resource depends on."
                                 Domain="@_model.Domain.EditedValue" DomainLabel="@DomainLabel"
                                 ExcludeResourceUid="@_model.ResourceUid"
-                                ReadOnly="@(_mode == "View")" OnFieldChanged="OnGeneralFieldChanged"
-                                OnCreateNewRequested="InitiateNestedCreate" />
+                                ReadOnly="@(_mode == "View")" OnFieldChanged="OnGeneralFieldChanged" />
             </MudTabPanel>
             @* History tab: scaffolded per design §12, not built — commented out until audit/versioning lands.
             <MudTabPanel Text="History">
@@ -94,13 +91,6 @@ else if (_model is not null && _response is not null)
 @code {
     [Parameter] public string? ResourceUid { get; set; }
 
-    /// <summary>Nested-editor marker (?n=k). Its presence (rather than mere Stack.HasFrames)
-    /// distinguishes a genuine nested descent from a stale/abandoned frame (RD12) — see
-    /// OnParametersSetAsync. Each nested level gets a distinct k so browser history and
-    /// OnParametersSetAsync treat descents as real navigations (RD17).</summary>
-    [SupplyParameterFromQuery(Name = "n")]
-    public int? NestedLevel { get; set; }
-
     /// <summary>?mode=edit opens an existing resource straight in Edit (the resource view's Edit button).</summary>
     [SupplyParameterFromQuery(Name = "mode")]
     public string? StartMode { get; set; }
@@ -112,9 +102,8 @@ else if (_model is not null && _response is not null)
     private string? _loadError;
     private bool _saving;
     private bool _deleting;
-    private bool _domainLocked;
 
-    // §5 shell: tab strip bound to _activeTab so a record change or nested return can reset/restore it.
+    // §5 shell: tab strip bound to _activeTab so a record change can reset it.
     private int _activeTab;
 
     /// <summary>
@@ -125,24 +114,19 @@ else if (_model is not null && _response is not null)
 
     /// <summary>
     /// PL-33: the user-facing name of the domain/boundary field, read from the domain tag's own
-    /// DisplayName ("Subscription" in this deployment) and passed to every tab that names it. It
-    /// used to be derived inside GeneralTab and hardcoded elsewhere, so the same field read
-    /// "Subscription" on General and "Domain" on Review. Deriving it once here means a deployment
-    /// that renames the tag renames it everywhere; "Domain" is only the fallback when no domain tag
-    /// is defined at all.
+    /// DisplayName and passed to every tab that names it. "Domain" is only the fallback when no
+    /// domain tag is defined at all.
     /// </summary>
     private string DomainLabel =>
         _response?.TagDictionary?.FirstOrDefault(t => t.IsDomainTag)?.DisplayName ?? "Domain";
 
     /// <summary>Whether a domain tag is designated at all, gating General's "Create {Domain}…" action:
     /// DomainValue_Add appends to that tag's vocabulary, so with no such tag there is nothing to
-    /// append to. Being system-managed is deliberately NOT a reason to hide it — the append-only
-    /// procedure is exactly what makes creating a value safe on a deployment-owned vocabulary.</summary>
+    /// append to.</summary>
     private bool HasDomainTag => _response?.TagDictionary?.Any(t => t.IsDomainTag) == true;
 
     private bool _hasLoadedOnce;
     private string? _lastLoadedUid;
-    private int? _lastNestedLevel;
 
     // Dirty-guard bookkeeping (RD1/RD3): one-shot suppression for intentional navigations, and a
     // re-entrancy guard while the unsaved-changes dialog is open.
@@ -150,21 +134,7 @@ else if (_model is not null && _response is not null)
     private bool _navPromptOpen;
     private IDisposable? _locationChangingRegistration;
 
-    protected override async Task OnParametersSetAsync()
-    {
-        if (IsReturningToFrame())
-        {
-            RestoreFromFrame();
-            return;
-        }
-
-        // A fresh top-level entry (no ?n marker) abandons any stale/abandoned nested frame
-        // (RD12) so the hamburger "Create Resource" is always a genuine fresh start.
-        if (NestedLevel is null)
-            Stack.Clear();
-
-        await LoadAsync();
-    }
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
 
     protected override void OnAfterRender(bool firstRender)
     {
@@ -182,130 +152,19 @@ else if (_model is not null && _response is not null)
         _ => string.IsNullOrWhiteSpace(_model?.Name.EditedValue) ? "Resource" : _model!.Name.EditedValue
     };
 
-    /// <summary>Normalizes a location to a comparable, no-leading-slash base-relative form,
-    /// regardless of whether it arrives absolute (Navigation.Uri) or root-relative
-    /// (LocationChangingContext.TargetLocation isn't documented to guarantee either shape).</summary>
-    private string NormalizeRoute(string location)
-    {
-        if (Uri.TryCreate(location, UriKind.Absolute, out _))
-            return Navigation.ToBaseRelativePath(location);
-        return location.TrimStart('/');
-    }
-
-    private string CurrentRelativePath() => NormalizeRoute(Navigation.Uri);
-
-    /// <summary>True when the current URL is the parent frame's route — i.e. we're ascending
-    /// back to it (via child Save, Cancel, or browser Back), not descending into a fresh nested
-    /// create. The ?n marker on nested URLs guarantees a descent's URL never equals its parent's,
-    /// so this predicate can't misread a descent as a return (RD6).</summary>
-    private bool IsReturningToFrame() =>
-        Stack.HasFrames && string.Equals(CurrentRelativePath(), Stack.Peek().ParentRoute, StringComparison.Ordinal);
-
-    private void RestoreFromFrame()
-    {
-        var frame = Stack.Peek();
-        _response = frame.Response;
-        _mode = frame.ParentMode;
-        _domainLocked = false; // the parent set its own domain; it was never locked
-        _loading = false;
-        _loadError = null;
-        _hasLoadedOnce = true;
-        _lastLoadedUid = ResourceUid;
-        _lastNestedLevel = NestedLevel;
-
-        // Back to the tab that launched the descent, not General. Safe to set here precisely because
-        // this path returns before LoadAsync, which is where the level-change tab reset lives.
-        _activeTab = frame.ParentTab;
-
-        if (frame.Returned is not null)
-        {
-            LinkReturnedChild(frame.Direction, frame.Returned);
-            frame.Returned = null;
-        }
-
-        Stack.Pop();
-    }
-
-    /// <summary>Appends the nested-created child as a new dependency row, deduping against an
-    /// existing (or removed) row for the same uid — mirrors DependencyTab.OnPicked's RD9/RD10.</summary>
-    private void LinkReturnedChild(string direction, ReturnedChild child)
-    {
-        if (_model is null) return;
-        var rows = direction == "DependsOn" ? _model.DependsOn : _model.DependentOn;
-
-        var removedRow = rows.FirstOrDefault(r => r.IsRemoved && string.Equals(r.OtherResourceUid, child.ResourceUid, StringComparison.Ordinal));
-        if (removedRow is not null)
-        {
-            removedRow.IsRemoved = false;
-            return;
-        }
-
-        if (rows.Any(r => !r.IsRemoved && string.Equals(r.OtherResourceUid, child.ResourceUid, StringComparison.Ordinal)))
-            return;
-
-        rows.Add(new DependencyRowEditor
-        {
-            Direction = direction,
-            OtherResourceUid = child.ResourceUid,
-            OtherResourceName = child.Name,
-            OtherResourceType = child.TypeName,
-            OtherDomain = child.Domain,
-            IsNew = true
-        });
-    }
-
-    /// <summary>
-    /// General's "Add Resource": catalogue the next resource without linking it to this one. It goes
-    /// through the same frame stack as a dependency create for one reason — the way back. A plain
-    /// href here (the first cut) left no frame, so Cancel fell through to its no-frame branch and
-    /// dumped you on the resource list instead of the record you started from. Every "+ Add …" that
-    /// NAVIGATES has to push a frame; the ones that open a modal never leave the page and so need no
-    /// frame at all.
-    /// </summary>
-    private void InitiateSiblingCreate() => InitiateNestedCreate(EditorFrame.NoLink);
-
-    /// <summary>Pushes the CURRENT (parent) state onto the stack before navigating — the reused
-    /// component instance's _response is about to be overwritten by the nested load, so the
-    /// parent's live edits must be stashed first (RD4).</summary>
-    private void InitiateNestedCreate(string direction)
-    {
-        if (_response is null) return;
-
-        Stack.Push(new EditorFrame
-        {
-            Response = _response,
-            ParentRoute = CurrentRelativePath(),
-            Direction = direction,
-            ParentMode = _mode,
-            ParentTab = _activeTab
-        });
-        _suppressNavGuard = true;
-        Navigation.NavigateTo($"/resources?n={Stack.Depth}");
-    }
-
     private async Task LoadAsync(bool forceReload = false)
     {
-        if (!forceReload && _hasLoadedOnce
-            && string.Equals(ResourceUid, _lastLoadedUid, StringComparison.Ordinal)
-            && _lastNestedLevel == NestedLevel)
+        if (!forceReload && _hasLoadedOnce && string.Equals(ResourceUid, _lastLoadedUid, StringComparison.Ordinal))
             return;
 
         _hasLoadedOnce = true;
 
         // Every route into this component is /resources or /resources/{uid}, so Blazor reuses the
-        // same instance across records and nested descents — which means _activeTab persists unless
-        // it is reset here. Without this, opening a second record (or a nested "Create new…") lands
-        // you on whichever tab you happened to leave, e.g. a brand-new resource opening on
-        // Dependencies with its identity fields unseen. Deliberately reset on record/level CHANGE
-        // only: re-rendering the same record — View -> Edit, or a save — should keep you where you
-        // were. Regression introduced with @bind-ActivePanelIndex; MudTabs used to default to the
-        // first panel because nothing held the state.
-        var isDifferentRecord = !string.Equals(ResourceUid, _lastLoadedUid, StringComparison.Ordinal)
-                                || _lastNestedLevel != NestedLevel;
-        if (isDifferentRecord) _activeTab = 0;
+        // same instance across records — _activeTab persists unless it is reset here. Reset on
+        // record CHANGE only: View -> Edit, or a save, should keep you where you were.
+        if (!string.Equals(ResourceUid, _lastLoadedUid, StringComparison.Ordinal)) _activeTab = 0;
 
         _lastLoadedUid = ResourceUid;
-        _lastNestedLevel = NestedLevel;
         _loading = true;
         _loadError = null;
         try
@@ -320,27 +179,6 @@ else if (_model is not null && _response is not null)
             if (response.IsSuccess() && response.ApiResponse.Data is not null)
             {
                 _response = response.ApiResponse.Data;
-
-                // A nested create (has a ?n marker AND an ancestor frame) is domain-locked to its
-                // immediate parent (RD7) — reading Peek() here means a multi-level chain stays
-                // same-domain, since each ancestor was itself already locked to its own parent.
-                // ...but an "Add Resource" descent (EditorFrame.NoLink) is NOT a dependency target, so
-                // the same-domain rule does not apply to it: it must be free to pick its own
-                // Subscription, and pre-filling the parent's would be wrong rather than helpful.
-                _domainLocked = false;
-                if (NestedLevel is not null && Stack.HasFrames
-                    && !string.Equals(Stack.Peek().Direction, EditorFrame.NoLink, StringComparison.Ordinal))
-                {
-                    var parentDomain = Stack.Peek().Response.EditorModel.Domain.EditedValue;
-                    // Set BOTH Original and Edited so this system pre-fill does not itself count
-                    // as a user change — an untouched nested-create page must not read as dirty
-                    // (SingleValueEditor.IsChanged compares the two); only an actual edit by the
-                    // user should trip the dirty guard.
-                    _model!.Domain.OriginalValue = parentDomain;
-                    _model!.Domain.EditedValue = parentDomain;
-                    _domainLocked = true;
-                    OnGeneralFieldChanged();
-                }
             }
             else
             {
@@ -362,14 +200,9 @@ else if (_model is not null && _response is not null)
 
     private void EnterEditMode() => _mode = "Edit";
 
-    /// <summary>Cancel now confirms when there are unsaved changes — this reverses the design's
-    /// OQ3 default ("Cancel is an explicit discard, so it suppresses the guard"), which in practice
-    /// discarded real edits with no warning. The guard can never do this for us: the two navigating
-    /// branches set _suppressNavGuard themselves, consuming the one-shot before OnLocationChanging
-    /// runs, and the persisted branch never navigates at all — so the IsDirty check has to live
-    /// here, with the same three-way choice semantics the guard applies (RD1/RD13/RD19).
-    /// Async, not void: the persisted branch's reload must be awaited or the discarded task leaves
-    /// _loading stuck true with nothing to repaint it (and swallows its exceptions with it).</summary>
+    /// <summary>Cancel confirms when there are unsaved changes, with the same three-way choice the
+    /// dirty guard applies (RD1/RD13). Async, not void: the persisted branch's reload must be
+    /// awaited or _loading stays stuck true.</summary>
     private async Task Cancel()
     {
         if (_model?.IsDirty == true)
@@ -389,32 +222,10 @@ else if (_model is not null && _response is not null)
 
             if (choice is null || choice == "cancel") return; // stay on the form, edits intact
 
-            if (choice == "save")
-            {
-                var uid = await SaveInternalAsync();
-                if (uid is null) return; // save failed → stay, exactly as the dirty guard does
-
-                // A nested child saved from this prompt must link into the parent just as the
-                // Save button would (RD19) — the same rule OnLocationChanging applies.
-                if (Stack.HasFrames)
-                {
-                    CommitChildAndReturn(uid);
-                    return;
-                }
-            }
-
-            // "discard", or a save with nothing left to link → fall through to Cancel's normal
-            // destination below. Note the model still reads dirty after a Create save (RD13),
-            // so the navigating branches' existing suppression is what keeps it from re-prompting.
+            if (choice == "save" && await SaveInternalAsync() is null) return; // save failed → stay
         }
 
-        if (Stack.HasFrames)
-        {
-            // Discarding a nested child: pop back to the parent, linking nothing (Returned stays null).
-            _suppressNavGuard = true;
-            Navigation.NavigateTo(Stack.Peek().ParentRoute, replace: true);
-        }
-        else if (_model?.IsPersisted == true)
+        if (_model?.IsPersisted == true)
         {
             _mode = "View";
             await LoadAsync(forceReload: true); // discard in-memory edits, reload the persisted values
@@ -445,75 +256,10 @@ else if (_model is not null && _response is not null)
     {
         if (_model is null || _response is null || _model.IsPersisted) return;
 
-        // Drop existing pre-seeded rows (a value the user typed before switching type is lost —
-        // accepted, RD6); keep user-added rows.
-        _model.Tags = _model.Tags.Where(t => !t.IsPreSeeded).ToList();
-
-        if (resourceTypeId is null)
-        {
-            StateHasChanged();
-            return;
-        }
-
-        var templates = _response.EntryPointTemplates.Where(t => t.ResourceTypeId == resourceTypeId).ToList();
-        var newDefaultPrimaryId = templates.FirstOrDefault(t => t.IsDefaultPrimary)?.TagDefinitionId;
-
-        foreach (var template in templates)
-        {
-            if (_model.Tags.Any(t => t.TagDefinitionId == template.TagDefinitionId)) continue;
-
-            var definition = _response.TagDictionary.FirstOrDefault(d => d.TagDefinitionId == template.TagDefinitionId);
-            if (definition is null || definition.IsDomainTag) continue;
-
-            _model.Tags.Add(new TagRowEditor
-            {
-                Definition = definition,
-                TagDefinitionId = definition.TagDefinitionId,
-                Values = new List<SingleValueEditor>(),
-                IsPrimary = template.IsDefaultPrimary,
-                IsPreSeeded = true
-            });
-        }
-
-        // PL-53: a globally REQUIRED tag gets a row whether or not this type's entry-point template
-        // lists it. Requiredness lives on the definition, so the server demands every
-        // RequirementLevel='Error' tag on every resource (ResourceService: "'{name}' is required").
-        // Seeding only from the template meant a type with no template for such a tag produced a
-        // form that could never be saved — Save was refused for a field the UI never offered, with
-        // no way for the user to comply. Found because it makes every create-and-save e2e spec fail
-        // against a type created after the vocabulary seed ran.
-        foreach (var definition in _response.TagDictionary.Where(IsGloballyRequired))
-        {
-            if (_model.Tags.Any(t => t.TagDefinitionId == definition.TagDefinitionId)) continue;
-
-            _model.Tags.Add(new TagRowEditor
-            {
-                Definition = definition,
-                TagDefinitionId = definition.TagDefinitionId,
-                Values = new List<SingleValueEditor>(),
-                IsPrimary = false,
-                IsPreSeeded = true
-            });
-        }
-
-        if (newDefaultPrimaryId is not null)
-        {
-            foreach (var t in _model.Tags)
-                t.IsPrimary = t.TagDefinitionId == newDefaultPrimaryId;
-            _model.PrimaryTagDefinitionId = newDefaultPrimaryId;
-        }
-
+        // A value the user typed into a pre-seeded row before switching type is lost — accepted, RD6.
+        EditorSave.SeedTagsForType(_model, _response, resourceTypeId);
         StateHasChanged();
     }
-
-    /// <summary>
-    /// Mirrors the server's required-tag rule exactly (ResourceService.ValidateTags): every
-    /// RequirementLevel='Error' definition except the domain tag, whose requiredness is enforced
-    /// through request.Domain instead. System tags are excluded here for the same reason they are
-    /// excluded from the add-tag picker — they are plumbing, not user metadata.
-    /// </summary>
-    private static bool IsGloballyRequired(TagDefinitionModel d) =>
-        !d.IsDomainTag && !d.IsSystemTag && string.Equals(d.RequirementLevel, "Error", StringComparison.Ordinal);
 
     private void OnResourceDomainChanged()
     {
@@ -559,12 +305,6 @@ else if (_model is not null && _response is not null)
         var savedUid = await SaveInternalAsync();
         if (savedUid is null) return;
 
-        if (Stack.HasFrames)
-        {
-            CommitChildAndReturn(savedUid);
-            return;
-        }
-
         if (string.Equals(ResourceUid, savedUid, StringComparison.Ordinal))
         {
             // Edit-mode save on the same route — reload fresh and drop back to View.
@@ -573,18 +313,15 @@ else if (_model is not null && _response is not null)
         }
         else
         {
-            // Create-mode save — move to the resource's permalink; OnParametersSetAsync loads it.
-            // The model is still (harmlessly) "dirty" per IsChanged bookkeeping even though the
-            // save just succeeded (nothing resets OriginalValue), so this navigation must suppress
-            // the guard itself (RD13) or it would prompt "unsaved changes?" on every Create save.
+            // Create-mode save — move to the resource's permalink. The model still reads dirty
+            // (nothing resets OriginalValue), so this navigation must suppress the guard (RD13).
             _suppressNavGuard = true;
             Navigation.NavigateTo($"/resources/{savedUid}", replace: true);
         }
     }
 
     /// <summary>Validates + persists the current model. Returns the saved uid, or null on
-    /// validation/server failure. Never navigates — callers (the Save button, the dirty guard's
-    /// save choice) own the follow-on navigation (RD13).</summary>
+    /// validation/server failure. Never navigates — callers own the follow-on navigation (RD13).</summary>
     private async Task<string?> SaveInternalAsync()
     {
         if (_model is null) return null;
@@ -600,30 +337,14 @@ else if (_model is not null && _response is not null)
         _saving = true;
         try
         {
-            var flattenedTags = FlattenTags(_model);
-            var request = new SaveResourceRequest
-            {
-                Mode = _model.IsPersisted ? "Edit" : "Create",
-                ResourceUid = _model.ResourceUid,
-                ResourceTypeId = _model.ResourceTypeId ?? 0,
-                Domain = _model.Domain.EditedValue,
-                ResourceName = _model.Name.EditedValue,
-                ResourceKey = _model.Key.EditedValue,
-                Description = _model.Description.EditedValue,
-                PrimaryTagDefinitionId = ResolveEffectivePrimary(_model, flattenedTags),
-                Tags = flattenedTags,
-                DependsOnUids = FlattenDependencyUids(_model.DependsOn),
-                DependentOnUids = FlattenDependencyUids(_model.DependentOn)
-            };
-
-            var response = await ResourceService.SaveResourceAsync(request, CancellationToken.None);
+            var response = await ResourceService.SaveResourceAsync(EditorSave.BuildRequest(_model), CancellationToken.None);
             if (response.IsSuccess() && response.ApiResponse.Data is not null)
             {
                 Snackbar.Add(response.ApiResponse.Data.Message, Severity.Success);
                 return response.ApiResponse.Data.ResourceUid;
             }
 
-            ApplyServerErrors(response);
+            EditorSave.ApplyServerErrors(_model, response, Snackbar);
             Snackbar.Add("Could not save — see the highlighted fields.", Severity.Warning);
             return null;
         }
@@ -635,101 +356,6 @@ else if (_model is not null && _response is not null)
         finally
         {
             _saving = false;
-        }
-    }
-
-    /// <summary>The single pop-back-with-link path (RD8): the child is already fully persisted
-    /// (a plain Create); the parent gets only an in-memory dependency row — the edge itself
-    /// persists on the parent's own next Save.</summary>
-    private void CommitChildAndReturn(string uid)
-    {
-        if (_model is null) return;
-        var frame = Stack.Peek();
-
-        // An "Add Resource" descent reports nothing back: the resource it created is a peer, not a
-        // dependency, so linking it into the parent's rows would invent a relationship the user never
-        // asked for. Leaving Returned null is what makes the ascent a pure "return to where I was".
-        if (!string.Equals(frame.Direction, EditorFrame.NoLink, StringComparison.Ordinal))
-        {
-            frame.Returned = new ReturnedChild
-            {
-                ResourceUid = uid,
-                Name = _model.Name.EditedValue,
-                TypeName = _model.ResourceType.EditedValue,
-                Domain = _model.Domain.EditedValue
-            };
-        }
-
-        _suppressNavGuard = true;
-        // replace, NOT push: the descent's history entry belongs to a child that no longer exists, and
-        // leaving it behind means Back walks FORWARD into an abandoned create form whose frame has
-        // already been popped — from which Cancel would dump the user on the resource list, the very
-        // thing the frame was added to prevent. Popping the stack pops the history entry with it.
-        Navigation.NavigateTo(frame.ParentRoute, replace: true);
-    }
-
-    private static List<SaveTagValue> FlattenTags(ResourceEditorModel model)
-    {
-        var result = new List<SaveTagValue>();
-        foreach (var row in model.Tags.Where(t => !t.IsRemoved))
-        {
-            foreach (var value in row.Values.Where(v => !string.IsNullOrWhiteSpace(v.EditedValue)))
-            {
-                result.Add(new SaveTagValue
-                {
-                    TagDefinitionId = row.TagDefinitionId,
-                    TagDefinitionKey = row.Definition.TagDefinitionKey,
-                    Value = value.EditedValue
-                });
-            }
-        }
-        return result;
-    }
-
-    private static List<string> FlattenDependencyUids(List<DependencyRowEditor> rows) =>
-        rows.Where(r => !r.IsRemoved).Select(r => r.OtherResourceUid).Distinct().ToList();
-
-    // RD2: only send a primary when its row is a Link tag with a non-empty value that
-    // survives this save (an emptied/removed primary row must clear the primary).
-    private static int? ResolveEffectivePrimary(ResourceEditorModel model, List<SaveTagValue> flattenedTags)
-    {
-        if (model.PrimaryTagDefinitionId is null) return null;
-
-        var primaryRow = model.Tags.FirstOrDefault(t => !t.IsRemoved && t.TagDefinitionId == model.PrimaryTagDefinitionId);
-        if (primaryRow is null || !primaryRow.IsLink) return null;
-
-        var survives = flattenedTags.Any(t => t.TagDefinitionId == model.PrimaryTagDefinitionId);
-        return survives ? model.PrimaryTagDefinitionId : null;
-    }
-
-    private void ApplyServerErrors(ApiServiceResponse<SaveResourceResponse> response)
-    {
-        if (_model is null) return;
-        foreach (var error in response.ApiResponse.Errors ?? new List<Message>())
-        {
-            var message = error.Details ?? error.Title ?? "Invalid";
-            var target = error.PropertyName switch
-            {
-                "request.ResourceTypeId" => _model.ResourceType,
-                "request.Domain" => _model.Domain,
-                "request.ResourceName" => _model.Name,
-                "request.ResourceKey" => _model.Key,
-                _ => null
-            };
-
-            if (target is not null)
-            {
-                target.Messages.Add(new EditorMessage { Message = message, Level = EditorFieldLevel.Error });
-            }
-            else if (string.Equals(error.PropertyName, "request.Tags", StringComparison.Ordinal)
-                     || string.Equals(error.PropertyName, "request.DependsOnUids", StringComparison.Ordinal)
-                     || string.Equals(error.PropertyName, "request.DependentOnUids", StringComparison.Ordinal))
-            {
-                // Server-side tag/relationship validation is a defense backstop (the client
-                // already validates via the picker), so surface it directly rather than trying
-                // to map it to a row.
-                Snackbar.Add(message, Severity.Error);
-            }
         }
     }
 
@@ -804,30 +430,11 @@ else if (_model is not null && _response is not null)
 
         if (choice is null || choice == "cancel") return; // stay put — already prevented
 
-        if (choice == "save")
-        {
-            var uid = await SaveInternalAsync();
-            if (uid is null) return; // save failed → stay
+        if (choice == "save" && await SaveInternalAsync() is null) return; // save failed → stay
 
-            // A nested child saved via the back-prompt (rather than the Save button) must still
-            // link into the parent exactly as the button would (RD19).
-            if (Stack.HasFrames && string.Equals(NormalizeRoute(target), Stack.Peek().ParentRoute, StringComparison.Ordinal))
-            {
-                CommitChildAndReturn(uid);
-                return;
-            }
-        }
-
-        _suppressNavGuard = true; // discard, or a save with nothing more to link → let the re-nav through
-        // Ascending replaces rather than pushes, for the same reason CommitChildAndReturn does: a
-        // popped child must leave history with it. Any other target keeps normal push semantics.
-        Navigation.NavigateTo(target, replace: IsAscentTarget(target));
+        _suppressNavGuard = true; // discard, or a successful save → let the re-nav through
+        Navigation.NavigateTo(target);
     }
-
-    /// <summary>True when a navigation target is the frame we would ascend to — i.e. this navigation
-    /// is a stack pop, not a fresh move.</summary>
-    private bool IsAscentTarget(string target) =>
-        Stack.HasFrames && string.Equals(NormalizeRoute(target), Stack.Peek().ParentRoute, StringComparison.Ordinal);
 
     private async Task<string?> ShowUnsavedDialogAsync()
     {

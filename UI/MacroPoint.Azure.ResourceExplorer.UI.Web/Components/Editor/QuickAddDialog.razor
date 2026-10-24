@@ -1,0 +1,18 @@
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.Editor.Contracts
+
+@* The dependency picker's "Create new…": the same quick-add form, in a dialog. Closes with the
+   saved resource as a ResourcePickerItem so the caller links it like any other pick. *@
+<MudDialog Class="rm-quick-dialog">
+    <DialogContent>
+        <QuickAddForm InitialDomain="@InitialDomain" OnSaved="OnSaved" OnCancel="@(() => MudDialog.Cancel())" />
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>The calling resource's domain, so the new one lands where the picker searches.</summary>
+    [Parameter] public string? InitialDomain { get; set; }
+
+    private void OnSaved(ResourcePickerItem created) => MudDialog.Close(DialogResult.Ok(created));
+}

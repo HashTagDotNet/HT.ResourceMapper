@@ -18,7 +18,7 @@
     <FormRow Label="@DomainLabel" Required="true"
              Info="@($"The boundary this resource lives in. Resources can only depend on others in the same {DomainLabel}.")">
         <MudSelect T="string" Value="@Model.Domain.EditedValue" ValueChanged="OnDomainChanged"
-                   aria-label="@DomainLabel" Disabled="@(ReadOnly || Model.IsPersisted || DomainLocked)"
+                   aria-label="@DomainLabel" Disabled="@(ReadOnly || Model.IsPersisted)"
                    Placeholder="Select…" Variant="Variant.Outlined" Margin="Margin.Dense"
                    HelperText="@DomainHelper"
                    Error="@(Model.Domain.Level == EditorFieldLevel.Error)"
@@ -75,15 +75,13 @@
            with it, so this slot under the field is free — and it is where the eye already looks for
            this row's action. Right-aligning it (the first cut) put it at the far edge of the panel,
            where it was reliably missed.
-           Raises an event rather than linking to /resources directly: the parent pushes a frame so
-           closing the new resource returns HERE — same record, same mode, same tab — instead of
-           falling out to the resource list. Persisted-only: in Create mode you are already on a blank
-           resource, and a link to another one would just discard what you had typed. *@
+           Opens the quick-add form; the editor's dirty guard covers unsaved edits on the way out.
+           Persisted-only: in Create mode you are already on a blank resource. *@
         @if (Model.IsPersisted)
         {
             <div class="rm-fk-action">
                 <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
-                           OnClick="@(() => OnAddResourceRequested.InvokeAsync())">
+                           Href="/resources/new">
                     Add Resource
                 </MudButton>
             </div>
@@ -149,10 +147,6 @@
     /// </summary>
     [Parameter] public string DomainLabel { get; set; } = "Domain";
 
-    /// <summary>True for a nested "Create new…" dependency target — locks Domain to the parent's
-    /// (same-domain rule); the parent already pre-set Model.Domain.EditedValue before render.</summary>
-    [Parameter] public bool DomainLocked { get; set; }
-
     /// <summary>Parent performs the uniqueness-check service call and updates Model.IdentityPreview.</summary>
     [Parameter] public EventCallback OnCheckUniqueness { get; set; }
     [Parameter] public EventCallback OnFieldChanged { get; set; }
@@ -164,11 +158,6 @@
     /// rows that were validated same-domain against the old domain (RD6).</summary>
     [Parameter] public EventCallback OnResourceDomainChanged { get; set; }
 
-    /// <summary>Fired by "Add Resource". The parent owns the descent because only it can stash the
-    /// current state on the nav stack, which is what lets the new resource's Save/Cancel come back to
-    /// this exact record and tab.</summary>
-    [Parameter] public EventCallback OnAddResourceRequested { get; set; }
-
     private bool _keyManuallyEdited;
 
     /// <summary>PL-29: inline type create is only offered where the Type select is enabled.</summary>
@@ -178,19 +167,13 @@
     /// nothing to append to, so the action hides rather than opening a dialog that cannot save.</summary>
     [Parameter] public bool HasDomainTag { get; set; }
 
-    /// <summary>Mirrors CanCreateType: the same "only where the select is live" rule. DomainLocked
-    /// excluded too — a nested create cannot change its parent's boundary, so a new value there
-    /// would be unselectable.</summary>
+    /// <summary>Mirrors CanCreateType: the same "only where the select is live" rule.</summary>
     private bool CanCreateDomainValue =>
-        !ReadOnly && !Model.IsPersisted && !DomainLocked && HasDomainTag;
+        !ReadOnly && !Model.IsPersisted && HasDomainTag;
 
-    /// <summary>
-    /// PL-25b: the nested-create case genuinely is locked, so say why. Otherwise say what "fixed
-    /// after save" means for this field rather than leaving the helper slot empty.
-    /// </summary>
+    /// <summary>PL-25b: say what "fixed after save" means for this field rather than leaving the helper slot empty.</summary>
     private string DomainHelper =>
-        DomainLocked ? $"Locked to the parent resource's {DomainLabel}."
-        : Model.IsPersisted ? "Fixed after save."
+        Model.IsPersisted ? "Fixed after save."
         : "Pick the boundary first — it limits which resources this one can depend on.";
 
     /// <summary>
@@ -305,7 +288,7 @@
         StateHasChanged();
     }
 
-    private static string Slugify(string? name)
+    internal static string Slugify(string? name)
     {
         if (string.IsNullOrWhiteSpace(name)) return string.Empty;
         var sb = new System.Text.StringBuilder();

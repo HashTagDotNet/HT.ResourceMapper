@@ -1,0 +1,440 @@
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.Config
+@using MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Interfaces
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.Editor
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.Editor.Contracts
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.ResourceTypes
+@using MacroPoint.Azure.ResourceExplorer.UI.Web.Components.ResourceTypes
+@inject IResourceService ResourceService
+@inject GlobalConfig Config
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+@* Quick add (HardReview-Simplify §3 "Quick entry", mockups/quick-add.html): one form for a new
+   resource — Type, Name, Azure Resource Id(s), the type template's first two tags, Depends On.
+   Key, domain, description and the remaining tags sit under More Options. Used as the /resources/new
+   page and, from the dependency picker's "Create new…", as a dialog. Save is the editor's save. *@
+
+@if (_loadError is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-3">@_loadError</MudAlert>
+}
+else if (_model is null || _response is null)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+else
+{
+    <div class="rm-quick-form">
+        <FormRow Label="Type" Required="true" Info="Decides which tags are suggested below.">
+            <MudSelect T="int?" Value="@_model.ResourceTypeId" ValueChanged="OnTypeChanged"
+                       aria-label="Type" Placeholder="Select…" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Error="@(_model.ResourceType.Level == EditorFieldLevel.Error)"
+                       ErrorText="@_model.ResourceType.Messages.FirstOrDefault()?.Message">
+                @foreach (var option in _response.ResourceTypes)
+                {
+                    <MudSelectItem Value="@((int?)option.ResourceTypeId)">@option.TypeName</MudSelectItem>
+                }
+            </MudSelect>
+            <div class="rm-fk-action">
+                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add"
+                           OnClick="OpenCreateTypeDialog">
+                    Create new type…
+                </MudButton>
+            </div>
+        </FormRow>
+
+        <FormRow Label="Name" Required="true" Info="The human-readable name shown in the grid.">
+            <MudTextField T="string" Value="@_model.Name.EditedValue" ValueChanged="OnNameChanged"
+                          aria-label="Name" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          HelperText="@NameHelper"
+                          Error="@NameHasError" ErrorText="@NameErrorText" />
+        </FormRow>
+
+        @if (_domainInMain)
+        {
+            @DomainRow
+        }
+
+        @if (AzureRow is { } azureRow)
+        {
+            <FormRow Label="@RowLabel(azureRow)"
+                     Info="Multi-valued. Paste the full ARM id; add the new one next to the old during cutover.">
+                <TagValueEditor Row="azureRow" AllowSystemTag="true" OnChanged="StateHasChanged" />
+                @RowMessages(azureRow)
+            </FormRow>
+        }
+
+        @{
+            var keyRows = KeyRows();
+        }
+        @if (keyRows.Count > 0)
+        {
+            <div class="rm-section-heading mt-4">Key Tags</div>
+            <div class="rm-section-desc">The type template's first two tags, plus any the catalog requires. The rest are under More Options.</div>
+            @foreach (var row in keyRows)
+            {
+                @TagRow(row)
+            }
+        }
+
+        <div class="mt-4">
+            <DependencyTab Rows="_model.DependsOn" Direction="DependsOn"
+                           HelpText="What this resource needs. Type to search by name."
+                           Domain="@_model.Domain.EditedValue" DomainLabel="@DomainLabel"
+                           OnFieldChanged="StateHasChanged" />
+        </div>
+
+        <div class="rm-quick-more">
+            <MudButton Variant="Variant.Text" Size="Size.Small" Class="rm-quick-more-toggle"
+                       StartIcon="@(_showMore ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)"
+                       aria-expanded="@(_showMore ? "true" : "false")" OnClick="@(() => _showMore = !_showMore)">
+                More Options
+            </MudButton>
+        </div>
+
+        @if (_showMore)
+        {
+            <div class="rm-quick-more-body">
+                <FormRow Label="Description" Info="Shown in the grid's Description column and on hover.">
+                    <MudTextField T="string" @bind-Value="_model.Description.EditedValue"
+                                  aria-label="Description" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Lines="3" HelperText="What it does and who relies on it." />
+                </FormRow>
+
+                @if (!_domainInMain)
+                {
+                    @DomainRow
+                }
+
+                <FormRow Label="Key" Required="true" Info="Used by import, export and permalinks.">
+                    <MudTextField T="string" Value="@_model.Key.EditedValue" ValueChanged="OnKeyChanged"
+                                  aria-label="Key" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  HelperText="Auto-filled from Name — edit to override."
+                                  Error="@(_model.Key.Level == EditorFieldLevel.Error)"
+                                  ErrorText="@_model.Key.Messages.FirstOrDefault()?.Message" />
+                </FormRow>
+
+                <FormRow Label="Identity" Info="What uniqueness is checked against.">
+                    <div class="rm-identity-inline">
+                        @(string.IsNullOrEmpty(_model.IdentityPreview.Display) ? "—" : _model.IdentityPreview.Display)
+                    </div>
+                </FormRow>
+
+                @{
+                    var otherRows = OtherRows(keyRows);
+                }
+                @if (otherRows.Count > 0)
+                {
+                    <div class="rm-section-heading mt-4">Other Tags</div>
+                    @foreach (var row in otherRows)
+                    {
+                        @TagRow(row)
+                    }
+                }
+            </div>
+        }
+
+        <div class="rm-shell-foot">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@_saving" OnClick="@(() => SaveAsync(false))">
+                @(_saving ? "Saving…" : "Save")
+            </MudButton>
+            @if (ShowSaveAndAddAnother)
+            {
+                <MudButton Variant="Variant.Outlined" Disabled="@_saving" OnClick="@(() => SaveAsync(true))">Save and Add Another</MudButton>
+            }
+            <MudSpacer />
+            <MudButton Variant="Variant.Text" Disabled="@_saving" OnClick="@(() => OnCancel.InvokeAsync())">Cancel</MudButton>
+        </div>
+    </div>
+}
+
+@code {
+    private const string AzureResourceIdKey = "AzureResourceId";
+
+    /// <summary>Domain to start from (the dialog passes its caller's); otherwise the configured DefaultDomain.</summary>
+    [Parameter] public string? InitialDomain { get; set; }
+
+    /// <summary>Raised after a successful Save with the new resource.</summary>
+    [Parameter] public EventCallback<ResourcePickerItem> OnSaved { get; set; }
+
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    /// <summary>The page offers "Save and Add Another"; the dialog does not.</summary>
+    [Parameter] public bool ShowSaveAndAddAnother { get; set; }
+
+    private OpenEditorResponse? _response;
+    private ResourceEditorModel? _model => _response?.EditorModel;
+    private string? _loadError;
+    private bool _saving;
+    private bool _showMore;
+    private bool _keyManuallyEdited;
+
+    /// <summary>True when no domain came in and DefaultDomain is unset: the user has to pick one,
+    /// so the select moves out of More Options.</summary>
+    private bool _domainInMain;
+
+    private string DomainLabel =>
+        _response?.TagDictionary.FirstOrDefault(t => t.IsDomainTag)?.DisplayName ?? "Domain";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loadError = null;
+        _showMore = false;
+        _keyManuallyEdited = false;
+        try
+        {
+            var response = await ResourceService.GetResourceEditorModelAsync(new OpenEditorRequest { Mode = "Create" }, CancellationToken.None);
+            if (!response.IsSuccess() || response.ApiResponse.Data is null)
+            {
+                _response = null;
+                _loadError = "Could not load the form.";
+                return;
+            }
+
+            _response = response.ApiResponse.Data;
+            var domain = !string.IsNullOrWhiteSpace(InitialDomain) ? InitialDomain : Config.AzureIds.DefaultDomain;
+            _model!.Domain.OriginalValue = domain ?? string.Empty;
+            _model.Domain.EditedValue = domain ?? string.Empty;
+            _domainInMain = string.IsNullOrWhiteSpace(domain);
+            EnsureAzureRow();
+            RefreshIdentity();
+        }
+        catch (Exception ex)
+        {
+            _response = null;
+            _loadError = $"Could not load: {ex.Message}";
+        }
+    }
+
+    private RenderFragment DomainRow => __builder =>
+    {
+        <FormRow Label="@DomainLabel" Required="true" Info="Identity boundary. Fixed after save.">
+            <MudSelect T="string" Value="@_model!.Domain.EditedValue" ValueChanged="OnDomainChanged"
+                       aria-label="@DomainLabel" Placeholder="Select…" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       HelperText="@(_domainInMain ? null : "Defaults to the configured default.")"
+                       Error="@(_model.Domain.Level == EditorFieldLevel.Error)"
+                       ErrorText="@_model.Domain.Messages.FirstOrDefault()?.Message">
+                @foreach (var value in _response!.DomainAllowedValues)
+                {
+                    <MudSelectItem Value="@value">@value</MudSelectItem>
+                }
+            </MudSelect>
+        </FormRow>
+    };
+
+    private RenderFragment TagRow(TagRowEditor row) => __builder =>
+    {
+        <FormRow Label="@RowLabel(row)" Required="@row.IsRequired">
+            <TagValueEditor Row="row" OnChanged="StateHasChanged" />
+            @RowMessages(row)
+        </FormRow>
+    };
+
+    private RenderFragment RowMessages(TagRowEditor row) => __builder =>
+    {
+        @foreach (var msg in row.RowMessages)
+        {
+            <MudAlert Severity="@(msg.Level == EditorFieldLevel.Error ? Severity.Error : Severity.Warning)"
+                      Variant="Variant.Outlined" Dense="true" Class="mt-1">@msg.Message</MudAlert>
+        }
+    };
+
+    private static string RowLabel(TagRowEditor row) => row.Definition.DisplayName ?? row.Definition.TagDefinitionKey;
+
+    private TagRowEditor? AzureRow =>
+        _model?.Tags.FirstOrDefault(t => !t.IsRemoved && t.Definition.TagDefinitionKey == AzureResourceIdKey);
+
+    /// <summary>The type template's first two tags (in template order), then any required tag not
+    /// already among them — a required tag hidden under More Options would make Save fail on a field
+    /// the user cannot see.</summary>
+    private List<TagRowEditor> KeyRows()
+    {
+        var rows = _model!.Tags.Where(t => !t.IsRemoved && t != AzureRow).ToList();
+        var firstTwo = _response!.EntryPointTemplates
+            .Where(t => t.ResourceTypeId == _model.ResourceTypeId)
+            .Select(t => rows.FirstOrDefault(r => r.TagDefinitionId == t.TagDefinitionId))
+            .OfType<TagRowEditor>()
+            .Take(2)
+            .ToList();
+        return firstTwo.Concat(rows.Where(r => r.IsRequired && !firstTwo.Contains(r))).ToList();
+    }
+
+    private List<TagRowEditor> OtherRows(List<TagRowEditor> keyRows) =>
+        _model!.Tags.Where(t => !t.IsRemoved && t != AzureRow && !keyRows.Contains(t)).ToList();
+
+    /// <summary>Azure Resource Id is a first-class field whatever the type's template says. Not
+    /// pre-seeded, so a type change keeps the ids already pasted.</summary>
+    private void EnsureAzureRow()
+    {
+        if (AzureRow is not null) return;
+        var definition = _response!.TagDictionary.FirstOrDefault(d => d.TagDefinitionKey == AzureResourceIdKey);
+        if (definition is null) return;
+        var row = EditorSave.PreSeededRow(definition, false);
+        row.IsPreSeeded = false;
+        _model!.Tags.Add(row);
+    }
+
+    private bool NameHasError =>
+        _model!.Name.Level == EditorFieldLevel.Error || _model.IdentityPreview.IsUnique == false;
+
+    private string? NameErrorText =>
+        _model!.Name.Messages.FirstOrDefault()?.Message
+        ?? (_model.IdentityPreview.IsUnique == false ? _model.IdentityPreview.UniquenessMessage ?? "Another resource of this type already uses this key" : null);
+
+    private string NameHelper =>
+        _model!.IdentityPreview.IsUnique == true ? "✓ Not yet catalogued as this type." : "e.g. Orders API";
+
+    private async Task OnTypeChanged(int? value)
+    {
+        _model!.ResourceTypeId = value;
+        _model.ResourceType.EditedValue = _response!.ResourceTypes.FirstOrDefault(o => o.ResourceTypeId == value)?.TypeName ?? string.Empty;
+        EditorSave.SeedTagsForType(_model, _response, value);
+        EnsureAzureRow();
+        await IdentityChangedAsync();
+    }
+
+    private async Task OnNameChanged(string value)
+    {
+        _model!.Name.EditedValue = value;
+        if (!_keyManuallyEdited)
+            _model.Key.EditedValue = GeneralTab.Slugify(value);
+        await IdentityChangedAsync();
+    }
+
+    private async Task OnKeyChanged(string value)
+    {
+        _model!.Key.EditedValue = value;
+        _keyManuallyEdited = true;
+        await IdentityChangedAsync();
+    }
+
+    private async Task OnDomainChanged(string value)
+    {
+        _model!.Domain.EditedValue = value;
+        // RD6, as in the editor: picks made under the old domain are cleared.
+        _model.DependsOn.Clear();
+        await IdentityChangedAsync();
+    }
+
+    private void RefreshIdentity()
+    {
+        _model!.IdentityPreview.Domain = _model.Domain.EditedValue;
+        _model.IdentityPreview.ResourceType = _model.ResourceType.EditedValue;
+        _model.IdentityPreview.Key = _model.Key.EditedValue;
+        _model.IdentityPreview.IsUnique = null;
+        _model.IdentityPreview.UniquenessMessage = null;
+    }
+
+    /// <summary>The editor's uniqueness check, run whenever Name, Type, Key or domain changes.</summary>
+    private async Task IdentityChangedAsync()
+    {
+        RefreshIdentity();
+        if (!EditorValidation.IsIdentityComplete(_model!)) return;
+        try
+        {
+            var response = await ResourceService.CheckUniquenessAsync(new ResourceUniquenessRequest
+            {
+                ResourceTypeId = _model!.ResourceTypeId ?? 0,
+                Domain = _model.Domain.EditedValue,
+                ResourceKey = _model.Key.EditedValue
+            }, CancellationToken.None);
+            if (response.IsSuccess() && response.ApiResponse.Data is not null)
+            {
+                _model.IdentityPreview.IsUnique = response.ApiResponse.Data.IsUnique;
+                _model.IdentityPreview.UniquenessMessage = response.ApiResponse.Data.Message;
+            }
+        }
+        catch
+        {
+            // Non-critical — the server re-validates on Save regardless.
+        }
+    }
+
+    private async Task SaveAsync(bool addAnother)
+    {
+        if (_model is null) return;
+
+        var generalValid = EditorValidation.ValidateGeneral(_model);
+        var tagsValid = EditorValidation.ValidateTags(_model);
+        if (!generalValid || !tagsValid)
+        {
+            OpenMoreOptionsIfItHoldsAnError();
+            Snackbar.Add("Fix the highlighted fields before saving.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var response = await ResourceService.SaveResourceAsync(EditorSave.BuildRequest(_model), CancellationToken.None);
+            if (!response.IsSuccess() || response.ApiResponse.Data is null)
+            {
+                EditorSave.ApplyServerErrors(_model, response, Snackbar);
+                OpenMoreOptionsIfItHoldsAnError();
+                Snackbar.Add("Could not save — see the highlighted fields.", Severity.Warning);
+                return;
+            }
+
+            Snackbar.Add(response.ApiResponse.Data.Message, Severity.Success);
+            var created = new ResourcePickerItem
+            {
+                ResourceUid = response.ApiResponse.Data.ResourceUid,
+                ResourceName = _model.Name.EditedValue,
+                ResourceKey = _model.Key.EditedValue,
+                ResourceTypeName = _model.ResourceType.EditedValue,
+                Domain = _model.Domain.EditedValue
+            };
+
+            if (addAnother)
+                await LoadAsync();
+            else
+                await OnSaved.InvokeAsync(created);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Save failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    /// <summary>An error on a field that lives under More Options must not stay folded away.</summary>
+    private void OpenMoreOptionsIfItHoldsAnError()
+    {
+        var keyRows = KeyRows();
+        if (_model!.Key.Level == EditorFieldLevel.Error
+            || (!_domainInMain && _model.Domain.Level == EditorFieldLevel.Error)
+            || OtherRows(keyRows).Any(r => r.RowLevel == EditorFieldLevel.Error))
+            _showMore = true;
+    }
+
+    /// <summary>Same dialog and fold-in as GeneralTab's "Create new type…".</summary>
+    private async Task OpenCreateTypeDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(ResourceTypeDialog.ExistingNames), _response!.ResourceTypes.Select(t => t.TypeName).ToList() }
+        };
+
+        var dialog = await DialogService.ShowAsync<ResourceTypeDialog>("New Resource Type", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not ResourceTypeModel created) return;
+
+        if (!_response.ResourceTypes.Any(t => t.ResourceTypeId == created.ResourceTypeId))
+        {
+            _response.ResourceTypes.Add(new ResourceTypeOption
+            {
+                ResourceTypeId = created.ResourceTypeId,
+                TypeName = created.TypeName,
+                ResourceTypeUid = created.ResourceTypeUid
+            });
+            _response.ResourceTypes.Sort((a, b) => string.Compare(a.TypeName, b.TypeName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        await OnTypeChanged(created.ResourceTypeId);
+    }
+}

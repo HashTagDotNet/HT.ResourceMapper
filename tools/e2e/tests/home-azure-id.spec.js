@@ -13,7 +13,7 @@ test.describe('Home (Beta slice 7)', () => {
     page.on('pageerror', err => consoleErrors.push('pageerror: ' + err.message));
 
     await page.goto('/');
-    await expect(page.getByRole('link', { name: 'Add Resource' })).toHaveAttribute('href', '/resources');
+    await expect(page.getByRole('link', { name: 'Add Resource' })).toHaveAttribute('href', '/resources/new');
 
     const search = page.getByLabel('Filter for any field');
     await search.fill(ARM_ID);

@@ -1,0 +1,20 @@
+@page "/resources/new"
+@using MacroPoint.Azure.ResourceExplorer.Common.Shared.Editor.Contracts
+@using MacroPoint.Azure.ResourceExplorer.UI.Web.Components.Editor
+@inject NavigationManager Navigation
+
+<PageTitle>Add Resource — MacroPoint Azure Resource Explorer</PageTitle>
+
+<div class="rm-quick">
+    <PageHeader Title="Add Resource" Parents="@ParentCrumbs"
+                Description="The few things that matter for the migration. Anything else can be added later." />
+    <QuickAddForm ShowSaveAndAddAnother="true" OnSaved="OnSaved" OnCancel="@(() => Navigation.NavigateTo("/"))" />
+</div>
+
+@code {
+    private static readonly (string Text, string Href)[] ParentCrumbs = [("Resources", "/")];
+
+    /// <summary>Save returns to the resource view (§3 quick entry step 8).</summary>
+    private void OnSaved(ResourcePickerItem created) =>
+        Navigation.NavigateTo($"/resources/{created.ResourceUid}/view", replace: true);
+}

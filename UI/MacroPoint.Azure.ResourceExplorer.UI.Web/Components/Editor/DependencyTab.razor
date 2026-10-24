@@ -1,5 +1,6 @@
 @using MacroPoint.Azure.ResourceExplorer.Common.Shared.Editor
 @using MacroPoint.Azure.ResourceExplorer.Common.Shared.Editor.Contracts
+@inject IDialogService DialogService
 
 @* §3: heading + description, so the panel subtitle outranks the row text below it (PL-31). *@
 <div class="rm-section-heading">@Heading</div>
@@ -64,12 +65,21 @@
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public EventCallback OnFieldChanged { get; set; }
 
-    /// <summary>Fired (with this tab's Direction) when the user asks to create a new dependency
-    /// target that doesn't exist yet — either via the standalone button or the picker's
-    /// no-matches state. The parent (ResourceEditor) owns the nested-editor nav-stack push.</summary>
-    [Parameter] public EventCallback<string> OnCreateNewRequested { get; set; }
+    /// <summary>
+    /// "Create new…" (the standalone button or the picker's no-matches state): the quick-add form
+    /// opens as a dialog over this one, pre-set to this resource's domain, and the resource it saves
+    /// is linked here exactly as a pick would be. Nothing navigates, so nothing on this form is lost.
+    /// </summary>
+    private async Task RaiseCreateNewRequested()
+    {
+        var parameters = new DialogParameters { { nameof(QuickAddDialog.InitialDomain), Domain } };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<QuickAddDialog>("Add Resource", parameters, options);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not ResourcePickerItem created) return;
 
-    private async Task RaiseCreateNewRequested() => await OnCreateNewRequested.InvokeAsync(Direction);
+        await OnPicked(created);
+    }
 
     private List<DependencyRowEditor> VisibleRows() => Rows.Where(r => !r.IsRemoved).ToList();
 

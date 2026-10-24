@@ -883,3 +883,8 @@ html, body {
 .rm-azid-hit { background: #FEF08A; outline: 1px solid #FACC15; }
 .rm-azid .rm-copy { opacity: 0; }
 .rm-azid:hover .rm-copy, .rm-azid:focus-within .rm-copy { opacity: 1; }
+
+/* Quick add (Beta slice 8): one short form; More Options folds the rest away. */
+.rm-quick { max-width: 860px; }
+.rm-quick-more { border-top: 1px solid var(--mud-palette-divider); margin-top: 1rem; padding-top: .25rem; }
+.rm-quick-more-body { padding-top: .5rem; }
