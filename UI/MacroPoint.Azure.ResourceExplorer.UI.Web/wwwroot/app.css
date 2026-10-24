@@ -101,6 +101,10 @@ html, body {
         visibility: visible;
     }
 
+    .rm-azid .rm-copy {
+        opacity: 1;
+    }
+
     /* Same reasoning for the editor's copy-value buttons (Tags and Review tabs). */
     .rm-copybtn {
         opacity: 1;
