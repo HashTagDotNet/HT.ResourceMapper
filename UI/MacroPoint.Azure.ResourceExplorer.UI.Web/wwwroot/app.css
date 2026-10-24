@@ -122,6 +122,16 @@ html, body {
     font-size: 1.05rem;
 }
 
+/* The portal link is the one row action that is always visible, in the primary colour. */
+.rm-actions .rm-portal {
+    visibility: visible;
+}
+
+.rm-actions .rm-portal .mud-icon-button,
+.rm-actions .rm-portal .mud-icon-button .mud-icon-root {
+    color: var(--mud-palette-primary);
+}
+
 /* PL-12(a): Description was the runaway column — free-flowing text wrapped to 5–6 lines and tripled
    row height, so ~6 rows were visible at 768px against ~22 at 1600px. Clamping to two lines caps the
    worst case at roughly double the minimum row height; the full text stays available via the cell's

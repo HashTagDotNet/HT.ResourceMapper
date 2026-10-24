@@ -96,11 +96,13 @@
                 <div class="rm-actions">
                     @if (portalUrl is not null)
                     {
-                        <MudTooltip Text="Open in portal">
-                            <MudIconButton Icon="@Icons.Material.Outlined.Cloud" Size="Size.Small"
-                                           Href="@portalUrl" Target="_blank"
-                                           aria-label="Open in portal" data-testid="open-in-portal" />
-                        </MudTooltip>
+                        <span class="rm-portal">
+                            <MudTooltip Text="Open in portal">
+                                <MudIconButton Icon="@Icons.Material.Outlined.Cloud" Size="Size.Small"
+                                               Href="@portalUrl" Target="_blank"
+                                               aria-label="Open in portal" data-testid="open-in-portal" />
+                            </MudTooltip>
+                        </span>
                     }
                     @* PL-07: this was the one row action of four with no tooltip, in both its states.
                        Disabled state — a MudTooltip cannot fire on a disabled button (Mud sets
