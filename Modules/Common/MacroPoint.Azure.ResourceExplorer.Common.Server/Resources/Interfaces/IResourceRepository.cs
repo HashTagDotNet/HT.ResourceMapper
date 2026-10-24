@@ -93,7 +93,7 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources.Interfaces
         // its non-domain tags (full replace) and both edge directions (full-set replace per
         // direction; dependentOnIds are written on the far side). Result is 'created' | 'updated' |
         // 'error' (Type or Domain changed post-save; nothing is written).
-        Task<(string Result, int ResourceId)> SaveResourceWithTagsAndEdgesAsync(string resourceUid, int resourceTypeId,
+        Task<ResourceSaveResult> SaveResourceWithTagsAndEdgesAsync(string resourceUid, int resourceTypeId,
             string resourceKey, string resourceName, string? description, string? domain,
             int? primaryTagDefinitionId, IReadOnlyList<(string TagKey, string TagValue)> tags,
             IReadOnlyList<int> dependsOnIds, IReadOnlyList<int> dependentOnIds, CancellationToken cancellationToken);

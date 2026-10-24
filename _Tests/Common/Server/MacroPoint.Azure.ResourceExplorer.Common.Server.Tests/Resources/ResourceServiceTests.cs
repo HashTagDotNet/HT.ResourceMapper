@@ -1729,7 +1729,7 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Resources
                 .Callback((string _, int _, string _, string _, string? _, string? domain, int? primary,
                     IReadOnlyList<(string TagKey, string TagValue)> tags, IReadOnlyList<int> dependsOn, IReadOnlyList<int> dependentOn,
                     CancellationToken _) => calls.Add(new SaveCall(domain, primary, tags, dependsOn, dependentOn)))
-                .ReturnsAsync((result, resourceId));
+                .ReturnsAsync(new ResourceSaveResult(result, resourceId));
             return calls;
         }
 

@@ -384,7 +384,7 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
 
                 // One transaction: resource, non-domain tags and both edge directions (full-set
                 // replace per direction). Domain is excluded from the tags here and in the sproc.
-                var (result, _) = await _repo.SaveResourceWithTagsAndEdgesAsync(
+                var saveResult = await _repo.SaveResourceWithTagsAndEdgesAsync(
                     request.ResourceUid, request.ResourceTypeId, request.ResourceKey, request.ResourceName,
                     request.Description, request.Domain, effectivePrimaryId,
                     nonEmptyTags.Select(t => (t.TagDefinitionKey, t.Value!)).ToList(),
@@ -392,7 +392,7 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
                     resolvedDependentOn.Select(d => d.Id).ToList(),
                     cancellationToken);
 
-                if (string.Equals(result, "error", StringComparison.Ordinal))
+                if (string.Equals(saveResult.Result, "error", StringComparison.Ordinal))
                 {
                     builder.Validation.AddValidation("request.ResourceTypeId", "Resource type or Domain cannot be changed after save");
                     return builder.BuildResponse();

@@ -298,7 +298,7 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
             await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
         }
 
-        public async Task<(string Result, int ResourceId)> SaveResourceWithTagsAndEdgesAsync(string resourceUid, int resourceTypeId,
+        public async Task<ResourceSaveResult> SaveResourceWithTagsAndEdgesAsync(string resourceUid, int resourceTypeId,
             string resourceKey, string resourceName, string? description, string? domain,
             int? primaryTagDefinitionId, IReadOnlyList<(string TagKey, string TagValue)> tags,
             IReadOnlyList<int> dependsOnIds, IReadOnlyList<int> dependentOnIds, CancellationToken cancellationToken)
@@ -327,7 +327,7 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Resources
                 .AddVarchar("@Result", null, 10, ParameterDirection.Output);
 
             await _db.Execute.ExecuteNonQueryAsync(cmd, cancellationToken: cancellationToken);
-            return (cmd.ReadString("@Result") ?? "error", cmd.ReadInt("@ResourceId"));
+            return new ResourceSaveResult(cmd.ReadString("@Result") ?? "error", cmd.ReadInt("@ResourceId"));
         }
 
         private static DataTable ToResourceIdTable(IReadOnlyList<int> resourceIds)
