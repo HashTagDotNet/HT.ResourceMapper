@@ -162,7 +162,8 @@ else if (_model is not null && _response is not null)
         // Every route into this component is /resources or /resources/{uid}, so Blazor reuses the
         // same instance across records — _activeTab persists unless it is reset here. Reset on
         // record CHANGE only: View -> Edit, or a save, should keep you where you were.
-        if (!string.Equals(ResourceUid, _lastLoadedUid, StringComparison.Ordinal)) _activeTab = 0;
+        var recordChanged = !string.Equals(ResourceUid, _lastLoadedUid, StringComparison.Ordinal);
+        if (recordChanged) _activeTab = 0;
 
         _lastLoadedUid = ResourceUid;
         _loading = true;
@@ -170,8 +171,10 @@ else if (_model is not null && _response is not null)
         try
         {
             var isNew = string.IsNullOrWhiteSpace(ResourceUid);
-            _mode = isNew ? "Create"
-                : string.Equals(StartMode, "edit", StringComparison.OrdinalIgnoreCase) ? "Edit" : "View";
+            // ?mode=edit applies only when the record changes; Save/Cancel reloads keep the mode they set.
+            if (isNew) _mode = "Create";
+            else if (recordChanged)
+                _mode = string.Equals(StartMode, "edit", StringComparison.OrdinalIgnoreCase) ? "Edit" : "View";
 
             var request = new OpenEditorRequest { Mode = isNew ? "Create" : "Edit", ResourceUid = ResourceUid };
             var response = await ResourceService.GetResourceEditorModelAsync(request, CancellationToken.None);
