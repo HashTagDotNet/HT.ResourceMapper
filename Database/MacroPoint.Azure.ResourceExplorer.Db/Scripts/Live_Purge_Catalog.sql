@@ -10,9 +10,7 @@ Removes the demo/sample catalog so the live seed starts from an empty board. Run
     4. Live_Seed_PostImport.sql     what the import format cannot express
 
 WHAT IT DELETES
-  Every resource, relationship, resource tag, resource type, per-type tag template, and every
-  saved explorer diagram (diagrams reference resources by uid, so they are meaningless once the
-  resources they point at are gone).
+  Every resource, relationship, resource tag, resource type and per-type tag template.
 
 WHAT IT KEEPS
   [TagContentType]  -- the fixed Text/Link set, owned by Script.PostDeployment1.sql.
@@ -55,14 +53,11 @@ BEGIN TRANSACTION;
     -- 4. Per-type entry-point templates (ResourceType + TagDefinition).
     DELETE FROM [ResourceExplorer].[ResourceTypeTag];
 
-    -- 5. Saved explorer diagrams -- they hold resource uids that no longer exist.
-    DELETE FROM [ResourceExplorer].[Diagram];
-
-    -- 6. The resources themselves, then the types they referenced.
+    -- 5. The resources themselves, then the types they referenced.
     DELETE FROM [ResourceExplorer].[Resource];
     DELETE FROM [ResourceExplorer].[ResourceType];
 
-    -- 7. User-created tag definitions. System tags (the 'Domain' row) survive -- see header.
+    -- 6. User-created tag definitions. System tags (the 'Domain' row) survive -- see header.
     DELETE FROM [ResourceExplorer].[TagDefinition]
     WHERE [IsSystemTag] = 0;
 
@@ -76,6 +71,5 @@ SELECT
     ,[TagDefinitions]   = (SELECT COUNT(*) FROM [ResourceExplorer].[TagDefinition])
     ,[Relationships]    = (SELECT COUNT(*) FROM [ResourceExplorer].[ResourceRelationship])
     ,[ResourceTags]     = (SELECT COUNT(*) FROM [ResourceExplorer].[ResourceTag])
-    ,[TypeTemplates]    = (SELECT COUNT(*) FROM [ResourceExplorer].[ResourceTypeTag])
-    ,[Diagrams]         = (SELECT COUNT(*) FROM [ResourceExplorer].[Diagram]);
+    ,[TypeTemplates]    = (SELECT COUNT(*) FROM [ResourceExplorer].[ResourceTypeTag]);
 GO

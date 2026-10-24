@@ -3,9 +3,7 @@ using MacroPoint.Azure.ResourceExplorer.SqlClient.Extensions.Abstractions.Interf
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MacroPoint.Azure.ResourceExplorer.Common.Server.Config;
-using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer;
 using MacroPoint.Azure.ResourceExplorer.Common.Server.Identity;
-using MacroPoint.Azure.ResourceExplorer.Common.Server.Explorer.Interfaces;
 using MacroPoint.Azure.ResourceExplorer.Common.Server.Resources;
 using MacroPoint.Azure.ResourceExplorer.Common.Server.SavedViews;
 using MacroPoint.Azure.ResourceExplorer.Common.Server.SavedViews.Interfaces;
@@ -29,10 +27,6 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Utils
 
             services.TryAddScoped<IResourceRepository,ResourceSqlRepository>();
             services.TryAddScoped<IResourceService,ResourceService>();
-            services.TryAddScoped<IExplorerRepository, ExplorerSqlRepository>();
-            services.TryAddScoped<IExplorerService, ExplorerService>();
-            services.TryAddScoped<IDiagramRepository, DiagramSqlRepository>();
-            services.TryAddScoped<IDiagramService, DiagramService>();
             services.TryAddScoped<IImportRepository,ImportSqlRepository>();
             services.TryAddScoped<IImportService,ImportService>();
             services.TryAddScoped<IExportRepository,ExportSqlRepository>();

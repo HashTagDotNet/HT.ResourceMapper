@@ -67,10 +67,6 @@
     <Build Include="Security\ResourceExplorer.sql" />
     <Build Include="Stored Procedures\ClientSetting_Get.sql" />
     <Build Include="Stored Procedures\ClientSetting_Upsert.sql" />
-    <Build Include="Stored Procedures\Diagram_Delete.sql" />
-    <Build Include="Stored Procedures\Diagram_GetByShareId.sql" />
-    <Build Include="Stored Procedures\Diagram_ListForOwner.sql" />
-    <Build Include="Stored Procedures\Diagram_Upsert.sql" />
     <Build Include="Stored Procedures\DomainValue_Add.sql" />
     <Build Include="Stored Procedures\DomainValue_Delete.sql" />
     <Build Include="Stored Procedures\DomainValue_GetAllWithUsage.sql" />
@@ -79,7 +75,6 @@
     <Build Include="Stored Procedures\Export_GetDependencies.sql" />
     <Build Include="Stored Procedures\Export_GetResources.sql" />
     <Build Include="Stored Procedures\Export_GetResourceTags.sql" />
-    <Build Include="Stored Procedures\PlaceholderStoredProcedure.sql" />
     <Build Include="Stored Procedures\ResourceRelationship_Add.sql" />
     <Build Include="Stored Procedures\ResourceRelationship_GetForResource.sql" />
     <Build Include="Stored Procedures\ResourceRelationship_Remove.sql" />
@@ -94,9 +89,7 @@
     <Build Include="Stored Procedures\Resource_Delete.sql" />
     <Build Include="Stored Procedures\Resource_GetAllKeys.sql" />
     <Build Include="Stored Procedures\Resource_GetByResourceUid.sql" />
-    <Build Include="Stored Procedures\Resource_GetDaysAgo.sql" />
     <Build Include="Stored Procedures\Resource_GetFilterValues.sql" />
-    <Build Include="Stored Procedures\Resource_GetForExplorer.sql" />
     <Build Include="Stored Procedures\Resource_GetItems.sql" />
     <Build Include="Stored Procedures\Resource_Save.sql" />
     <Build Include="Stored Procedures\Resource_SearchForPicker.sql" />
@@ -114,7 +107,6 @@
     <Build Include="Stored Procedures\TagDefinition_GetAllWithUsage.sql" />
     <Build Include="Stored Procedures\TagDefinition_Upsert.sql" />
     <Build Include="Tables\ClientSetting.sql" />
-    <Build Include="Tables\Diagram.sql" />
     <Build Include="Tables\Resource.sql" />
     <Build Include="Tables\ResourceRelationship.sql" />
     <Build Include="Tables\ResourceTag.sql" />
@@ -132,7 +124,6 @@
     <None Include="Scripts\02_Seed_PropertyTypes.sql" />
     <None Include="Scripts\03_Seed_SystemTags.sql" />
     <None Include="Scripts\04_Seed_All.sql" />
-    <None Include="Scripts\05_Seed_ResourceTypeCodes.sql" />
     <None Include="Scripts\Demo_Insert_ResourceItemsForGrid.sql" />
     <None Include="Scripts\Demo_Purge_ResourceItemsForGrid.sql" />
     <None Include="Scripts\Demo_Insert_ExplorerGraph.sql" />

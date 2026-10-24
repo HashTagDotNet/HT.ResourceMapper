@@ -9,31 +9,10 @@
 
 <MudDialog>
     <DialogContent>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-            Short code and icon are what the dependency explorer draws: the code is printed inside
-            each node and the icon picks the glyph and colour. Leaving them blank gives every
-            resource of this type a generic blue dot.
-        </MudText>
-
         <MudTextField T="string" @bind-Value="_typeName" Label="Type Name" Required="true"
                       Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="250"
                       Immediate="true" Error="@_typeNameError" ErrorText="@_typeNameErrorText"
                       HelperText="@DuplicateHint" />
-
-        <div class="rt-dialog-row mt-2">
-            <MudTextField T="string" @bind-Value="_shortCode" Label="Short Code" Variant="Variant.Outlined"
-                          Margin="Margin.Dense" MaxLength="10" Immediate="true"
-                          HelperText="Up to 10 characters, e.g. APP, SBQ" />
-
-            <MudSelect T="string" @bind-Value="_iconKey" Label="Icon" Variant="Variant.Outlined"
-                       Margin="Margin.Dense" Clearable="true"
-                       HelperText="Determines the node glyph and colour">
-                @foreach (var key in ResourceTypeIcons.KnownKeys)
-                {
-                    <MudSelectItem Value="@key">@key</MudSelectItem>
-                }
-            </MudSelect>
-        </div>
 
         @* Wrapped in its own div: MudCheckBox renders a MudInputControl whose input container is a
            flex ROW, and everything after it was being laid out inside that container. The tag
@@ -145,26 +124,6 @@
             </MudButton>
         </div>
 
-        @* Scoped CSS only reaches elements this component renders itself, so the framing here is
-           an inline style on the MudPaper and the classes below sit on plain divs. *@
-        <MudPaper Elevation="0" Class="pa-3 mt-3" Style="border:1px solid var(--mud-palette-divider);">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Explorer node preview</MudText>
-            <div class="rt-preview-body mt-2">
-                <div class="rt-preview-node" style="@($"background:{ResourceTypeIcons.ColorFor(_iconKey)};")">
-                    @PreviewCode
-                </div>
-                <MudText Typo="Typo.body2">
-                    @(string.IsNullOrWhiteSpace(_typeName) ? "Untitled type" : _typeName)
-                </MudText>
-            </div>
-            @if (string.IsNullOrWhiteSpace(_shortCode))
-            {
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    No short code — the explorer falls back to the first three letters of the name.
-                </MudText>
-            }
-        </MudPaper>
-
         @if (!string.IsNullOrEmpty(_error))
         {
             <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mt-3">@_error</MudAlert>
@@ -205,8 +164,6 @@
     private int _addKey;
 
     private string _typeName = string.Empty;
-    private string? _shortCode;
-    private string? _iconKey;
     private bool _allowCustomTags = true;
     private bool _saving;
     private bool _typeNameError;
@@ -239,8 +196,6 @@
         if (Existing is null) return;
 
         _typeName = Existing.TypeName;
-        _shortCode = Existing.ShortCode;
-        _iconKey = Existing.IconKey;
         _allowCustomTags = Existing.AllowCustomTags;
     }
 
@@ -363,22 +318,6 @@
         }
     }
 
-    /// <summary>Mirrors explorer-canvas.js: the node prints ShortCode, or the first three letters
-    /// of the type name upper-cased when there isn't one.</summary>
-    private string PreviewCode
-    {
-        get
-        {
-            if (!string.IsNullOrWhiteSpace(_shortCode)) return _shortCode!.Trim();
-            if (!string.IsNullOrWhiteSpace(_typeName))
-            {
-                var trimmed = _typeName.Trim();
-                return trimmed[..Math.Min(3, trimmed.Length)].ToUpperInvariant();
-            }
-            return "?";
-        }
-    }
-
     private string? DuplicateHint =>
         !string.IsNullOrWhiteSpace(_typeName)
         && ExistingNames.Any(n => string.Equals(n, _typeName.Trim(), StringComparison.OrdinalIgnoreCase))
@@ -405,8 +344,8 @@
             {
                 ResourceTypeId = Existing?.ResourceTypeId ?? 0,
                 TypeName = _typeName.Trim(),
-                ShortCode = string.IsNullOrWhiteSpace(_shortCode) ? null : _shortCode!.Trim(),
-                IconKey = string.IsNullOrWhiteSpace(_iconKey) ? null : _iconKey!.Trim(),
+                ShortCode = Existing?.ShortCode,
+                IconKey = Existing?.IconKey,
                 AllowCustomTags = _allowCustomTags,
                 // Null when this caller does not offer template editing, so the existing template is
                 // left alone rather than cleared. An empty LIST is different — it means "no tags".

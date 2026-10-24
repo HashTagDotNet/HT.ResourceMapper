@@ -45,7 +45,7 @@
     </FormRow>
 
     <FormRow Label="Resource Type" Required="true"
-             Info="Determines which tags this resource is prompted for, and the icon and short code it draws with in the explorer.">
+             Info="Determines which tags this resource is prompted for.">
         <MudSelect T="int?" Value="@Model.ResourceTypeId" ValueChanged="OnTypeChanged"
                    aria-label="Resource Type" Disabled="@(ReadOnly || Model.IsPersisted)"
                    Placeholder="Select…" Variant="Variant.Outlined" Margin="Margin.Dense"

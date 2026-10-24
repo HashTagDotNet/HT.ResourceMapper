@@ -14,7 +14,7 @@
 <PageTitle>Resource Types — MacroPoint Azure Resource Explorer</PageTitle>
 
 <PageHeader Title="Resource Types"
-            Description="The catalog's vocabulary. Short code and icon drive how each resource is drawn in the dependency explorer. A type can only be deleted once nothing uses it.">
+            Description="The catalog's vocabulary. A type can only be deleted once nothing uses it.">
     <Actions>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.Add"
                    OnClick="@(() => OpenEditor(null))">
@@ -37,8 +37,6 @@ else
               Elevation="0" Breakpoint="Breakpoint.Sm" AllowUnsorted="false">
         <HeaderContent>
             <MudTh><MudTableSortLabel SortBy="@(new Func<ResourceTypeModel, object?>(t => t.TypeName))" InitialDirection="SortDirection.Ascending">Type Name</MudTableSortLabel></MudTh>
-            <MudTh>Node</MudTh>
-            <MudTh><MudTableSortLabel SortBy="@(new Func<ResourceTypeModel, object?>(t => t.IconKey ?? string.Empty))">Icon Key</MudTableSortLabel></MudTh>
             <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="@(new Func<ResourceTypeModel, object?>(t => t.ResourceCount))">Resources</MudTableSortLabel></MudTh>
             <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="@(new Func<ResourceTypeModel, object?>(t => t.EntryPointTagCount))">Tag Template</MudTableSortLabel></MudTh>
             <MudTh>Custom Tags</MudTh>
@@ -46,29 +44,6 @@ else
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Type Name">@context.TypeName</MudTd>
-            <MudTd DataLabel="Node">
-                <div class="rt-node" style="@($"background:{ResourceTypeIcons.ColorFor(context.IconKey)};")">
-                    @NodeCode(context)
-                </div>
-            </MudTd>
-            <MudTd DataLabel="Icon Key">
-                @if (string.IsNullOrWhiteSpace(context.IconKey))
-                {
-                    <MudTooltip Text="No icon key — the explorer draws a generic dot on the default blue.">
-                        <MudText Typo="Typo.body2" Color="Color.Warning">not set</MudText>
-                    </MudTooltip>
-                }
-                else if (!ResourceTypeIcons.KnownKeys.Contains(context.IconKey))
-                {
-                    <MudTooltip Text="The explorer has no glyph for this key — it renders a generic dot.">
-                        <MudText Typo="Typo.body2" Color="Color.Warning">@context.IconKey (unknown)</MudText>
-                    </MudTooltip>
-                }
-                else
-                {
-                    <MudText Typo="Typo.body2">@context.IconKey</MudText>
-                }
-            </MudTd>
             <MudTd DataLabel="Resources" Style="text-align:right;">@context.ResourceCount</MudTd>
             <MudTd DataLabel="Tag Template" Style="text-align:right;">@context.EntryPointTagCount</MudTd>
             <MudTd DataLabel="Custom Tags">
@@ -148,14 +123,6 @@ else
         {
             _loading = false;
         }
-    }
-
-    /// <summary>Mirrors explorer-canvas.js's fallback so the grid shows what the graph will show.</summary>
-    private static string NodeCode(ResourceTypeModel type)
-    {
-        if (!string.IsNullOrWhiteSpace(type.ShortCode)) return type.ShortCode!;
-        if (string.IsNullOrWhiteSpace(type.TypeName)) return "?";
-        return type.TypeName[..Math.Min(3, type.TypeName.Length)].ToUpperInvariant();
     }
 
     private static string DeleteTooltip(ResourceTypeModel type) =>

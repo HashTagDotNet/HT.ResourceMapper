@@ -44,8 +44,6 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Resources
             var model = response.ApiResponse.Data.Should().ContainSingle("because the repository returned one row").Subject;
             model.ResourceTypeId.Should().Be(7, "because the surrogate id identifies the row for later edit/delete calls");
             model.TypeName.Should().Be("Azure Redis", "because the type name is projected verbatim");
-            model.ShortCode.Should().Be("RDS", "because ShortCode is what the explorer prints inside the node");
-            model.IconKey.Should().Be("memory", "because IconKey is what the explorer colours the node by");
             model.ResourceCount.Should().Be(12, "because the dependent count drives whether delete is offered");
             model.EntryPointTagCount.Should().Be(3, "because the tag-template size is shown on the management screen");
         }
@@ -102,32 +100,6 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Resources
             VerifySaveNeverCalled();
         }
 
-        [Fact]
-        public async Task SaveResourceTypeAsync_ShortCodeLongerThanColumn_FailsValidationAndSkipsRepository()
-        {
-            var request = MakeRequest(shortCode: new string('A', 11));
-
-            var response = await _sut.SaveResourceTypeAsync(request, CancellationToken.None);
-
-            response.IsSuccess().Should().BeFalse("because ShortCode is VARCHAR(10)");
-            HasErrorForField(response.ApiResponse.Errors, "request.ShortCode").Should().BeTrue(
-                "because the message must point at the short-code field");
-            VerifySaveNeverCalled();
-        }
-
-        [Fact]
-        public async Task SaveResourceTypeAsync_IconKeyLongerThanColumn_FailsValidationAndSkipsRepository()
-        {
-            var request = MakeRequest(iconKey: new string('k', 41));
-
-            var response = await _sut.SaveResourceTypeAsync(request, CancellationToken.None);
-
-            response.IsSuccess().Should().BeFalse("because IconKey is VARCHAR(40)");
-            HasErrorForField(response.ApiResponse.Errors, "request.IconKey").Should().BeTrue(
-                "because the message must point at the icon field");
-            VerifySaveNeverCalled();
-        }
-
         #endregion
 
         #region SaveResourceTypeAsync: repository call shape
@@ -179,43 +151,13 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Resources
         public async Task SaveResourceTypeAsync_PaddedValues_AreTrimmedBeforeReachingRepository()
         {
             var capturedName = string.Empty;
-            string? capturedShortCode = null;
-            string? capturedIconKey = null;
-            CaptureSave((_, _, name, code, icon, _) =>
-            {
-                capturedName = name;
-                capturedShortCode = code;
-                capturedIconKey = icon;
-            }, ("created", 3));
+            CaptureSave((_, _, name, _, _, _) => capturedName = name, ("created", 3));
             SetupUsageRows(MakeUsageRow(3, "Padded Type", "PAD", "web"));
 
-            var request = MakeRequest(typeName: "  Padded Type  ", shortCode: "  PAD  ", iconKey: "  web  ");
+            var request = MakeRequest(typeName: "  Padded Type  ");
             await _sut.SaveResourceTypeAsync(request, CancellationToken.None);
 
             capturedName.Should().Be("Padded Type", "because a stray space would create a near-duplicate type name");
-            capturedShortCode.Should().Be("PAD", "because the node badge would render the padding");
-            capturedIconKey.Should().Be("web", "because a padded key would not match any glyph in the icon map");
-        }
-
-        [Theory]
-        [InlineData("")]
-        [InlineData("   ")]
-        [InlineData(null)]
-        public async Task SaveResourceTypeAsync_BlankOptionalFields_AreSentAsNullNotEmptyString(string? blank)
-        {
-            string? capturedShortCode = "unset";
-            string? capturedIconKey = "unset";
-            CaptureSave((_, _, _, code, icon, _) =>
-            {
-                capturedShortCode = code;
-                capturedIconKey = icon;
-            }, ("created", 4));
-            SetupUsageRows(MakeUsageRow(4, "Blank Type", null, null));
-
-            await _sut.SaveResourceTypeAsync(MakeRequest(shortCode: blank, iconKey: blank), CancellationToken.None);
-
-            capturedShortCode.Should().BeNull("because the column is nullable and empty string is not the same as absent");
-            capturedIconKey.Should().BeNull("because an empty IconKey must fall through to the canvas default, not match nothing");
         }
 
         #endregion
@@ -286,7 +228,6 @@ namespace MacroPoint.Azure.ResourceExplorer.Common.Server.Tests.Resources
             var model = response.ApiResponse.Data;
             model.Should().NotBeNull("because the caller needs the persisted row to add to its picklist");
             model!.ResourceTypeId.Should().Be(55, "because the inline-create caller selects the new type by id");
-            model.ShortCode.Should().Be("AST", "because the persisted value is re-read rather than echoed from the request");
             model.EntryPointTagCount.Should().Be(2, "because the counts come from the re-read, not the write");
         }
 

@@ -7,11 +7,6 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <Compile Remove="Sample\**" />
-    <EmbeddedResource Remove="Sample\**" />
-    <None Remove="Sample\**" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector">
