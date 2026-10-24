@@ -10,7 +10,7 @@ namespace MacroPoint.Azure.ResourceExplorer.UI.Web.Components.Editor
     /// Model-to-request mapping and server-error mapping shared by the full editor and the quick-add
     /// form, so both go through the same transactional save with the same request shape.
     /// </summary>
-    public static class EditorSave
+    internal static class EditorSave
     {
         public static SaveResourceRequest BuildRequest(ResourceEditorModel model)
         {
