@@ -33,7 +33,7 @@ BEGIN
         SET @OrderDirection = 'ASC';
 
     -- Escape LIKE special characters and prepare search parameter
-    DECLARE @SafeSearchFor NVARCHAR(255) = NULL;
+    DECLARE @SafeSearchFor NVARCHAR(MAX) = NULL;
     IF @SearchFor IS NOT NULL AND LTRIM(RTRIM(@SearchFor)) <> ''
     BEGIN
         -- Escape LIKE special characters: %, _, [, ]
@@ -64,9 +64,8 @@ BEGIN
             OR r.Description LIKE @SafeSearchForParam ESCAPE '']''
             OR EXISTS (
                 SELECT 1 FROM [ResourceExplorer].[ResourceTag] rt2
-                INNER JOIN [ResourceExplorer].[TagDefinition] td2 ON rt2.TagDefinitionId = td2.TagDefinitionId
                 WHERE rt2.ResourceId = r.ResourceId
-                AND (rt2.TagValue LIKE @SafeSearchForParam ESCAPE '']'' OR td2.TagDefinitionKey LIKE @SafeSearchForParam ESCAPE '']'')
+                AND rt2.TagValue LIKE @SafeSearchForParam ESCAPE '']''
             )
         )';
 
@@ -147,9 +146,9 @@ BEGIN
 
     -- Shared parameter definition for the (possibly NULL) search value and the filter TVP.
     DECLARE @countParamDef NVARCHAR(MAX) =
-        N'@SafeSearchForParam NVARCHAR(255), @FiltersParam [ResourceExplorer].[ResourceFilterList] READONLY, @TotalRecordsParam INT OUTPUT';
+        N'@SafeSearchForParam NVARCHAR(MAX), @FiltersParam [ResourceExplorer].[ResourceFilterList] READONLY, @TotalRecordsParam INT OUTPUT';
     DECLARE @pageParamDef NVARCHAR(MAX) =
-        N'@SafeSearchForParam NVARCHAR(255), @SkipParam INT, @TakeParam INT, @TagLimitParam INT, @FiltersParam [ResourceExplorer].[ResourceFilterList] READONLY';
+        N'@SafeSearchForParam NVARCHAR(MAX), @SkipParam INT, @TakeParam INT, @TagLimitParam INT, @FiltersParam [ResourceExplorer].[ResourceFilterList] READONLY';
 
     -- Get total count of distinct resources (same @whereClause as the page query)
     SET @sql = '

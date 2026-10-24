@@ -23,7 +23,7 @@ BEGIN
 
     -- Escape LIKE special characters (%, _, [, ]) so a search containing them isn't misread as
     -- wildcards — same convention as Resource_GetItems.
-    DECLARE @SafeSearchFor NVARCHAR(255) = NULL;
+    DECLARE @SafeSearchFor NVARCHAR(MAX) = NULL;
     IF @SearchFor IS NOT NULL AND LTRIM(RTRIM(@SearchFor)) <> ''
     BEGIN
         SET @SafeSearchFor = '%' +
